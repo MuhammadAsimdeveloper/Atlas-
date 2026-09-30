@@ -1,0 +1,15 @@
+Atlas V80.0.0 — Agent Skills Fabric + Operational Pulse
+
+V80 delivered
+- Reusable tenant-scoped AI skill bundles
+- Skill-to-agent assignments and runtime tool narrowing
+- Deterministic operational pulse
+- V80 PostgreSQL migration
+- Updated tests, docs and release checklist
+
+V80 verification
+- 107 automated tests passed
+- Doctor: 11 checks, 0 failed
+- npm audit: 0 vulnerabilities
+- Live V79 smoke suite passed with explicit development auth
+- Live V80 skill/pulse smoke passed
