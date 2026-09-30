@@ -1,9 +1,1 @@
-{
-  "name": "atlas-business-os",
-  "private": true,
-  "version": "81.0.0",
-  "description": "Atlas Business Operating System",
-  "type": "module",
-  "scripts": {"test": "node --test", "test:coverage": "node --test --experimental-test-coverage"},
-  "engines": {"node": ">=20"}
-}
+{"name":"atlas-business-os","private":true,"version":"85.0.0","type":"module","scripts":{"test":"node --test","check":"node --check packages/atlas-platform/index.mjs apps/command-center/app.mjs"},"engines":{"node":">=20"}}

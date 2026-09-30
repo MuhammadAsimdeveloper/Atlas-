@@ -1,31 +1,34 @@
 # Atlas Business Operating System
 
-Atlas is a laptop-first, multi-tenant business operating system combining CRM, engagement, workflow automation, AI workforce, customer intelligence, knowledge, revenue operations, growth, integrations, governance and an owner-only platform control plane.
+Atlas is a laptop-first, multi-tenant Business Operating System combining CRM, engagement, workflow automation, AI workforce, customer intelligence, knowledge, revenue operations, growth, integrations, governance and a platform-owner control plane.
 
-Current release: V81.0.0 — Capability Mesh + Proactive Action Loop.
+## V85 — Integrated Platform Foundation
 
-## V81
+V82 Connector Reliability → V83 Agent Evaluation + Observability → V84 Action Inbox + Durable Operations → V85 Visual Business Command Center
 
-- Actor × Agent × Skill capability intersection.
-- Hard tenant-boundary enforcement.
-- Approval gates for side-effect capabilities.
-- Connector capability negotiation without permission escalation.
-- Operational Pulse risk-to-action proposals.
-- Deterministic agent-evaluation scoring primitive.
-- Architecture, release and V81–V85 roadmap documentation.
+### Core packages
 
-## Safety model
+- packages/atlas-core/ — authorization/capability primitives from V81.
+- packages/agent-skills/ — V80 Agent Skills Fabric.
+- packages/atlas-platform/ — V82–V85 reliability, evaluation, telemetry, durable-action and command-center domain primitives.
+- apps/command-center/ — laptop-first operational dashboard.
+- infra/postgres/FINAL-MIGRATION-V85.sql — V82–V85 persistence additions.
 
-Skills narrow capability; they never grant permissions. Every real tool call remains subject to server-side authorization, tenant checks, risk policy, approvals and audit.
+## Safety architecture
+
+Skills narrow capability; they never grant authority. Tool execution remains subject to server-side authorization, tenant boundaries, risk policy and approvals.
+
+Durable actions use an explicit lifecycle and tenant-scoped idempotency. Approval is a server-side state transition, not merely a UI control.
 
 ## Development
 
-Requires Node.js 20+.
+Node.js 20+.
 
-Run:
+npm test
+npm run check
 
-    npm test
+The command center can be opened locally from apps/command-center/index.html.
 
-See docs/ARCHITECTURE.md, docs/V81-CAPABILITY-MESH.md, docs/V81-RELEASE-CHECKLIST.md and docs/ROADMAP-V81-V85.md.
+## Roadmap after V85
 
-The repository contains the V80/V81 source-of-truth engineering delta. The complete historical local V80 artifact remains referenced by the V80 source manifest.
+Provider-specific reliability adapters and contract tests; durable queue workers and recovery/replay; full OTLP exporter and production telemetry pipeline; customer intelligence graph visualization; revenue cockpit; deeper CRM/workflow/finance synchronization; platform-owner command center.

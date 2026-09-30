@@ -1,11 +1,20 @@
 # Changelog
 
-## 81.0.0 — Capability Mesh + Proactive Action Loop
+## 85.0.0 — V82–V85 Platform Foundation
 
-- Added actor/agent/skill capability intersection.
-- Added hard tenant-boundary rejection.
-- Added connector capability negotiation with degraded-state reporting.
-- Added deterministic Operational Pulse action proposals.
-- Added evaluation scoring primitive.
-- Added tests for authorization, approvals, connector negotiation, proactive operations and evaluation.
-- Added architecture, release and roadmap documentation.
+### V82
+- Added connector health assessment, bounded retry backoff and capability-drift detection.
+- Added connector health/capability persistence schema.
+
+### V83
+- Added golden-task evaluation, tenant-safe trace checks and release gates.
+- Added OpenTelemetry-compatible telemetry facade and observability contract.
+
+### V84
+- Added approval-gated durable action lifecycle.
+- Added idempotency claim primitive and action-event persistence schema.
+
+### V85
+- Added laptop-first Business Command Center surface.
+- Added command-center aggregation contract for revenue, risks, connectors, evaluations and approvals.
+- Added V85 release checklist and implementation documentation.
