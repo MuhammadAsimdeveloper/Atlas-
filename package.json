@@ -1,1 +1,1 @@
-{"name":"atlas-business-os","private":true,"version":"85.0.0","type":"module","scripts":{"test":"node --test","check":"node --check packages/atlas-platform/index.mjs apps/command-center/app.mjs"},"engines":{"node":">=20"}}
+{"name":"atlas-business-os","private":true,"version":"90.0.0","type":"module","scripts":{"test":"node --test","check":"node --check packages/atlas-platform/index.mjs packages/atlas-frontier/index.mjs apps/command-center/app.mjs"},"engines":{"node":">=20"}}
