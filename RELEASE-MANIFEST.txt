@@ -1,15 +1,14 @@
-Atlas V80.0.0 — Agent Skills Fabric + Operational Pulse
+Atlas V90.0.0 — V86-V90 Frontier Foundation
 
-V80 delivered
-- Reusable tenant-scoped AI skill bundles
-- Skill-to-agent assignments and runtime tool narrowing
-- Deterministic operational pulse
-- V80 PostgreSQL migration
-- Updated tests, docs and release checklist
+Delivered
+- Provider adapter + sync contracts
+- Durable queue/worker primitives
+- OTLP-shaped traces + SLO/error-budget math
+- Customer intelligence graph
+- Revenue cockpit + business graph
+- Project description and living engineering docs updated
 
-V80 verification
-- 107 automated tests passed
-- Doctor: 11 checks, 0 failed
-- npm audit: 0 vulnerabilities
-- Live V79 smoke suite passed with explicit development auth
-- Live V80 skill/pulse smoke passed
+Verification
+- V86-V90 deterministic unit coverage added
+- Existing V80-V85 tests retained
+- Production deployment gaps remain explicit
