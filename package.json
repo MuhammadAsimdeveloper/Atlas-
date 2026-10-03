@@ -13,7 +13,9 @@
     "preview": "node scripts/preview.mjs",
     "build:site": "node scripts/build-site.mjs",
     "seo:check": "node scripts/seo-check.mjs",
-    "launch:check": "node scripts/launch-check.mjs"
+    "launch:check": "node scripts/launch-check.mjs",
+    "start:api": "node apps/api/server.mjs",
+    "production:check": "node scripts/production-check.mjs"
   },
   "engines": {
     "node": ">=20"
