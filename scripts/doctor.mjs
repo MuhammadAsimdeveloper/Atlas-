@@ -93,6 +93,12 @@ try {
   const productTest = await read('packages/atlas-product/index.test.mjs');
   check('V111 product resource safety', product.includes('defineProductResource') && product.includes('planProductResourcePublish') && product.includes('createFeatureBundle') && productTest.includes('feature bundles'), 'GHL-class product resources are tenant-bound, checksummed and protected by publish/permission gates');
 
+  const business = await read('packages/atlas-business/index.mjs');
+  const businessTest = await read('packages/atlas-business/index.test.mjs');
+  check('V111 business surface', business.includes('createCampaign') && business.includes('submitForm') && business.includes('createAdCampaign') && business.includes('createCourse') && business.includes('createSaaSPlan') && businessTest.includes('marketplace packages'), 'GHL-class business resources have bounded tenant-safe contracts and publish/spend/entitlement gates');
+  const v111Sql = await read('infra/postgres/FINAL-MIGRATION-V111.sql');
+  check('V111 durable persistence', v111Sql.includes('atlas_product_resources') && v111Sql.includes('atlas_workflow_executions') && v111Sql.includes('atlas_queue_jobs') && v111Sql.includes('FORCE ROW LEVEL SECURITY') && !/BYPASSRLS/i.test(v111Sql), 'V111 product/workflow/queue persistence is tenant-isolated with forced RLS');
+
   const engagement = await read('packages/customer-operations/engagement.mjs');
   check('tenant-bound message renderer', engagement.includes('export function renderMessageTemplateVersion') && engagement.includes('Message template tenant does not match') && engagement.includes('Email HTML contains a tag or attribute outside the safe formatting allowlist') && engagement.includes('needs_data'), 'Template renderer is tenant-bound, context-escapes HTML, restricts markup and fails closed on missing fields');
 } catch (error) {
