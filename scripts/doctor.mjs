@@ -99,6 +99,12 @@ try {
   const v111Sql = await read('infra/postgres/FINAL-MIGRATION-V111.sql');
   check('V111 durable persistence', v111Sql.includes('atlas_product_resources') && v111Sql.includes('atlas_workflow_executions') && v111Sql.includes('atlas_queue_jobs') && v111Sql.includes('FORCE ROW LEVEL SECURITY') && !/BYPASSRLS/i.test(v111Sql), 'V111 product/workflow/queue persistence is tenant-isolated with forced RLS');
 
+  const ai = await read('packages/atlas-ai/index.mjs');
+  const aiTest = await read('packages/atlas-ai/index.test.mjs');
+  check('V114 governed AI workforce', ai.includes('defineAgent') && ai.includes('createKnowledgeDocument') && ai.includes('createMcpCapability') && ai.includes('createAiEvaluation') && aiTest.includes('AI evaluations'), 'AI agents are tenant-scoped with tool budgets, provenance, MCP approval, evaluation and human handoff gates');
+  const security = await read('packages/atlas-security/index.mjs');
+  const securityTest = await read('packages/atlas-security/index.test.mjs');
+  check('V117 enterprise security', security.includes('authorize') && security.includes('createSecretReference') && security.includes('evaluatePolicy') && security.includes('verifyAuditChain') && security.includes('createSsoPolicy') && securityTest.includes('audit hashes'), 'IAM, secrets, default-deny policy, SSO and tamper-evident audit controls are explicit');
   const engagement = await read('packages/customer-operations/engagement.mjs');
   check('tenant-bound message renderer', engagement.includes('export function renderMessageTemplateVersion') && engagement.includes('Message template tenant does not match') && engagement.includes('Email HTML contains a tag or attribute outside the safe formatting allowlist') && engagement.includes('needs_data'), 'Template renderer is tenant-bound, context-escapes HTML, restricts markup and fails closed on missing fields');
 } catch (error) {
