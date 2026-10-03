@@ -35,7 +35,7 @@ const server = createServer((req, res) => {
     const databaseConfigured = Boolean(process.env.ATLAS_DATABASE_URL);
     return json(res, databaseConfigured ? 200 : 503, { status: databaseConfigured ? 'ready-for-adapters' : 'blocked', database: databaseConfigured ? 'configured' : 'missing', message: databaseConfigured ? 'Database adapter must verify connectivity before reporting ready.' : 'Configure ATLAS_DATABASE_URL.' });
   }
-  if (url.pathname === '/api/v1/status') return json(res, 200, { product: 'Atlas', release: process.env.ATLAS_RELEASE || 'V102', environment: env, mode: 'production-contract', authenticatedApi: false, message: 'Wire a trusted session adapter and PostgreSQL transaction adapter before enabling tenant routes.' });
+  if (url.pathname === '/api/v1/status') return json(res, 200, { product: 'Atlas', release: process.env.ATLAS_RELEASE || 'V103', environment: env, mode: 'production-contract', authenticatedApi: false, message: 'Wire a trusted session adapter and PostgreSQL transaction adapter before enabling tenant routes.' });
   return json(res, 404, { error: 'not_found' });
 });
 server.listen(port, '0.0.0.0', () => process.stdout.write('Atlas API listening on :' + port + '\n'));
