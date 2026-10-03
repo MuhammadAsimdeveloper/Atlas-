@@ -23,6 +23,9 @@ jobs:
       - run: npm run build:site
       - run: npm run smoke:e2e
       - run: npm run launch:check
+      - run: npm run production:check
+      - name: Build production container
+        run: docker build -t atlas-ci:${{ github.sha }} .
       - run: npm audit --audit-level=moderate
       - name: Upload launch-safe preview artifact
         uses: actions/upload-artifact@v4
