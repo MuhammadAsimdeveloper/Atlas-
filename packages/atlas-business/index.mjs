@@ -47,7 +47,7 @@ export function createCampaign({tenantId,campaignId,name,channel,audienceRef,con
   if(!text(audienceRef,'audienceRef')||!text(contentRef,'contentRef'))throw new Error('campaign references required');
   if(!['conversion','lead','appointment','retention','awareness'].includes(goal))throw new Error('campaign goal invalid');
   if(!Array.isArray(variants)||variants.length<1||variants.length>20)throw new Error('campaign variants invalid');
-  const normalized=variants.map((v,i)=>({id:text(v?.id||('variant_'+(i+1)),'variant id'),contentRef:text(v?.contentRef||contentRef,'variant content'),weight:Number.isFinite(v?.weight)?Math.max(0,Math.min(1,v.weight)):1}));
+  const normalized=variants.map((v,i)=>({id:text(v?.id||('variant_'+(i+1)),'variant id'),contentRef:text(v?.contentRef||contentRef,'variant content'),weight:Number.isFinite(v?.weight)?Math.max(0,Math.min(100,v.weight)):1}));
   const total=normalized.reduce((n,v)=>n+v.weight,0); if(total<=0)throw new Error('campaign weights invalid');
   const body={...base,config:{channel,audienceRef,contentRef,goal,scheduledAt,variants:normalized.map(v=>({...v,weight:v.weight/total})),frequencyPolicy}};
   delete body.checksum; return freeze({...body,checksum:sha256(body)});
