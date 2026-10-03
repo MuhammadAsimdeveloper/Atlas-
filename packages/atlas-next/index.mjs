@@ -121,7 +121,7 @@ export function assessProviderHealth({ consecutiveFailures=0, errorRate=0, laten
 const normalizePath = raw => {
   let p=text(raw,'path',500);
   if (!p.startsWith('/')) p='/'+p;
-  p=p.replace(/\/g,'/').replace(//+/g,'/');
+  p=p.replace(/\\/g,'/').replace(/\/+/g,'/');
   if (p.length>1 && p.endsWith('/')) p=p.slice(0,-1);
   if (p.includes('..') || /[?#]/.test(p)) throw new Error('Unsafe page path');
   return p;

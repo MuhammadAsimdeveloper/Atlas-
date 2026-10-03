@@ -40,7 +40,8 @@ test('V105 website publish plan prevents unsafe public publication', () => {
   const preview = createPublishPlan({site,mode:'preview',artifactHash:'a1'});
   assert.equal(preview.robots,'noindex,nofollow');
   assert.equal(createPublishPlan({site,mode:'public',artifactHash:'a2',verifiedDomain:true}).sitemapEntries.length,2);
-  assert.throws(() => createPublishPlan({site:{...site,origin:'http://acme.example'},mode:'public',artifactHash:'a3'}),/HTTPS/);
+  const insecureSite = createSiteDefinition({tenantId:'t1',origin:'http://acme.example',pages:[{path:'/',title:'Acme',description:'Acme',indexable:false}]});
+  assert.throws(() => createPublishPlan({site:insecureSite,mode:'public',artifactHash:'a3',verifiedDomain:true}),/HTTPS/);
 });
 
 test('V106 communications fail closed on consent, suppression, and idempotency boundaries', () => {
