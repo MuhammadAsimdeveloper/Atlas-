@@ -1,7 +1,7 @@
 ATLAS V111.0.0 — Full GHL + n8n Feature Completion Foundation
 
 Implemented
-- Exhaustive GHL + n8n feature catalog with per-feature stage, status, domain and Atlas anchor.
+- Exhaustive GHL + n8n feature catalog with per-feature stage, status, domain, Atlas anchor and acceptance gate.
 - Explicit contract/build/deployment semantics replacing “targeted”.
 - Tenant-bound, checksummed product resources and publish/approval gates.
 - Feature-bundle integrity and contractor/secret/financial permission boundaries.
