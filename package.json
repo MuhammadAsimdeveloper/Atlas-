@@ -12,7 +12,10 @@
     "smoke:e2e": "node scripts/smoke-http.mjs",
     "preview": "node scripts/preview.mjs",
     "build:site": "node scripts/build-site.mjs",
-    "seo:check": "node scripts/seo-check.mjs"
+    "seo:check": "node scripts/seo-check.mjs",
+    "launch:check": "node scripts/launch-check.mjs"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }
