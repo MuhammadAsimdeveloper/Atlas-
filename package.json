@@ -1,7 +1,7 @@
 {
   "name": "atlas-business-os",
   "private": true,
-  "version": "110.0.0",
+  "version": "111.0.0",
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1",
@@ -15,7 +15,8 @@
     "seo:check": "node scripts/seo-check.mjs",
     "launch:check": "node scripts/launch-check.mjs",
     "start:api": "node apps/api/server.mjs",
-    "production:check": "node scripts/production-check.mjs"
+    "production:check": "node scripts/production-check.mjs",
+    "feature:check": "node scripts/feature-coverage-check.mjs"
   },
   "engines": {
     "node": ">=20"
