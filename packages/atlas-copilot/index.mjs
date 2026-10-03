@@ -144,7 +144,7 @@ function validateArguments(tool, raw, tenantIdForValidation) {
     case 'automation.workflow.draft.create': {
       requireOnly(args, ['name', 'triggerType', 'steps'], tool);
       if (!AUTOMATION_TRIGGERS.includes(args.triggerType) || !Array.isArray(args.steps)) throw new Error('Workflow draft requires an approved trigger and a step list');
-      const draft = createAutomationWorkflowDraft({ id: `copilot_${crypto.randomUUID().replaceAll('-', '')}`, tenantId: tenantIdForValidation, name: args.name, triggerType: args.triggerType, steps: args.steps });
+      const draft = createAutomationWorkflowDraft({ id: crypto.randomUUID(), tenantId: tenantIdForValidation, name: args.name, triggerType: args.triggerType, steps: args.steps });
       return { name: draft.name, triggerType: draft.triggerType, steps: draft.steps };
     }
     case 'communications.message.send':
@@ -312,8 +312,8 @@ export async function runAtlasCopilotTurn({
       try {
         const created = createAction({ tenantId: scope.tenantId, actorId: scope.actorId, proposalId: `copilot_${idempotencyKey.slice(0, 24)}`, tool: result.name, payload: args, risk: tool.risk, idempotencyKey });
         action = { ...created, id: `act_copilot_${idempotencyKey}` };
-      } catch (error) {
-        return { status: 'handoff', reason: 'action_validation_failed:' + String(error?.message || error), text: 'Atlas could not validate this action safely. No change was made.', trace };
+      } catch {
+        return { status: 'handoff', reason: 'action_validation_failed', text: 'Atlas could not validate this action safely. No change was made.', trace };
       }
       let persisted;
       try { persisted = await withTimeout(adapterSignal => actionStore.createPending(action, { signal: adapterSignal }), timeoutMs, signal); }
