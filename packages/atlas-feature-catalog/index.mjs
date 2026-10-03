@@ -131,6 +131,20 @@ const sections = [
   ]]
 ];
 
+const CONTRACT_FEATURES = new Set([
+  'contacts','companies','custom_objects','contact_associations','opportunities','pipelines','pipeline_stages','opportunity_value','opportunity_status',
+  'tasks','notes','custom_fields','custom_objects','customer_timelines',
+  'funnel_builder','website_builder','domain_connection','ssl','redirects','site_publishing','seo_metadata','title_tags','meta_descriptions',
+  'canonical_urls','robots_controls','sitemap','schema_markup','open_graph','twitter_cards',
+  'calendars','availability_rules','working_hours','calendar_assignment','round_robin','resource_booking','appointment_booking_pages',
+  'appointment_reschedule','appointment_cancellation','booking_automation',
+  'message_templates','send_email','send_sms','send_whatsapp','webhook_trigger','webhook_action','create_task','update_contact','add_remove_tag',
+  'create_opportunity','update_opportunity','move_pipeline_stage','appointment_action','if_else','switch_branch','wait','workflow_chaining','sub_workflows',
+  'invoices','revenue_ledger','billing_reconciliation',
+  'agency_project','granular_permissions',
+  'ai_workforce',
+]);
+
 const anchorStatus = Object.freeze({
   'packages/atlas-target/index.mjs': STATUS.CONTRACT,
   'packages/atlas-next/index.mjs': STATUS.CONTRACT,
@@ -152,7 +166,7 @@ export const FULL_FEATURE_CATALOG = freeze(sections.flatMap(([benchmark,domain,s
     feature,
     stage,
     atlasAnchor: anchor,
-    atlasStatus: anchorStatus[anchor] || STATUS.BUILD,
+    atlasStatus: CONTRACT_FEATURES.has(feature) ? STATUS.CONTRACT : STATUS.BUILD,
     productionBoundary: anchorStatus[anchor] === STATUS.CONTRACT
       ? 'domain-contract: live adapters, infrastructure and external credentials still require deployment verification'
       : 'build: contract must be completed before live deployment',
