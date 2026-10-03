@@ -27,8 +27,8 @@ const sections = [
     'messenger_campaigns','segmentation','trigger_links','url_shorteners','forms','surveys','quizzes','lead_forms','funnel_pages','website_pages',
     'blog_publishing','blog_authors','blog_categories','content_scheduling','social_planner','social_approval','social_drafts',
     'recurring_social_posts','social_analytics','facebook_publishing','instagram_publishing','linkedin_publishing','tiktok_publishing',
-    'youtube_publishing','pinterest_publishing','google_business_profile_publishing','threads_publishing','bluesky_publishing','ad_manager',
-    'google_ads','meta_ads','linkedin_ads','prospecting_tool','marketing_audit_reports','content_ai','image_ai','email_ai','funnel_website_ai',
+    'youtube_publishing','pinterest_publishing','google_business_profile_publishing','threads_publishing','bluesky_publishing','ad_manager','brand_voice','content_ai_social_guided_questions','social_ai_edit_with_ask','social_preview','saved_editing_sessions',
+    'google_ads','meta_ads','linkedin_ads','prospecting_tool','marketing_audit_reports','content_ai','image_ai','email_ai','funnel_website_ai','browse_ai_integration','browse_ai_run_task','browse_ai_bulk_run','browse_ai_get_task','browse_ai_get_bulk_run','documents_contracts','folders',
     'seo_assistance','split_testing'
   ]],
   ['GHL','Website, Funnels & SEO','V105','packages/atlas-next/index.mjs',[
@@ -65,7 +65,7 @@ const sections = [
   ]],
   ['GHL','Agency, SaaS & White Label','V116','packages/atlas-product/index.mjs',[
     'agency_account','subaccounts','agency_dashboard','subaccount_creation','subaccount_users','user_management','agency_permissions',
-    'location_permissions','granular_permissions','snapshots','snapshot_deployment','snapshot_sharing','snapshot_templates','saas_mode',
+    'location_permissions','granular_permissions','snapshots','snapshot_deployment','snapshot_sharing','snapshot_templates','snapshot_selective_loading','snapshot_conflict_resolution','snapshot_brand_voice','snapshot_design_kit','snapshot_custom_metrics','snapshot_custom_reports','snapshot_documents_contracts','snapshot_folders','snapshot_knowledge_bases','snapshot_whatsapp_templates','saas_mode',
     'saas_plans','saas_subscriptions','saas_account_provisioning','saas_billing','phone_rebilling','email_rebilling','ai_rebilling',
     'usage_based_billing','markup_billing','white_label_branding','custom_domains','branded_desktop_app','branded_mobile_app',
     'mobile_companion','marketplace','app_installation','reselling','agency_template_library','subaccount_transfers','agency_level_billing',
@@ -73,25 +73,25 @@ const sections = [
   ]],
   ['GHL','AI','V114','packages/atlas-copilot/index.mjs',[
     'ask_ai','crm_ai_assistant','content_ai','image_ai','email_ai','website_ai','funnel_ai','conversation_ai','voice_ai','autonomous_agents',
-    'agent_studio','managed_agents','workflow_ai_generation','prompt_optimizer','prompt_testing','voice_testing','knowledge_base',
+    'agent_studio','managed_agents','workflow_ai_generation','prompt_optimizer','workflow_explain_ai','social_content_ai','social_edit_with_ask_ai','prompt_testing','voice_testing','knowledge_base',
     'ai_review_replies','ai_review_summaries','ai_customer_qualification','ai_booking','ai_routing','ai_crm_actions','ai_connector_actions'
   ]],
   ['GHL','Workflow Automation','V113','packages/atlas-target/index.mjs',[
-    'event_triggers','contact_created_trigger','contact_changed_trigger','birthday_trigger','appointment_triggers','opportunity_triggers',
+    'event_triggers','contact_created_trigger','contact_changed_trigger','birthday_trigger','form_submitted_trigger','customer_replied_trigger','customer_replied_phrase_filter','customer_replied_tag_filter','customer_replied_intent_filter','customer_replied_channel_filter','appointment_triggers','opportunity_triggers',
     'payment_triggers','ecommerce_triggers','affiliate_triggers','course_triggers','community_triggers','communication_triggers',
     'google_ads_triggers','social_triggers','ivr_triggers','send_email','send_sms','send_whatsapp','assign_user','create_task','update_contact',
     'add_remove_tag','create_opportunity','update_opportunity','move_pipeline_stage','appointment_action','webhook_trigger','webhook_action',
     'internal_notification','goal_events','if_else','switch_branch','wait','reply_wait','action_wait','condition_wait','appointment_relative_wait',
-    'date_wait','recurring_schedule_wait','time_window_wait','workflow_chaining','sub_workflows','ai_workflow_builder'
+    'date_wait','recurring_schedule_wait','time_window_wait','workflow_chaining','sub_workflows','go_to_workflow','remove_from_workflow','update_custom_value','arrays_action','drip_mode','text_formatter','number_formatter','custom_code_action','ai_prompt_action','ai_agent_workflow_action','goal_event_action','workflow_explain_ai','workflow_ai_builder','ai_workflow_builder'
   ]],
 
   ['n8n','Core Workflow Runtime','V113','packages/atlas-target/index.mjs',[
     'visual_workflow_canvas','manual_trigger','schedule_trigger','webhook_trigger','app_event_trigger','chat_trigger','sse_trigger',
     'polling_trigger','conditional_branching','if_node','switch_node','merge_node','looping','split_out','aggregate','filter','sort',
     'remove_duplicates','limit_node','wait_node','execute_workflow','sub_workflow','stop_error','no_op','data_mapping','expression_engine',
-    'previous_node_data','item_linking','binary_data','file_operations','http_request','graphql','webhooks','jwt','ftp_sftp','ssh','ldap',
+    'previous_node_data','manual_mapping','item_linking','data_pinning','binary_data','file_operations','http_request','graphql','webhooks','webhook_response','jwt','error_workflow','ftp_sftp','ssh','ldap',
     'imap_email','rss','html','markdown','xml','compression','crypto','git','code_node','javascript_execution','python_execution',
-    'custom_functions','jmespath','data_tables','mock_execution_data','pinned_execution_data','pagination','workflow_versioning'
+    'custom_functions','jmespath','data_tables','mock_execution_data','pinned_execution_data','pagination','workflow_versioning','workflow_templates','workflow_sharing','credential_testing','connection_testing','execution_retention'
   ]],
   ['n8n','Integration Fabric','V113','packages/atlas-next/index.mjs',[
     'rest_api_connectors','graphql_connectors','oauth2_connectors','api_key_connectors','service_account_connectors','hmac_connectors',
