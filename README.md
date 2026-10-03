@@ -1,62 +1,106 @@
 # Atlas Business Operating System
 
-Atlas is a laptop-first, multi-tenant Business Operating System combining CRM, engagement, workflow automation, AI workforce, customer intelligence, knowledge, revenue operations, growth, integrations, governance and a platform-owner control plane.
+Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
 
-## Current release: V90
+## Current release: V98
 
-V80–V85 established skills, capability intersection, connector reliability, evaluation, durable actions and the visual command center. V86–V90 turns those foundations into synchronization, worker-runtime, observability, customer-graph and revenue-graph contracts.
+V98 closes the outbound-template rendering gap found during the customer-operations audit. A tenant-bound renderer now creates deterministic email/SMS/chat message drafts from immutable template releases. Email HTML uses a small formatting allowlist and escapes personalized text; missing merge fields produce `needs_data` with no partial sendable content, and subject data cannot inject headers. This prepares a draft only; consent/provider rechecks and actual delivery remain worker/integration responsibilities.
 
-### Core capabilities
-- CRM, engagement, deals and customer operations.
-- Workflow automation, simulation and approval-gated actions.
-- AI workforce, reusable skills, evaluations and governed assistant operations.
-- Provider adapters, capability negotiation, incremental sync cursors and webhook dedupe.
-- Durable queue jobs with idempotency, worker leases, heartbeats, retry and dead-letter recovery.
-- OTLP-shaped traces and SLO/error-budget calculations.
-- Tenant-scoped customer intelligence graph with bounded traversal and explainable health.
-- Revenue cockpit and business graph projections.
-- Laptop-first Business Command Center.
+See [V98 message rendering](docs/V98-MESSAGE-TEMPLATE-RENDERING.md) and [V98 deep audit](docs/DEEP-AUDIT-V98.md).
 
-## Architecture
+## V97 — Domain-Independent SEO and Preview Publishing
 
-actor -> authorization -> agent -> skill -> risk/approval -> durable action/job -> provider adapter -> audit/telemetry
+V97 adds a domain-independent marketing-site build with explicit preview/public indexing modes. Preview output is `noindex` with a deny-all robots file; public output refuses to build without a real HTTPS origin and includes a canonical URL, social metadata, JSON-LD, robots sitemap reference and a one-page sitemap. The sample command center remains `noindex` and is never listed in the sitemap.
 
-Customer and revenue context:
-contacts + companies + deals + activities + knowledge + support + finance -> customer graph -> revenue cockpit -> governed action proposals
+There is no public Atlas domain yet. The default preview build does not invent one:
 
-Provider capabilities never grant authority. Tenant boundaries and server-side policy remain authoritative.
+```sh
+node scripts/build-site.mjs
+node scripts/seo-check.mjs
+```
 
-## V80–V90 progression
-- V80 Agent Skills Fabric + Operational Pulse
-- V81 Capability Mesh + Proactive Action Loop
-- V82 Connector Reliability Fabric
-- V83 Agent Evaluation + Observability
-- V84 Action Inbox + Durable Operations
-- V85 Visual Business Command Center
-- V86 Provider Adapter & Sync Fabric
-- V87 Durable Worker / Queue Runtime
-- V88 Full OTLP + SLO Observability
-- V89 Customer Intelligence Graph
-- V90 Revenue Command Center + Business Graph
+Once Atlas has a real domain and HTTPS is active, generate indexable output with `ATLAS_PUBLIC_ORIGIN=https://your-real-domain` and `node scripts/build-site.mjs --mode public` (PowerShell: `$env:ATLAS_PUBLIC_ORIGIN='https://your-real-domain'`). See [SEO deployment](docs/SEO-DEPLOYMENT.md) for the launch checklist.
 
-## Development
-Node.js 20+.
+## V96 — Business-Hours SLA Engine
 
-npm test
-npm run check
+V96 adds business-hours SLA calculation for the service desk.
 
-The repository stays dependency-light so domain contracts remain deterministic and can later be backed by managed Postgres, Redis/queue infrastructure and an OTLP collector.
+- Tenant owners/admins create immutable calendar revisions with an IANA timezone, weekly hours, holiday dates and date-specific exceptions.
+- The engine calculates first-response and resolution deadlines in business minutes, handles DST transitions, and pins the exact calendar revision to each case.
+- Customer-wait time is reconstructed from the case audit timeline and pauses only during scheduled working minutes. A calendar edit creates a new revision and does not change an existing case's deadline rules.
+- Calendar snapshots are checksummed and tenant-bound. API handlers must load a calendar by `(tenant, calendar ID, version)` from trusted storage instead of accepting a caller-provided schedule.
 
-## Security
-1. Tenant-owned records are tenant-bound.
-2. Actor × agent × skill intersection controls effective tools.
-3. Risky actions require server-side approval.
-4. Sync and queue work is idempotent.
-5. Provider adapters are not authorization boundaries.
-6. Telemetry excludes secrets, tokens and message bodies.
-7. Laptop/desktop is primary; mobile is a companion surface.
+See [V96 Business-Hours SLA](docs/V96-BUSINESS-SLA.md) for supported rules and limits.
 
-## Production hardening still required
-Concrete provider adapters and OAuth/token rotation, managed queue workers, authenticated OTLP export, graph indexing, live API projections, historical forecast calibration and production load/failover testing.
+V95 adds support-case intelligence and safer Copilot retries.
 
-See docs/ROADMAP-V86-V90.md, docs/DEEP-AUDIT-V86-V90.md, docs/V86-V90-IMPLEMENTATION.md, docs/COMPETITOR-BENCHMARK-2026-09.md and docs/RELEASE-CHECKLIST-V90.md.
+- Recent duplicate suggestions compare same-conversation cases or similar subjects for the same contact within a bounded window. The system never merges automatically.
+- An authorized tenant admin can link a duplicate to an active canonical case. Both records remain in history; the explicitly linked case is closed with an auditable relation and version preconditions.
+- Copilot retries use a deterministic tenant/action identity and verify the stored action-binding hash, so timeout/replay reconciliation can return the same pending approval.
+
+V94 adds the operator-side AI Copilot and tenant-scoped service desk contracts.
+
+- Copilot receives an allowlisted tool manifest derived from a trusted server-resolved authority. Reads receive tenant scope from the server; model arguments cannot choose another tenant or request credentials, arbitrary HTTP, SQL or code execution.
+- Tenant writes create durable, idempotent pending-approval proposals. Copilot does not directly execute CRM, workflow or message writes. A late persistence timeout is treated as an unknown outcome; the approval inbox must be checked before retrying.
+- Only Khan's verified platform-owner authority can enter platform scope. It receives global read-only tools; customer company owners/admins cannot get platform tools or global privileges.
+- Service desk case records keep contact/conversation references and a short subject, not the full conversation body. Agent handoffs can open a stable-ID case; assignment suggestions consider tenant membership, skills and current capacity but do not assign automatically. A human confirms assignment and status changes use expected versions.
+- SLA contracts track first response and resolution deadlines, record a response only from a trusted delivery receipt, flag at-risk/breached work, and pause timers while a case waits on the customer. V96 applies each case's pinned business calendar, timezone, holidays and working-day schedule.
+
+## V94 — AI Copilot and Service Desk
+
+V94 added the bounded operator Copilot, safe tenant support-case intake, human-approved actions, receipt-backed first response, SLA state and skill/capacity assignment suggestions. See [V94 AI Copilot and Service Desk](docs/V94-COPILOT-SERVICE-DESK.md).
+
+## V93 — Customer Operations Hardening
+
+V93 hardens the customer-operations layer with immutable message-template versions and additional CRM workflow actions.
+
+- Email/SMS/chat/social/voice message workflow steps must pin a checksummed template release from the same tenant. Channel and purpose must match the workflow step.
+- Automation actions include tasks, contact-field updates, add/remove contact tags, tenant-pinned sub-workflows and tenant-pinned customer-agent deployments.
+- Contact update commands are bounded, idempotent and stored using an RLS-protected invocation target that carries references and a configuration hash rather than copying a mutable action payload.
+- Customer agents use evaluation-gated immutable releases, channel/segment routing, time-aware availability, handoff rules, bounded tool calls, exact-scope approval and explicitly consented short-term memory.
+- Messaging intents require fresh policy, consent, suppression and frequency evidence; workers must recheck these immediately before provider delivery.
+- Business recipe descriptors cover lead intake/follow-up, appointment reminders and no-show recovery, missed calls, after-call follow-up, service reviews, failed payments, abandoned checkout and course onboarding.
+- The command-center is an accessible laptop-first sample-data preview; it does not connect to an authenticated API or provider.
+
+## Authority boundary
+
+Only the single configured and verified `ATLAS_PLATFORM_OWNER_EMAIL` account can receive global Atlas authority. Tenant owners and admins can manage their own company only. A request-body role, `platformOwner` flag, or caller-supplied email never grants global access. See [authority implementation](packages/atlas-core/authority.mjs) and [V93 operations notes](docs/V93-CUSTOMER-OPERATIONS.md).
+
+Configure Khan's verified owner identity through deployment secrets. The setting is intentionally absent from source. API handlers must resolve identity and tenant membership from trusted session/storage before invoking these domain contracts.
+
+## V80–V92 foundations
+
+- Tenant-scoped skills and actor/agent/skill capability intersection.
+- Provider, webhook, sync and idempotent action contracts.
+- Durable-queue lease, worker heartbeat, retry and dead-letter primitives.
+- OpenTelemetry-shaped redacted traces and SLO/error-budget calculations.
+- Tenant-bound customer graph, revenue cockpit and command-center preview.
+- Customer-agent routing, evaluation gates, channel canaries, memory-consent contracts and human handoff.
+- Lifecycle triggers, message outbox/receipts, consent/suppression snapshots, forward-only workflow branches and pinned sub-workflows/agents.
+
+## Run locally
+
+Requires Node.js 20 or newer. The source declares no third-party npm packages.
+
+```sh
+node --test
+node scripts/check.mjs
+node scripts/docs-check.mjs
+node scripts/doctor.mjs
+node scripts/smoke-http.mjs
+node scripts/preview.mjs
+```
+
+Open the local address printed by the preview process. UI figures, plans and action inbox rows are sample values. Do not treat the preview as live SaaS data.
+
+## Production readiness boundary
+
+This repository contains deterministic domain contracts, tests, SQL migration targets and a static preview. It does not ship a complete authenticated API, account signup/login, real email/SMS/WhatsApp/social/voice adapters, calendar booking, payment checkout, campaign delivery, live tenant console, KMS-backed memory adapter, production Redis worker service or production observability exporter. Local JSON/state is development-only.
+
+Target deployment architecture: managed PostgreSQL with forced tenant RLS; managed Redis/queue; separately scaled authenticated API, webhook ingress and workers; managed secret manager/KMS; object storage and CDN for attachments; WAF/rate limits; OpenTelemetry collection; tested backups, restores, load, failover and SLOs. No millions-of-users capacity claim is verified by this repository.
+
+Apply SQL targets in order: V80, V85, V90, V91, V92, V93, V94, V95, then V96. SQL has not been run against a live PostgreSQL service in this workspace. API and worker roles must not have `BYPASSRLS`, and `app.tenant_id` must be set from authenticated membership in every tenant transaction.
+
+For GHL/n8n/monday/HubSpot analysis and explicit feature gaps, see [October 2026 competitor benchmark](docs/COMPETITOR-BENCHMARK-2026-10.md). For the V95 duplicate-case behavior see [V95 Case Intelligence](docs/V95-CASE-INTELLIGENCE.md); the [V94 Copilot and Service Desk](docs/V94-COPILOT-SERVICE-DESK.md) document describes the underlying contracts.
+
+For findings, addressed risks and items that still need a production environment, see the [V96 deep audit](docs/DEEP-AUDIT-V96.md), [V95 deep audit](docs/DEEP-AUDIT-V95.md), [V94 deep audit](docs/DEEP-AUDIT-V94.md) and [V93 deep audit](docs/DEEP-AUDIT-V93.md).

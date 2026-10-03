@@ -1,14 +1,49 @@
-Atlas V90.0.0 — V86-V90 Frontier Foundation
+ATLAS V98.0.0 — Safe Customer Messaging + Domain-Independent SEO
 
-Delivered
-- Provider adapter + sync contracts
-- Durable queue/worker primitives
-- OTLP-shaped traces + SLO/error-budget math
-- Customer intelligence graph
-- Revenue cockpit + business graph
-- Project description and living engineering docs updated
+Source baseline
+- Continuation of Atlas V90 through the existing V91–V96 customer-agent, automation, service desk, SLA and authority work.
+- V97 added no-domain-safe marketing SEO generation and preview indexing controls.
+- V98 adds deterministic tenant-bound template rendering and the message-studio sample preview.
+- Platform-global authority remains exclusive to the configured, verified Khan account. Company owners/admins remain tenant-scoped.
 
-Verification
-- V86-V90 deterministic unit coverage added
-- Existing V80-V85 tests retained
-- Production deployment gaps remain explicit
+V98 implementation
+- Added renderMessageTemplateVersion() for immutable, checksummed, exact-tenant templates. It returns a deterministic draft only; it does not deliver or persist a message.
+- Added allowlisted business-data variables, safe own-property reads, HTML text escaping, a small email markup/HTTPS-link allowlist, header-injection rejection and fail-closed missing-data outcomes.
+- Added a laptop-first Message Studio preview, clearly marked as sample data and not sent.
+- Extended GHL/n8n benchmark findings and CI checks; preserved existing business-hours SLA and verified single-owner security invariants.
+
+V97 indexing behavior
+- Default `node scripts/build-site.mjs` produces a preview with noindex/nofollow and deny-all robots.txt; no canonical or sitemap is invented.
+- Public mode requires an explicit real HTTPS origin, emits canonical/social metadata and visible-content-matched JSON-LD, and writes a one-page sitemap. The sample /app/ remains noindex and is excluded.
+- No public Atlas domain exists yet; do not deploy public mode until a real domain and HTTPS are configured.
+
+Key added/updated files
+- `packages/customer-operations/engagement.mjs`, `packages/customer-operations/index.mjs`, `packages/customer-operations/template-renderer.test.mjs`
+- `apps/command-center/app.mjs`, `apps/command-center/styles.css`, `apps/command-center/index.html`
+- `apps/marketing-site/index.html`, `apps/marketing-site/styles.css`, `apps/marketing-site/favicon.svg`
+- `scripts/build-site.mjs`, `scripts/seo.mjs`, `scripts/site-utils.mjs`, `scripts/seo-check.mjs`, `scripts/doctor.mjs`, `scripts/smoke-http.mjs`
+- `docs/V98-MESSAGE-TEMPLATE-RENDERING.md`, `docs/DEEP-AUDIT-V98.md`, `docs/SEO-DEPLOYMENT.md`, `docs/DEEP-AUDIT-V97.md`, `docs/COMPETITOR-BENCHMARK-2026-10.md`, `docs/N8N-ARCHITECTURE-REVIEW-2026-10.md`
+- `README.md`, `CHANGELOG.md`, `package.json`, `package-lock.json`, `.gitignore`, `.github/workflows/ci.yml`
+
+Verification (Node v24.19.0 on Windows)
+- `node --test`: PASS — 106 tests, 106 passed, 0 failed, 0 skipped.
+- `node scripts/check.mjs`: PASS — all discovered JavaScript modules pass syntax checks.
+- `node scripts/doctor.mjs`: PASS — 17/17 invariants.
+- `node scripts/docs-check.mjs`: PASS — 35 Markdown files, 0 errors.
+- `node scripts/smoke-http.mjs`: PASS — 5/5 command-center HTTP smoke checks.
+- `node scripts/seo-check.mjs`: PASS — 33 build and loopback HTTP assertions for preview/public metadata, robots, schema, sitemap and app indexing.
+- `node scripts/build-site.mjs`: PASS — generated `dist/atlas-site` in safe preview/noindex mode.
+- `npm audit --audit-level=moderate`: NOT RUN — npm executable is unavailable in this desktop runtime (exit 127). `package.json` and lockfile declare no third-party runtime dependencies; CI runs npm audit on Node 20 and 22.
+
+Not verified / external work
+- No live domain, DNS, TLS, CDN/WAF, Search Console/Bing verification or search indexing. The public-mode URL is tested only with a non-deployed fixture origin.
+- No authenticated API, signup/login, connected CRM/inbox, email/SMS/WhatsApp/social/voice/payment/calendar/review provider or real message delivery. The message renderer produces drafts only.
+- PostgreSQL migrations were statically inspected but not applied; no managed Postgres/Redis/workers/KMS/object storage/OTel deployment or production load/failover test.
+- Figma returned a view-only Starter seat and then rejected metadata access after the plan's MCP tool-call limit; no Figma file was modified. Other Atlas conversations were not available to read from the conversation connector; the supplied V72 preview and repository docs were used.
+- No millions-of-users capacity claim is verified.
+
+Authority boundary
+- Only the configured, verified Khan platform-owner identity receives global Atlas authority. Tenant owners/admins can manage only their own company. Do not accept caller-supplied roles, emails or tenant IDs as trusted authority.
+
+Release ZIP
+- `atlas-v98.0.0-final.zip` is packaged at the worktree root. Its SHA-256 is in the adjacent `.sha256` sidecar.
