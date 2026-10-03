@@ -207,7 +207,7 @@ export function assertFeatureCatalogComplete(catalog = FULL_FEATURE_CATALOG) {
   for (const row of catalog) {
     if (!row.id || ids.has(row.id)) throw new Error('Duplicate or missing feature id: '+row.id);
     ids.add(row.id);
-    if (!row.benchmark || !row.domain || !row.feature || !/^V(11[1-9]|120)$/.test(row.stage) || !row.atlasAnchor) {
+    if (!row.benchmark || !row.domain || !row.feature || !/^V(105|11[1-9]|120)$/.test(row.stage) || !row.atlasAnchor) {
       throw new Error('Feature mapping incomplete: '+JSON.stringify(row));
     }
   }
