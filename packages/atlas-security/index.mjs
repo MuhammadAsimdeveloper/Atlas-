@@ -69,7 +69,9 @@ export function createAuditEvent({tenantId,actorId,action,resourceType,resourceI
   resourceId=text(resourceId,'resourceId'); if(!RISK_LEVELS.includes(risk))throw new Error('risk invalid');
   if(!['allowed','denied','approved','executed','failed'].includes(decision))throw new Error('decision invalid');
   const body={tenantId,actorId,action,resourceType,resourceId,risk,decision,metadata:structuredClone(metadata),previousHash,timestamp:new Date().toISOString()};
-  return freeze({...body,eventId:'audit_'+hash(body).slice(0,28),eventHash:hash(body)});
+  const eventId='audit_'+hash(body).slice(0,28);
+  const material={...body,eventId};
+  return freeze({...material,eventHash:hash(material)});
 }
 
 export function verifyAuditChain(events=[]){
