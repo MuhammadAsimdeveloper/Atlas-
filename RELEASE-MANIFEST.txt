@@ -1,3 +1,18 @@
+ATLAS V102.0.0 — Hardened CRM, Workflow Nodes, Booking Calendars and AI Agents
+
+V102 implementation
+- Hardened provider-neutral CRM records, typed custom properties, associations, pipelines, optimistic mutation commands and deterministic search.
+- Added a node graph target for n8n/GHL-style triggers, branches, waits, CRM actions, messaging, appointment actions, sub-workflows, webhooks and bounded execution inspection.
+- Added a separate customer-facing booking calendar target with timezone-aware availability, hosts/capacity, holds, idempotent bookings and version-safe rescheduling/cancellation.
+- Added a reusable AI-agent runtime envelope with exact release/argument approval binding, budgeted sessions, leases and structured-output validation.
+- Added V102 tenant-RLS migration, focused tests, release docs and doctor coverage.
+
+V102 verification
+- Focused V102 target tests: 4 passed, 0 failed on Node 22 in the build workspace.
+- New target module passed Node syntax checking.
+- The V102 PostgreSQL migration is shipped as a static target and was not executed against a live database.
+- Real calendar/message/CRM/agent providers, authenticated tenant API, transactional booking concurrency, production queue workers and live model adapters remain unverified.
+
 ATLAS V100.0.0 — Voice Operations, Quality and Coaching
 
 V100 implementation
