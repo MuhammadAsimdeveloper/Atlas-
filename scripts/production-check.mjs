@@ -1,0 +1,21 @@
+import { access, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const checks = [];
+const check = (name, ok, detail) => checks.push({ name, ok: Boolean(ok), detail });
+async function exists(file) { try { await access(path.join(root,file)); return true; } catch { return false; } }
+check('production API entrypoint', await exists('apps/api/server.mjs'), 'HTTP entrypoint exists');
+check('container definition', await exists('Dockerfile'), 'Production container exists');
+check('production compose reference', await exists('infra/docker-compose.production.yml'), 'API/Postgres/Redis deployment reference exists');
+check('environment template', await exists('.env.example'), 'Required configuration is documented');
+const api = await readFile(path.join(root,'apps/api/server.mjs'),'utf8');
+check('secure HTTP defaults', api.includes('x-content-type-options') && api.includes('x-frame-options') && api.includes('cache-control'), 'Security response headers are set');
+check('production configuration gate', api.includes('ATLAS_DATABASE_URL') && api.includes('ATLAS_SESSION_SECRET') && api.includes('ATLAS_ACTION_APPROVAL_KEY') && api.includes('ATLAS_PUBLIC_ORIGIN'), 'Production startup requires critical configuration');
+check('no tenant API yet', api.includes('authenticatedApi: false'), 'Unwired tenant routes fail closed rather than pretending to be authenticated');
+const readme = await readFile(path.join(root,'README.md'),'utf8');
+check('production boundary retained', readme.includes('Local JSON/state is development-only') && readme.includes('authenticated API'), 'Existing production boundary remains explicit');
+for (const r of checks) process.stdout.write((r.ok ? 'PASS ' : 'FAIL ') + r.name + ': ' + r.detail + '\n');
+const failed = checks.filter(r => !r.ok).length;
+process.stdout.write('Atlas production check: ' + (checks.length-failed) + '/' + checks.length + ' checks passed.\n');
+if (failed) process.exitCode = 1;

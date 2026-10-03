@@ -144,7 +144,7 @@ function validateArguments(tool, raw, tenantIdForValidation) {
     case 'automation.workflow.draft.create': {
       requireOnly(args, ['name', 'triggerType', 'steps'], tool);
       if (!AUTOMATION_TRIGGERS.includes(args.triggerType) || !Array.isArray(args.steps)) throw new Error('Workflow draft requires an approved trigger and a step list');
-      const draft = createAutomationWorkflowDraft({ id: `copilot_${crypto.randomUUID().replaceAll('-', '')}`, tenantId: tenantIdForValidation, name: args.name, triggerType: args.triggerType, steps: args.steps });
+      const draft = createAutomationWorkflowDraft({ id: crypto.randomUUID(), tenantId: tenantIdForValidation, name: args.name, triggerType: args.triggerType, steps: args.steps });
       return { name: draft.name, triggerType: draft.triggerType, steps: draft.steps };
     }
     case 'communications.message.send':
