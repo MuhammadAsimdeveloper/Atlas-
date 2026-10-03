@@ -148,7 +148,9 @@ export function createMarketplacePackage({tenantId,packageId,name,version,resour
   const refs=Array.isArray(resources)?resources:[]; if(refs.length>500)throw new Error('resources invalid');
   const normalized=refs.map(r=>({type:text(r?.type,'resource type'),resourceId:text(r?.resourceId,'resourceId'),checksum:text(r?.checksum,'resource checksum',128)}));
   const body={tenantId,packageId,name,version,resources:normalized,declaredCapabilities:list(declaredCapabilities,'declaredCapabilities',200),provenanceRef:text(provenanceRef,'provenanceRef'),signature};
-  return freeze({...body,packageHash:sha256(body),checksum:sha256(body)});
+  const packageHash=sha256(body);
+  const material={...body,packageHash};
+  return freeze({...material,checksum:sha256(material)});
 }
 
 export function authorizeMarketplacePublish(pkg,{signingKeyPresent=false,securityScan='pass',allDependenciesVerified=false}={}){
