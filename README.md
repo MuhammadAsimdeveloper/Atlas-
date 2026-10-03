@@ -1,8 +1,15 @@
 # Atlas Business Operating System
 
-Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
+Atlas is a laptop-first, multi-tenant Business Operating System combining GHL-class CRM, communications, marketing, websites, reputation, calendars, commerce, agency/SaaS and AI with n8n-class workflow automation, connector orchestration, code/data processing, durable execution and enterprise runtime controls.
 
-## Current release: V110
+## Current release: V111
+
+V111 begins the full GHL + n8n feature-completion frontier. It replaces the ambiguous term “targeted” with three explicit states — contract, build and deployment — and adds a machine-readable benchmark catalog so every major feature has a stage and Atlas implementation anchor.
+
+See [PLAN.md](PLAN.md) and [GHL + n8n full coverage](docs/GHL-N8N-FULL-COVERAGE-2026-10.md).
+
+The branch also adds tenant-bound reusable product resource/publish contracts, feature-bundle integrity, permission boundaries and a coverage checker.
+
 
 V104–V110 adds the provider adapter and sync fabric, production website/SEO publish gate, unified communication policy, USD financial operations, freelancer/agency work controls, explicit GHL capability coverage, integrity-protected snapshots, and trust/DR/SLO release gates. Live providers and managed production infrastructure remain deployment work.
 
@@ -118,3 +125,7 @@ Apply SQL targets in order: V80, V85, V90, V91, V92, V93, V94, V95, V96, V99, V1
 For GHL/n8n/monday/HubSpot analysis and explicit feature gaps, see [October 2026 competitor benchmark](docs/COMPETITOR-BENCHMARK-2026-10.md). For the V95 duplicate-case behavior see [V95 Case Intelligence](docs/V95-CASE-INTELLIGENCE.md); the [V94 Copilot and Service Desk](docs/V94-COPILOT-SERVICE-DESK.md) document describes the underlying contracts.
 
 For findings, addressed risks and items that still need a production environment, see the [V96 deep audit](docs/DEEP-AUDIT-V96.md), [V95 deep audit](docs/DEEP-AUDIT-V95.md), [V94 deep audit](docs/DEEP-AUDIT-V94.md) and [V93 deep audit](docs/DEEP-AUDIT-V93.md).
+
+## Full feature completion boundary
+
+Atlas now tracks every benchmark feature individually in `packages/atlas-feature-catalog/index.mjs`. A feature is not called production-complete until its domain contract, tests, live provider/API path, tenant isolation, observability and deployment evidence are all present. The V111–V120 frontier in `PLAN.md` is the authoritative build sequence.
