@@ -312,8 +312,8 @@ export async function runAtlasCopilotTurn({
       try {
         const created = createAction({ tenantId: scope.tenantId, actorId: scope.actorId, proposalId: `copilot_${idempotencyKey.slice(0, 24)}`, tool: result.name, payload: args, risk: tool.risk, idempotencyKey });
         action = { ...created, id: `act_copilot_${idempotencyKey}` };
-      } catch {
-        return { status: 'handoff', reason: 'action_validation_failed', text: 'Atlas could not validate this action safely. No change was made.', trace };
+      } catch (error) {
+        return { status: 'handoff', reason: 'action_validation_failed:' + String(error?.message || error), text: 'Atlas could not validate this action safely. No change was made.', trace };
       }
       let persisted;
       try { persisted = await withTimeout(adapterSignal => actionStore.createPending(action, { signal: adapterSignal }), timeoutMs, signal); }
