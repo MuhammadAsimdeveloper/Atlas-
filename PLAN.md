@@ -58,11 +58,13 @@ Connect real email/SMS/WhatsApp/voice/calendar/payment/social/ad/accounting/CRM 
 Every benchmark feature must have an immutable feature ID, domain, planned stage, Atlas code/doc anchor, explicit status, acceptance gate, and production deployment evidence before it can be called complete.
 
 ## Current V111 change set
-- exhaustive GHL + n8n feature catalog;
+- exhaustive GHL + n8n feature catalog with per-feature acceptance gates;
 - explicit status semantics replacing “targeted”;
 - reusable tenant-bound product resource/publish contract covering major GHL resource families;
 - feature-bundle integrity and permission boundaries;
 - coverage checker suitable for CI/doctor integration;
+- tenant-safe business resources for campaigns, forms, social/reputation, ads, learning, affiliates, SaaS and marketplace packages;
+- durable workflow execution, queue lease/DLQ and connector SDK contracts plus V111 persistence targets;
 - this canonical V111–V120 plan.
 
 ## Research boundary
