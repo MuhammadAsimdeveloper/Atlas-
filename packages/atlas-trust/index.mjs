@@ -136,8 +136,8 @@ export function authorizeFreelancerAction({ workspace, memberId, action, spend=0
 
 export function generateSeoMetadata({ title, description, canonicalUrl, siteName, imageUrl, locale='en_US', type='website', robots='index,follow', keywords=[] } = {}) {
   title=text(title,'title',120); description=text(description,'description',320);
-  if (!/^https?:\\/\\//.test(canonicalUrl)) throw new Error('canonicalUrl invalid');
-  if (imageUrl && !/^https?:\\/\\//.test(imageUrl)) throw new Error('imageUrl invalid');
+  if (!/^https?:\/\//.test(canonicalUrl)) throw new Error('canonicalUrl invalid');
+  if (imageUrl && !/^https?:\/\//.test(imageUrl)) throw new Error('imageUrl invalid');
   const body={title,description,canonicalUrl,siteName:text(siteName,'siteName',120),imageUrl:imageUrl||null,locale,type,robots,keywords:[...new Set(keywords)].slice(0,30)};
   return freeze({...body,checksum:hash(body)});
 }
