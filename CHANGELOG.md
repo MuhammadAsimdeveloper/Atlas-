@@ -1,3 +1,13 @@
+## 110.0.0 — V104–V110 Production Hardening Frontier
+- Added provider adapter definitions with webhook verification, rate limits, incremental sync checkpoints and circuit-breaker health states.
+- Added tenant-bound website/domain/publish contracts with HTTPS, verified-domain and preview noindex gates.
+- Added communication delivery envelopes with idempotency, consent, suppression, frequency and quiet-hour controls.
+- Added USD integer-minor usage metering, deterministic invoices and duplicate-safe provider payment reconciliation.
+- Added project-scoped freelancer/agency permissions, secret scopes, milestone budget bounds and deliverable evidence.
+- Added a concrete GHL capability catalog and integrity-protected snapshot manifests.
+- Added trust-control evidence, measured recovery-drill, SLO/error-budget and release-gate contracts.
+- Added V104–V110 PostgreSQL tenant-RLS persistence targets and release doctor coverage.
+
 ## 103.0.0 — Trust, Commerce & Connector Fabric
 - Added scoped third-party connector definitions and tenant grants with operation/scope/expiry enforcement.
 - Added A-to-B automation contracts with bounded records, idempotency and risky-action approval gates.
