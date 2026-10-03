@@ -126,6 +126,10 @@ For GHL/n8n/monday/HubSpot analysis and explicit feature gaps, see [October 2026
 
 For findings, addressed risks and items that still need a production environment, see the [V96 deep audit](docs/DEEP-AUDIT-V96.md), [V95 deep audit](docs/DEEP-AUDIT-V95.md), [V94 deep audit](docs/DEEP-AUDIT-V94.md) and [V93 deep audit](docs/DEEP-AUDIT-V93.md).
 
+## What “targeted” means
+
+Older Atlas plans used **targeted** to mean a capability was intended for Atlas but was not necessarily implemented or production-ready. That wording is retired. The V111+ catalog uses three precise states: **contract** (tested domain behavior exists), **build** (explicit implementation work is assigned), and **deployment** (live provider/infrastructure evidence remains).
+
 ## Full feature completion boundary
 
-Atlas now tracks every benchmark feature individually in `packages/atlas-feature-catalog/index.mjs`. A feature is not called production-complete until its domain contract, tests, live provider/API path, tenant isolation, observability and deployment evidence are all present. The V111–V120 frontier in `PLAN.md` is the authoritative build sequence.
+Atlas now tracks every benchmark feature individually in `packages/atlas-feature-catalog/index.mjs`, including an acceptance gate. A feature is not called production-complete until its domain contract, tests, live provider/API path, tenant isolation, observability and deployment evidence are all present. The V111–V120 frontier in `PLAN.md` is the authoritative build sequence.
