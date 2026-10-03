@@ -1,3 +1,13 @@
+## 103.0.0 — Trust, Commerce & Connector Fabric
+- Added scoped third-party connector definitions and tenant grants with operation/scope/expiry enforcement.
+- Added A-to-B automation contracts with bounded records, idempotency and risky-action approval gates.
+- Added USD-first financial safety controls: spend limits, approval thresholds, balanced immutable-ledger target and refund approval.
+- Added freelancer/agency project workspace authorization separated from financial authority.
+- Added deterministic website SEO metadata contract.
+- Added security control-plane contracts for step-up authentication and dual-control break-glass actions.
+- Added V103 PostgreSQL tenant-RLS persistence targets and release doctor checks.
+- Defined V104–V110 roadmap for provider adapters, communications, websites/SEO, financial OS, freelancer work OS, GHL capability sweep and trust certification.
+
 ## 102.0.0 — Hardened CRM, Workflow Nodes, Booking Calendars and AI Agents
 - Added a provider-neutral CRM target for contacts, companies, leads, deals, tickets, tasks, notes, appointments and custom records with typed properties, associations, deterministic search, optimistic versioning and pipeline governance.
 - Added a checksummed workflow graph target covering triggers, conditions, switches, waits, transforms, CRM actions, messaging, availability, appointment lifecycle, sub-workflows, approvals, webhooks and terminal nodes, with risk/guard/retry/timeout metadata.
