@@ -312,7 +312,8 @@ export async function runAtlasCopilotTurn({
       try {
         const created = createAction({ tenantId: scope.tenantId, actorId: scope.actorId, proposalId: `copilot_${idempotencyKey.slice(0, 24)}`, tool: result.name, payload: args, risk: tool.risk, idempotencyKey });
         action = { ...created, id: `act_copilot_${idempotencyKey}` };
-      } catch {
+      } catch (error) {
+        console.error('[atlas-copilot] action_validation_failed', error?.stack || error);
         return { status: 'handoff', reason: 'action_validation_failed', text: 'Atlas could not validate this action safely. No change was made.', trace };
       }
       let persisted;
