@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '103.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '110.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('no runtime package dependencies', Object.keys(pkg.dependencies || {}).length === 0 && Object.keys(lock.packages?.['']?.dependencies || {}).length === 0, 'No third-party runtime packages are declared');
 
   const authority = await read('packages/atlas-core/authority.mjs');
@@ -71,6 +71,17 @@ try {
   check('V103 SEO contract', trust.includes('generateSeoMetadata') && trustTest.includes('SEO metadata'), 'Generated websites have deterministic SEO metadata with canonical and robots controls');
   check('V103 security control plane', trust.includes('createSecurityControlPlane') && trust.includes('assessHighValueAction') && trustTest.includes('high-value security'), 'Money, secret and break-glass actions fail closed behind step-up/dual approval controls');
   check('V103 tenant RLS', trustSql.includes('FORCE ROW LEVEL SECURITY') && trustSql.includes('atlas_billing_ledger') && trustSql.includes('atlas_security_events') && !/BYPASSRLS/i.test(trustSql), 'V103 persistence targets use forced tenant RLS and protect ledger/security rows from application updates/deletes');
+
+  const next = await read('packages/atlas-next/index.mjs');
+  const nextTest = await read('packages/atlas-next/index.test.mjs');
+  const nextSql = await read('infra/postgres/FINAL-MIGRATION-V104-V110.sql');
+  check('V104 provider adapter fabric', next.includes('defineProviderAdapter') && next.includes('verifyWebhookSignature') && next.includes('planSyncCheckpoint') && next.includes('assessProviderHealth') && nextTest.includes('V104 provider adapter'), 'Provider adapters enforce verification, bounded sync and health states');
+  check('V105 website publish fabric', next.includes('createSiteDefinition') && next.includes('createPublishPlan') && next.includes('DOMAIN_NOT_VERIFIED') && nextTest.includes('V105 website'), 'Website publication uses normalized routes, HTTPS and verified-domain gates');
+  check('V106 communication OS', next.includes('authorizeCommunicationSend') && next.includes('createDeliveryEnvelope') && next.includes('CONSENT_REQUIRED') && next.includes('SUPPRESSED') && nextTest.includes('V106 communications'), 'Outbound delivery is idempotent and policy-gated');
+  check('V107 financial OS', next.includes('createUsageMeter') && next.includes('recordUsage') && next.includes('createInvoice') && next.includes('reconcileProviderPayment') && nextTest.includes('V107 financial'), 'Financial documents use integer USD minor units and duplicate-safe reconciliation');
+  check('V108 agency work OS', next.includes('createAgencyProject') && next.includes('authorizeWorkAction') && next.includes('FINANCE_AUTHORITY_SEPARATED') && nextTest.includes('V108 freelancer'), 'Freelancer work is scoped and separated from finance authority');
+  check('V109 capability parity', next.includes('GHL_CAPABILITY_CATALOG') && next.includes('createSnapshotManifest') && nextTest.includes('V109 GHL'), 'GHL benchmark capabilities and signed/integrity-protected snapshots are explicit');
+  check('V110 trust and recovery gates', next.includes('createControlRegister') && next.includes('recordControlEvidence') && next.includes('evaluateRecoveryDrill') && next.includes('calculateSloStatus') && next.includes('createReleaseGate') && nextSql.includes('atlas_trust_control_evidence') && nextSql.includes('atlas_release_gates'), 'Trust evidence, DR, SLO and release gates are explicit');
 
   const engagement = await read('packages/customer-operations/engagement.mjs');
   check('tenant-bound message renderer', engagement.includes('export function renderMessageTemplateVersion') && engagement.includes('Message template tenant does not match') && engagement.includes('Email HTML contains a tag or attribute outside the safe formatting allowlist') && engagement.includes('needs_data'), 'Template renderer is tenant-bound, context-escapes HTML, restricts markup and fails closed on missing fields');
