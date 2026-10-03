@@ -13,11 +13,13 @@ test('full GHL+n8n catalog is exhaustive enough to prevent silent omissions', ()
   assert.ok(result.n8n>=100);
 });
 
-test('every feature is mapped to an Atlas implementation anchor and stage', () => {
+test('every feature is mapped to an Atlas anchor and honest per-feature status', () => {
   for (const row of FULL_FEATURE_CATALOG) {
     assert.ok(row.atlasAnchor);
     assert.match(row.stage,/^V105$|^V11[1-9]$|^V120$/);
     assert.ok(Object.values(STATUS).includes(row.atlasStatus));
+    if (row.feature === 'website_builder' || row.feature === 'seo_metadata' || row.feature === 'invoices') assert.equal(row.atlasStatus,STATUS.CONTRACT);
+    if (row.feature === 'social_planner' || row.feature === 'pinecone' || row.feature === 'rbac') assert.equal(row.atlasStatus,STATUS.BUILD);
   }
 });
 
