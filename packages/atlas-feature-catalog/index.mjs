@@ -156,6 +156,28 @@ const anchorStatus = Object.freeze({
   'apps/marketing-site/index.html': STATUS.CONTRACT,
 });
 
+const ACCEPTANCE_GATES = Object.freeze({
+  'CRM': 'tenant-RLS + CRUD/API + validation + optimistic concurrency + deterministic search/association tests',
+  'Conversations & Phone': 'provider adapter + inbound/outbound receipt + consent/suppression + idempotency + handoff/recording policy tests',
+  'Marketing': 'draft/preview + tenant authorization + channel/provider contract + scheduling/idempotency + analytics attribution tests',
+  'Website, Funnels & SEO': 'lint + indexability + HTTPS verified domain + canonical/metadata/schema + preview/publish/rollback tests',
+  'Calendars & Scheduling': 'timezone/DST + availability + capacity/hold concurrency + version-safe booking lifecycle tests',
+  'Payments & Commerce': 'integer-minor arithmetic + spend policy + balanced journal + signed webhook reconciliation + refund/dispute tests',
+  'Reputation': 'source verification + review provenance + consent + sentiment/reply safety + publishing/idempotency tests',
+  'Courses, Memberships & Community': 'tenant entitlement + access policy + enrollment/content lifecycle + moderation/audit tests',
+  'Affiliate & Growth': 'attribution integrity + commission ledger + fraud/duplicate protection + payout approval tests',
+  'Agency, SaaS & White Label': 'tenant hierarchy + role/secret isolation + provisioning idempotency + rebilling/audit tests',
+  'AI': 'model/tool boundary + budget + structured output + evaluation + human approval/guardrail tests',
+  'Workflow Automation': 'bounded DAG + deterministic mapping + retries/waits + tenant-safe actions + replay/idempotency tests',
+  'Core Workflow Runtime': 'node semantics + expression/data lineage + checkpoint/replay + deterministic execution tests',
+  'Integration Fabric': 'auth/scopes + webhook verification + rate limits + sync cursor + conflict/idempotency tests',
+  'AI & Agents': 'tool permission + tenant isolation + RAG provenance + evaluation + HITL tests',
+  'Execution & Queue Runtime': 'lease ownership + retries/backoff + DLQ + replay/resume + concurrency/backpressure tests',
+  'Security & Enterprise': 'negative authorization matrix + secret controls + tamper evidence + isolation/SSO/security tests',
+  'DevOps & Lifecycle': 'reproducible artifact + environment promotion + diff + protected production + rollback tests',
+  'Observability & Governance': 'trace/log/metric emission + SLO/error budget + DR evidence + capacity/retention tests'
+});
+
 const slug = (x) => x.replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'').toLowerCase();
 
 export const FULL_FEATURE_CATALOG = freeze(sections.flatMap(([benchmark,domain,stage,anchor,features]) =>
@@ -167,6 +189,7 @@ export const FULL_FEATURE_CATALOG = freeze(sections.flatMap(([benchmark,domain,s
     stage,
     atlasAnchor: anchor,
     atlasStatus: CONTRACT_FEATURES.has(feature) ? STATUS.CONTRACT : STATUS.BUILD,
+    acceptanceGate: ACCEPTANCE_GATES[domain],
     productionBoundary: anchorStatus[anchor] === STATUS.CONTRACT
       ? 'domain-contract: live adapters, infrastructure and external credentials still require deployment verification'
       : 'build: contract must be completed before live deployment',
