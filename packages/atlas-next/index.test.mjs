@@ -39,7 +39,7 @@ test('V105 website publish plan prevents unsafe public publication', () => {
   assert.equal(createDomainBinding({tenantId:'t1',domain:'acme.example',verification:'dns_txt',verified:true}).verified,true);
   const preview = createPublishPlan({site,mode:'preview',artifactHash:'a1'});
   assert.equal(preview.robots,'noindex,nofollow');
-  assert.equal(createPublishPlan({site,mode:'public',artifactHash:'a2'}).sitemapEntries.length,2);
+  assert.equal(createPublishPlan({site,mode:'public',artifactHash:'a2',verifiedDomain:true}).sitemapEntries.length,2);
   assert.throws(() => createPublishPlan({site:{...site,origin:'http://acme.example'},mode:'public',artifactHash:'a3'}),/HTTPS/);
 });
 
@@ -78,16 +78,16 @@ test('V108 freelancer workspace separates work permissions, approvals and secret
     milestones:[{id:'m1',name:'Homepage',amountMinor:30000}]
   });
   assert.equal(authorizeWorkAction({project,memberId:'f1',action:'upload_asset'}).allowed,true);
-  assert.equal(authorizeWorkAction({project,memberId:'f1',action:'refund_customer'}).code,'PERMISSION_DENIED');
+  assert.equal(authorizeWorkAction({project,memberId:'f1',action:'refund_customer'}).code,'FINANCE_AUTHORITY_SEPARATED');
   assert.equal(authorizeWorkAction({project,memberId:'f1',action:'access_secret',secretScope:'billing.keys'}).code,'SECRET_SCOPE_DENIED');
   assert.equal(createDeliverableReview({projectId:'p1',milestoneId:'m1',reviewerId:'owner1',decision:'approved',evidenceRefs:['sha:abc']}).decision,'approved');
 });
 
 test('V109 GHL parity catalog is explicit and snapshot packages are integrity-protected', () => {
   assert.ok(GHL_CAPABILITY_CATALOG.length >= 25);
-  const snap=createSnapshotManifest({tenantId:'t1',name:'agency-template',version:'1.0.0',capabilities:['crm','workflows','website','calendar','payments'],assets:[{path:'workflow.json',sha256:'abc'}]});
+  const snap=createSnapshotManifest({tenantId:'t1',name:'agency-template',version:'1.0.0',capabilities:['crm','workflow_automation','website_builder','calendars_booking','payments_invoicing'],assets:[{path:'workflow.json',sha256:'abc'}]});
   assert.equal(snap.signature.length,64);
-  const coverage=assessCapabilityCoverage({implemented:['crm','workflows','website','calendar','payments'],catalog:GHL_CAPABILITY_CATALOG});
+  const coverage=assessCapabilityCoverage({implemented:['crm','workflow_automation','website_builder','calendars_booking','payments_invoicing'],catalog:GHL_CAPABILITY_CATALOG});
   assert.ok(coverage.implemented >= 5);
   assert.equal(coverage.missing.filter(x=>x==='crm').length,0);
 });
