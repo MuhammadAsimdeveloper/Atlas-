@@ -2,7 +2,11 @@
 
 Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
 
-## Current release: V100
+## Current release: V102
+
+V102 adds the hardened target layer for CRM objects, customer automation nodes, booking calendars and bounded AI-agent execution. It is composed with the V91–V100 authority, automation, service-desk, SLA and voice foundations. The target modules and migration are deterministic contracts; real provider/API/database connections remain deployment work.
+
+See [V102 CRM, Nodes, Calendars and Agents](docs/V102-CRM-NODES-CALENDARS-AGENTS.md).
 
 V100 completes the current voice foundation: V99's verified-event call lifecycle, pinned agent releases, outbound consent and local call-window gates, AI disclosure, capped specialist transfers, human handoff and optional consent-gated recording are paired with V100 call-quality evaluation, privacy-safe coaching codes and per-release service-business metrics. Reviews retain criterion scores and structured evidence references, not transcripts or audio. The laptop-first command center includes non-live journey and quality previews. No provider is connected and no call is placed.
 
