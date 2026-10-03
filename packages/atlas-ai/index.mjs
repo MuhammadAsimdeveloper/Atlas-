@@ -33,7 +33,9 @@ export function defineAgent({
   if(!Number.isSafeInteger(maxTokens)||maxTokens<1||maxTokens>1_000_000)throw new Error('maxTokens invalid');
   if(!Number.isSafeInteger(budgetMinor)||budgetMinor<0)throw new Error('budgetMinor invalid');
   const body={tenantId,agentId,name,type,version,instructions,models:normalizedModels,tools:normalizedTools,maxToolCalls,maxTokens,budgetMinor,requiresHumanApprovalFor:[...new Set(requiresHumanApprovalFor)].sort()};
-  return freeze({...body,releaseId:'agent_'+hash(body).slice(0,28),checksum:hash(body)});
+  const releaseId='agent_'+hash(body).slice(0,28);
+  const material={...body,releaseId};
+  return freeze({...material,checksum:hash(material)});
 }
 
 export function planAgentToolCall({agent,actor,tool,args={},risk='read',approval=null,remainingBudgetMinor=0,callNumber=1}={}){
