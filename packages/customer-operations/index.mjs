@@ -4,6 +4,8 @@ import { effectiveToolSet, evaluateCapability, normalizeTools } from '../atlas-c
 
 export * from './service-desk.mjs';
 export * from './engagement.mjs';
+export * from './voice-operations.mjs';
+export * from './voice-quality.mjs';
 
 export const CUSTOMER_CHANNELS = Object.freeze(['email', 'sms', 'whatsapp', 'facebook', 'instagram', 'webchat', 'voice']);
 export const DEPLOYMENT_STATES = Object.freeze(['draft', 'canary', 'active', 'paused', 'archived']);

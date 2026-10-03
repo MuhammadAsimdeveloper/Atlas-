@@ -1,4 +1,31 @@
-ATLAS V98.0.0 — Safe Customer Messaging + Domain-Independent SEO
+ATLAS V100.0.0 — Voice Operations, Quality and Coaching
+
+V100 implementation
+- Added authenticated, same-tenant, completed-call QA with a fixed six-part scorecard for privacy/policy, disclosure, booking/intake, grounded answers, handoff and approved follow-up.
+- Added checksummed append-only review records, strict request shape, bounded confidence/scores and opaque evidence references. Review records do not accept/store transcript, call audio, prompts, customer messages, credentials or free-text notes.
+- Added deterministic safety escalations and coaching codes, plus per-release quality, task completion, intent-attributed booking conversion, handoff, call-duration and rubric metrics.
+- Added an advisory governance-readiness result (20-call minimum, score 85+, task score 80+, zero policy/disclosure critical failures). Existing Atlas publish/authority gates still apply.
+- Added a forced-tenant-RLS V100 migration, desktop quality/coaching preview, audit docs, release checks and adversarial tests.
+
+V99 lifecycle hardening included in this release
+- Added tenant-bound checksummed calls, provider-attested inbound, outbound workflow identity, explicit consent/DNC/frequency/provider-terms/capacity checks, local time windows, disclosure-before-agent, bounded specialist transfer, human handoff and consent-gated recording state.
+- Hardened booking outcome evidence, needs-review terminal behavior, opaque policy refs, consent event timing and target-agent canary routing. Call records do not store transcript or audio content.
+
+## V100 verification
+- `node --test`: 123 passed, 0 failed.
+- `node scripts/check.mjs`: passed; JavaScript syntax checks completed with exit 0.
+- `node scripts/doctor.mjs`: 20/20 checks passed.
+- `node scripts/docs-check.mjs`: 39 Markdown files, 0 errors.
+- `node scripts/smoke-http.mjs`: 5/5 HTTP end-to-end checks passed.
+- `node scripts/build-site.mjs`: preview site built; indexing disabled because Atlas has no public domain yet.
+- `node scripts/seo-check.mjs`: 33 assertions passed, including preview noindex, public metadata/sitemap behavior and app exclusion.
+- `npm audit`: not run because npm is not installed in the build environment. The package declares no runtime dependencies; dependency audit remains unverified.
+- PostgreSQL migrations are shipped and statically checked, but were not executed; production DB, providers, mail/call services, infrastructure, load/failover/restore and domain/DNS/TLS are not configured or verified.
+- Dashboard data is illustrative; no production call, QA evaluator, reviewer API or scheduled report is connected.
+
+## Previous release: V98.0.0 — Safe Customer Messaging + Domain-Independent SEO
+
+## Previous release: V98.0.0 — Safe Customer Messaging + Domain-Independent SEO
 
 Source baseline
 - Continuation of Atlas V90 through the existing V91–V96 customer-agent, automation, service desk, SLA and authority work.

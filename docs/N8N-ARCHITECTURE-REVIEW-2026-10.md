@@ -48,6 +48,8 @@ n8n exposes evaluation nodes for dataset-driven workflow testing, a Guardrails n
 
 Atlas already scores evaluation cases, rejects cross-tenant traces and gates agent release/promotion on persisted evidence. Keep model quality, knowledge coverage and observed safe outcomes separate from access policy: evaluations may prevent publication or throttle traffic, while tenant scope and tool authorization must remain deterministic server-side. Add batch test sets for service-business conversations with de-identified examples, expected citations/skills, refusal and handoff cases, regression diffs, cost/latency measurements and reviewer coaching. Preserve only redacted traces and references; never use full chat or credentials as default observability data.
 
+V100 adds that loop for voice operations: a fixed booking/intake rubric, structured evidence refs, policy/disclosure critical failures, deterministic coaching codes, and per-release outcome, handoff and duration summaries. Readiness only recommends a governance review; it does not become a tool grant or publication capability. This adapts n8n's evaluation and execution replay concepts to Atlas's tenant and privacy boundaries without inheriting n8n's UI or execution-data model.
+
 Sources: [n8n evaluation and guardrail nodes](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.evaluation), [n8n run-security-audits](https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/run-security-audits), [n8n all-execution inspection](https://docs.n8n.io/build/understand-workflows/understand-executions/view-all-executions).
 
 ## 6. Atlas decisions from this review
@@ -57,7 +59,7 @@ Sources: [n8n evaluation and guardrail nodes](https://docs.n8n.io/integrations/b
 3. Treat email/SMS/WhatsApp/social/voice as provider adapters with fresh consent, suppression, rate/frequency limits, local send windows, idempotent receipts and explicit ambiguous-outcome review. Do not label a channel connected until provider credentials, callback verification and delivery tests pass.
 4. Implement durable execution history before adding broad arbitrary workflow graphs. Operators need to see trigger, pinned release, redacted inputs/outputs, retry state, model/tool decision evidence, cost and human approval lineage.
 5. Keep interactive agents out of production queue claims until an isolated runtime, bounded fan-out, session store, cancellation, queue fairness, backpressure and recovery have been implemented and tested.
-6. V96 implemented one concrete customer-operations gap found by this review: immutable, timezone/holiday/DST-aware support calendars and business-minute SLA pause calculation. V98 adds the previously missing safe merge/render stage for tenant message templates. The breach/escalation scheduler, calendar administration UI and real message delivery remain deployment/product work.
+6. V96 implemented immutable, timezone/holiday/DST-aware support calendars. V98 adds safe tenant message rendering, V99 adds the voice call lifecycle and V100 adds structured call quality/coaching. The visual workflow/agent session browser, scheduled voice reports, live provider execution logs, breach/escalation scheduler, calendar administration UI and real message delivery remain deployment/product work.
 
 ## Review limits
 

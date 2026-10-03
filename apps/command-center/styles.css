@@ -183,3 +183,26 @@ button, select { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.voice-preview-controls { display: grid; gap: 8px; max-width: 620px; margin: 18px 0 12px; }
+.voice-preview-controls label { color: var(--muted); font-size: 12px; font-weight: 700; }
+.voice-preview-controls > div { display: flex; gap: 9px; }
+.voice-preview-controls select, .voice-preview-controls button { min-height: 42px; border: 1px solid var(--border); border-radius: 10px; padding: 0 12px; background: var(--surface); color: var(--text); }
+.voice-preview-controls select { flex: 1; min-width: 0; }
+.voice-preview-controls button { border-color: var(--accent); background: var(--accent); color: var(--surface); font-size: 12px; font-weight: 750; cursor: pointer; }
+.voice-preview-controls button:hover { filter: brightness(.94); }
+.voice-preview-result { min-height: 48px; margin: 0 0 14px; border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; background: var(--surface-muted); font-size: 13px; line-height: 1.6; }
+.voice-quality-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 16px 0 20px; }
+.voice-quality-metrics > div { display: grid; gap: 8px; border: 1px solid var(--border); border-radius: 13px; padding: 16px; background: var(--surface-muted); }
+.voice-quality-metrics span { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.voice-quality-metrics strong { font-size: clamp(18px, 2vw, 25px); letter-spacing: -.04em; }
+.voice-quality-lower { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.voice-quality-lower h3 { margin: 0 0 11px; font-size: 14px; }
+.coaching-preview .row { gap: 10px; }
+.coaching-preview .row span:first-child { min-width: 0; }
+
+@media (max-width: 620px) {
+  .voice-quality-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .voice-quality-metrics > div { padding: 12px; }
+  .voice-quality-lower { grid-template-columns: 1fr; gap: 18px; }
+}

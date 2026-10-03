@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '98.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '100.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('no runtime package dependencies', Object.keys(pkg.dependencies || {}).length === 0 && Object.keys(lock.packages?.['']?.dependencies || {}).length === 0, 'No third-party runtime packages are declared');
 
   const authority = await read('packages/atlas-core/authority.mjs');
@@ -33,9 +33,17 @@ try {
   const calendar = await read('packages/customer-operations/business-calendar.mjs');
   const v96 = await read('infra/postgres/FINAL-MIGRATION-V96.sql');
   check('business SLA calendars', calendar.includes('requireTenantRole(authority, tenantId, [\'owner\', \'admin\'])') && calendar.includes('checksum') && calendar.includes('localBoundary') && calendar.includes('addBusinessMinutesExcludingPauses') && v96.includes('FORCE ROW LEVEL SECURITY') && v96.includes('PRIMARY KEY (tenant_id, calendar_id, version)') && v96.includes('BEFORE UPDATE OR DELETE'), 'Business schedules are immutable, tenant-scoped, DST-aware revisions pinned to support cases');
+  const voice = await read('packages/customer-operations/voice-operations.mjs');
+  const voiceSql = await read('infra/postgres/FINAL-MIGRATION-V99.sql');
+  check('voice-call lifecycle and transfer safety', voice.includes('verifyVoiceCallSession') && voice.includes('MAX_AGENT_TRANSFERS = 3') && voice.includes("new Set(['completed', 'failed', 'abandoned', 'needs_review'])") && voice.includes('appointment_booking_evidence_required') && voice.includes('ai_disclosure_required_before_agent_connection') && voice.includes('explicit_voice_consent_required') && voiceSql.includes('FORCE ROW LEVEL SECURITY') && voiceSql.includes('REVOKE UPDATE, DELETE, TRUNCATE ON atlas_voice_call_events FROM PUBLIC'), 'Voice calls pin checksummed same-tenant releases, require booking evidence, disclosure and outbound safeguards, and keep an RLS-protected append-only event log');
+  const voiceQuality = await read('packages/customer-operations/voice-quality.mjs');
+  const voiceQualitySql = await read('infra/postgres/FINAL-MIGRATION-V100.sql');
+  check('voice QA privacy, coaching and tenant boundaries', voiceQuality.includes('createVoiceCallQualityReview') && voiceQuality.includes('summarizeVoiceCallQuality') && voiceQuality.includes('businessIntentEvidenceRef') && voiceQuality.includes('existing_agent_governance_required') && voiceQuality.includes('criticalFailures') && voiceQualitySql.includes('business_intent_evidence_ref TEXT NOT NULL') && voiceQualitySql.includes('FORCE ROW LEVEL SECURITY') && voiceQualitySql.includes('REVOKE UPDATE, DELETE, TRUNCATE ON atlas_voice_call_quality_reviews FROM PUBLIC') && !/transcript|recording_url|call_audio/i.test(voiceQualitySql), 'V100 quality reviews use intent-bound evidence refs without call content and keep release insights tenant-bound and advisory');
+  const commandCenterSource = await read('apps/command-center/app.mjs');
+  check('voice QA desktop preview', commandCenterSource.includes('id="voice-quality"') && commandCenterSource.includes('Illustrative data') && commandCenterSource.includes('Atlas V100'), 'The laptop-first command center labels quality metrics and coaching examples as sample data');
   const copilot = await read('packages/atlas-copilot/index.mjs');
   check('Copilot scope, approvals and replay safety', copilot.includes('PLATFORM_READ_TOOLS') && copilot.includes('actionStore.createPending') && copilot.includes('Promise.race') && copilot.includes('request_canceled') && copilot.includes('hashAction(action)') && copilot.includes('act_copilot_${idempotencyKey}'), 'Copilot restricts global tools, approval-gates writes, bounds adapters and verifies a stable replay identity');
-  const sqlWithoutComments = `${v92}\n${v93}\n${v94}\n${v95}\n${v96}`.replace(/--[^\r\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const sqlWithoutComments = `${v92}\n${v93}\n${v94}\n${v95}\n${v96}\n${voiceSql}\n${voiceQualitySql}`.replace(/--[^\r\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
   check('no RLS bypass grant', !/\b(?:ALTER\s+ROLE|GRANT)[^;]*\bBYPASSRLS\b/i.test(sqlWithoutComments), 'Migrations do not grant BYPASSRLS');
 
   const docs = await read('README.md');

@@ -1,7 +1,7 @@
 {
   "name": "atlas-business-os",
   "private": true,
-  "version": "98.0.0",
+  "version": "100.0.0",
   "type": "module",
   "scripts": {
     "test": "node --test",

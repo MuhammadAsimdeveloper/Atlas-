@@ -2,7 +2,13 @@
 
 Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
 
-## Current release: V98
+## Current release: V100
+
+V100 completes the current voice foundation: V99's verified-event call lifecycle, pinned agent releases, outbound consent and local call-window gates, AI disclosure, capped specialist transfers, human handoff and optional consent-gated recording are paired with V100 call-quality evaluation, privacy-safe coaching codes and per-release service-business metrics. Reviews retain criterion scores and structured evidence references, not transcripts or audio. The laptop-first command center includes non-live journey and quality previews. No provider is connected and no call is placed.
+
+See [V99 Voice Operations](docs/V99-VOICE-OPERATIONS.md), [V100 Voice Quality and Coaching](docs/V100-VOICE-QUALITY.md) and the [V100 deep audit](docs/DEEP-AUDIT-V100.md). The SQL migrations target `infra/postgres/FINAL-MIGRATION-V99.sql` and `infra/postgres/FINAL-MIGRATION-V100.sql`; migrations are shipped for review and have not been applied to a production database.
+
+## V98 — Safe Tenant Message Rendering
 
 V98 closes the outbound-template rendering gap found during the customer-operations audit. A tenant-bound renderer now creates deterministic email/SMS/chat message drafts from immutable template releases. Email HTML uses a small formatting allowlist and escapes personalized text; missing merge fields produce `needs_data` with no partial sendable content, and subject data cannot inject headers. This prepares a draft only; consent/provider rechecks and actual delivery remain worker/integration responsibilities.
 

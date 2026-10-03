@@ -1,5 +1,20 @@
 # Changelog
 
+## 100.0.0 — Voice Quality Reviews and Agent Coaching
+- Added authenticated, tenant-pinned voice QA for completed calls with a fixed six-part rubric covering policy/privacy, disclosure, booking/intake completion, grounded answers, handoff quality and approved follow-up.
+- Added immutable checksummed reviews with bounded scores, confidence and structured evidence references; the review record never accepts or stores transcripts, audio, prompts or free-text notes.
+- Added deterministic coaching codes, urgent safety escalation for low policy/disclosure scores, and release-level intent-attributed booking conversion, task completion, handoff, talk-duration and criterion metrics.
+- Added an advisory readiness report that requires at least 20 reviewed calls, a score of 85 or higher, task completion of 80 or higher and zero critical policy/disclosure failures; existing agent publication authorization remains separate and stricter.
+- Added V100 forced tenant RLS and append-only Postgres tables, laptop-first sample-only QA panels, adversarial privacy/tenant tests, and updated HighLevel/n8n findings. No production reports or call provider are connected.
+
+## 99.0.0 — Voice Operations and Call Lifecycle
+- Added tenant-bound voice call sessions pinned to checksum-verified, published agent releases that expose a voice route.
+- Added disclosure-before-agent transitions, bounded specialist-agent transfer with loop prevention, authenticated human queue handoff, booking references and terminal call outcomes.
+- Added strict outbound call authorization for explicit contact voice consent, DNC/frequency checks, separate provider terms, atomic-capacity reservations and tenant-configured local call windows with overnight/DST handling.
+- Added recording-off/consent-required state transitions; recording starts only after caller consent evidence and normal completion requires a stop event.
+- Added V99 forced-RLS session/event schema, append-only call events, idempotency and version columns; added command-center voice journey previews explicitly marked as non-live.
+- Added adversarial lifecycle and policy tests plus first-party HighLevel/Twilio research notes. No telephony, speech, calendar, recording or production adapter is claimed as connected.
+
 ## 98.0.0 — Safe Tenant Message Rendering
 - Added a deterministic renderer for immutable message-template releases; it requires exact trusted tenant scope and valid release checksum and returns a send-ready draft shape without sending it.
 - Limited merge variables to approved business-data roots and own data properties; credential/payment fields, prototype paths, getters, object coercion, unsafe controls and email subject header injection are rejected.

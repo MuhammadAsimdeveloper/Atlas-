@@ -40,7 +40,13 @@ try {
   assert.match(appText, /service-desk/);
   assert.match(appText, /message-studio/);
   assert.match(appText, /Missing data stops for review/);
-  console.log('PASS HTTP GET /app.mjs: Copilot and service desk preview');
+  assert.match(appText, /voice-operations/);
+  assert.match(appText, /voice-quality/);
+  assert.match(appText, /Illustrative data/);
+  assert.match(appText, /zero policy\/disclosure failures/);
+  assert.match(appText, /Simulation only/);
+  assert.match(appText, /No provider connected/);
+  console.log('PASS HTTP GET /app.mjs: Copilot, service desk and voice preview');
 
   const css = await get('/styles.css');
   const cssText = await css.text();
