@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '100.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '102.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('no runtime package dependencies', Object.keys(pkg.dependencies || {}).length === 0 && Object.keys(lock.packages?.['']?.dependencies || {}).length === 0, 'No third-party runtime packages are declared');
 
   const authority = await read('packages/atlas-core/authority.mjs');
@@ -53,6 +53,15 @@ try {
   const commandCenter = await read('apps/command-center/index.html');
   check('SEO preview and public boundary', seo.includes('renderPreviewRobots') && seo.includes('renderPublicSitemap') && seo.includes('validatePublicOrigin') && marketing.includes('noindex,nofollow') && commandCenter.includes('noindex,nofollow'), 'Preview is noindex; public SEO metadata and sitemap require a validated real HTTPS origin');
   check('domain-independent SEO setup documented', docs.includes('SEO deployment') && docs.includes('ATLAS_PUBLIC_ORIGIN') && await read('docs/SEO-DEPLOYMENT.md').then(value => value.includes('public domain yet') && value.includes('Search Console')), 'No-domain preview and future indexing configuration are documented');
+  const target = await read('packages/atlas-target/index.mjs');
+  const targetTest = await read('packages/atlas-target/index.test.mjs');
+  const targetSql = await read('infra/postgres/FINAL-MIGRATION-V102.sql');
+  check('V102 CRM target', target.includes('CRM_OBJECT_TYPES') && target.includes('transitionCrmDeal') && target.includes('searchCrm') && targetTest.includes('typed properties'), 'CRM objects, schemas, versioned mutations, associations, pipelines and deterministic search are implemented and tested');
+  check('V102 workflow node target', target.includes('WORKFLOW_NODE_CATALOG') && target.includes('createWorkflowGraph') && target.includes('planWorkflowNode') && target.includes('summarizeWorkflowExecution') && targetTest.includes('workflow-node target'), 'Workflow graph is bounded, checksum protected, cycle checked, reachable and approval aware');
+  check('V102 booking calendar target', target.includes('createBookingCalendar') && target.includes('listAvailableSlots') && target.includes('holdBooking') && target.includes('bookAppointment') && targetTest.includes('booking calendar target'), 'Customer-facing booking calendars provide timezone-aware availability, holds and versioned lifecycle commands');
+  check('V102 agent runtime target', target.includes('createAgentRuntimePolicy') && target.includes('authorizeAgentToolCall') && target.includes('consumeAgentBudget') && target.includes('validateAgentOutput') && targetTest.includes('agent runtime target'), 'Agent runtime pins tenant/release, bounds budgets, requires exact write approval and validates structured output');
+  check('V102 SQL tenant isolation', targetSql.includes('FORCE ROW LEVEL SECURITY') && targetSql.includes('atlas_crm_records') && targetSql.includes('atlas_booking_calendars') && targetSql.includes('atlas_agent_sessions') && !/BYPASSRLS/i.test(targetSql), 'New V102 persistence tables use forced tenant RLS and do not grant BYPASSRLS');
+
   const engagement = await read('packages/customer-operations/engagement.mjs');
   check('tenant-bound message renderer', engagement.includes('export function renderMessageTemplateVersion') && engagement.includes('Message template tenant does not match') && engagement.includes('Email HTML contains a tag or attribute outside the safe formatting allowlist') && engagement.includes('needs_data'), 'Template renderer is tenant-bound, context-escapes HTML, restricts markup and fails closed on missing fields');
 } catch (error) {

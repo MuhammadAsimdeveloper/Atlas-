@@ -1,3 +1,10 @@
+## 102.0.0 — Hardened CRM, Workflow Nodes, Booking Calendars and AI Agents
+- Added a provider-neutral CRM target for contacts, companies, leads, deals, tickets, tasks, notes, appointments and custom records with typed properties, associations, deterministic search, optimistic versioning and pipeline governance.
+- Added a checksummed workflow graph target covering triggers, conditions, switches, waits, transforms, CRM actions, messaging, availability, appointment lifecycle, sub-workflows, approvals, webhooks and terminal nodes, with risk/guard/retry/timeout metadata.
+- Added customer-facing booking-calendar contracts distinct from SLA calendars: time zones, holidays, overrides, buffers, capacity, host routing, availability, holds, idempotent booking, rescheduling and cancellation.
+- Added a reusable AI-agent runtime envelope with tenant/release pinning, exact approval binding, turn/tool/execution budgets, lease-bound sessions and bounded structured outputs.
+- Added V102 tenant-RLS persistence targets, focused tests and release doctor invariants. Provider adapters, authenticated API, production queues, live calendar sync and database execution remain unverified.
+
 # Changelog
 
 ## 100.0.0 — Voice Quality Reviews and Agent Coaching
