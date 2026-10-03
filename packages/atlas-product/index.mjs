@@ -65,9 +65,6 @@ export function planProductResourcePublish({
   verifyProductResource(resource);
   const allowedRoles=new Set(['owner','admin','platform_release_manager']);
   if (!allowedRoles.has(actorRole)) return {allowed:false,code:'PUBLISH_ROLE_DENIED'};
-  const critical=resource.sensitivity==='critical';
-  if (critical && approvals.stepUp!==true) return {allowed:false,code:'STEP_UP_REQUIRED'};
-  if (critical && approvals.secondApprover!==true) return {allowed:false,code:'DUAL_APPROVAL_REQUIRED'};
   const missing=resource.dependencies.filter(dep=>!verifiedDependencies.includes(dep));
   if (missing.length) return {allowed:false,code:'DEPENDENCIES_UNVERIFIED',missingDependencies:missing};
   if (resource.type==='site' && policy.domainVerified!==true) return {allowed:false,code:'DOMAIN_NOT_VERIFIED'};
@@ -75,6 +72,9 @@ export function planProductResourcePublish({
   if (resource.type==='social_campaign' && policy.providerPublishGrant!==true) return {allowed:false,code:'SOCIAL_PUBLISH_GRANT_REQUIRED'};
   if (resource.type==='ad_campaign' && policy.spendApproval!==true) return {allowed:false,code:'AD_SPEND_APPROVAL_REQUIRED'};
   if (resource.type==='payment' && policy.paymentProviderReady!==true) return {allowed:false,code:'PAYMENT_PROVIDER_NOT_READY'};
+  const critical=resource.sensitivity==='critical';
+  if (critical && approvals.stepUp!==true) return {allowed:false,code:'STEP_UP_REQUIRED'};
+  if (critical && approvals.secondApprover!==true) return {allowed:false,code:'DUAL_APPROVAL_REQUIRED'};
   return freeze({
     allowed:true,
     actionId:'publish_'+sha256({resource:resource.checksum,actorRole,approvals,verifiedDependencies,policy}).slice(0,28),
