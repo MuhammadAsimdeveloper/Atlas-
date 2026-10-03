@@ -1,3 +1,23 @@
+## 110.0.0 — V104–V110 Production Hardening Frontier
+- Added provider adapter definitions with webhook verification, rate limits, incremental sync checkpoints and circuit-breaker health states.
+- Added tenant-bound website/domain/publish contracts with HTTPS, verified-domain and preview noindex gates.
+- Added communication delivery envelopes with idempotency, consent, suppression, frequency and quiet-hour controls.
+- Added USD integer-minor usage metering, deterministic invoices and duplicate-safe provider payment reconciliation.
+- Added project-scoped freelancer/agency permissions, secret scopes, milestone budget bounds and deliverable evidence.
+- Added a concrete GHL capability catalog and integrity-protected snapshot manifests.
+- Added trust-control evidence, measured recovery-drill, SLO/error-budget and release-gate contracts.
+- Added V104–V110 PostgreSQL tenant-RLS persistence targets and release doctor coverage.
+
+## 103.0.0 — Trust, Commerce & Connector Fabric
+- Added scoped third-party connector definitions and tenant grants with operation/scope/expiry enforcement.
+- Added A-to-B automation contracts with bounded records, idempotency and risky-action approval gates.
+- Added USD-first financial safety controls: spend limits, approval thresholds, balanced immutable-ledger target and refund approval.
+- Added freelancer/agency project workspace authorization separated from financial authority.
+- Added deterministic website SEO metadata contract.
+- Added security control-plane contracts for step-up authentication and dual-control break-glass actions.
+- Added V103 PostgreSQL tenant-RLS persistence targets and release doctor checks.
+- Defined V104–V110 roadmap for provider adapters, communications, websites/SEO, financial OS, freelancer work OS, GHL capability sweep and trust certification.
+
 ## 102.0.0 — Hardened CRM, Workflow Nodes, Booking Calendars and AI Agents
 - Added a provider-neutral CRM target for contacts, companies, leads, deals, tickets, tasks, notes, appointments and custom records with typed properties, associations, deterministic search, optimistic versioning and pipeline governance.
 - Added a checksummed workflow graph target covering triggers, conditions, switches, waits, transforms, CRM actions, messaging, availability, appointment lifecycle, sub-workflows, approvals, webhooks and terminal nodes, with risk/guard/retry/timeout metadata.

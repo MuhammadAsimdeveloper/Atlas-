@@ -2,7 +2,11 @@
 
 Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
 
-## Current release: V102
+## Current release: V110
+
+V104–V110 adds the provider adapter and sync fabric, production website/SEO publish gate, unified communication policy, USD financial operations, freelancer/agency work controls, explicit GHL capability coverage, integrity-protected snapshots, and trust/DR/SLO release gates. Live providers and managed production infrastructure remain deployment work.
+
+See [V104–V110 Production Hardening](docs/V104-V110-PRODUCTION-HARDENING.md).
 
 V102 adds the hardened target layer for CRM objects, customer automation nodes, booking calendars and bounded AI-agent execution. It is composed with the V91–V100 authority, automation, service-desk, SLA and voice foundations. The target modules and migration are deterministic contracts; real provider/API/database connections remain deployment work.
 
@@ -109,7 +113,7 @@ This repository contains deterministic domain contracts, tests, SQL migration ta
 
 Target deployment architecture: managed PostgreSQL with forced tenant RLS; managed Redis/queue; separately scaled authenticated API, webhook ingress and workers; managed secret manager/KMS; object storage and CDN for attachments; WAF/rate limits; OpenTelemetry collection; tested backups, restores, load, failover and SLOs. No millions-of-users capacity claim is verified by this repository.
 
-Apply SQL targets in order: V80, V85, V90, V91, V92, V93, V94, V95, V96, V99, V100, then V102. SQL has not been run against a live PostgreSQL service in this workspace. API and worker roles must not have `BYPASSRLS`, and `app.tenant_id` must be set from authenticated membership in every tenant transaction.
+Apply SQL targets in order: V80, V85, V90, V91, V92, V93, V94, V95, V96, V99, V100, V102, then V103. SQL has not been run against a live PostgreSQL service in this workspace. API and worker roles must not have `BYPASSRLS`, and `app.tenant_id` must be set from authenticated membership in every tenant transaction.
 
 For GHL/n8n/monday/HubSpot analysis and explicit feature gaps, see [October 2026 competitor benchmark](docs/COMPETITOR-BENCHMARK-2026-10.md). For the V95 duplicate-case behavior see [V95 Case Intelligence](docs/V95-CASE-INTELLIGENCE.md); the [V94 Copilot and Service Desk](docs/V94-COPILOT-SERVICE-DESK.md) document describes the underlying contracts.
 
