@@ -1,3 +1,20 @@
+ATLAS V110.0.0 — V104–V110 Production Hardening Frontier
+
+Implemented
+- V104 provider adapter, webhook verification, sync checkpoint and provider-health contracts.
+- V105 website/domain/publish and indexability contracts.
+- V106 communication delivery envelope and consent-policy contracts.
+- V107 usage metering, invoice calculation and payment reconciliation.
+- V108 freelancer/agency work permissions, secret scopes, milestones and deliverable evidence.
+- V109 GHL capability catalog and snapshot integrity manifests.
+- V110 trust evidence, recovery drills, SLO state and release gates.
+- V104–V110 forced-tenant-RLS persistence targets and doctor coverage.
+
+Verification boundary
+- Domain tests are committed; CI remains the authoritative merge verification.
+- PostgreSQL migrations are static targets and are not claimed as executed against live infrastructure.
+- Real provider credentials/adapters, carrier registration, checkout, DNS/CDN/WAF, managed workers and compliance certification remain external deployment work.
+
 ATLAS V103.0.0 — Trust, Commerce & Connector Fabric
 
 Implemented
