@@ -35,7 +35,7 @@ test('execution checkpoints support deterministic resume without cross-release d
 });
 
 test('queue leases prevent unowned completion and support retry/dead-letter',()=>{
-  const job=createQueueJob({tenantId:'t1',executionId:'e1',stepId:'s1',maxAttempts:1});
+  const job=createQueueJob({tenantId:'t1',executionId:'e1',stepId:'s1',maxAttempts:1,availableAt:'1970-01-01T00:00:00.000Z'});
   const store=new Map();
   const claimed=claimQueueJob(store,job,{workerId:'worker-a',nowMs:1000});
   assert.equal(claimed.status,'claimed');
