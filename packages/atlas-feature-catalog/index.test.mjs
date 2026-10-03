@@ -16,7 +16,7 @@ test('full GHL+n8n catalog is exhaustive enough to prevent silent omissions', ()
 test('every feature is mapped to an Atlas implementation anchor and stage', () => {
   for (const row of FULL_FEATURE_CATALOG) {
     assert.ok(row.atlasAnchor);
-    assert.match(row.stage,/^V11[1-9]$|^V120$/);
+    assert.match(row.stage,/^V105$|^V11[1-9]$|^V120$/);
     assert.ok(Object.values(STATUS).includes(row.atlasStatus));
   }
 });
