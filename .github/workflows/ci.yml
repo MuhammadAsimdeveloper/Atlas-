@@ -22,4 +22,12 @@ jobs:
       - run: npm run seo:check
       - run: npm run build:site
       - run: npm run smoke:e2e
+      - run: npm run launch:check
       - run: npm audit --audit-level=moderate
+      - name: Upload launch-safe preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-v100-static-preview-node-${{ matrix.node }}
+          path: dist/atlas-site
+          if-no-files-found: error
+          retention-days: 14
