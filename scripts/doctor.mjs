@@ -83,6 +83,16 @@ try {
   check('V109 capability parity', next.includes('GHL_CAPABILITY_CATALOG') && next.includes('createSnapshotManifest') && nextTest.includes('V109 GHL'), 'GHL benchmark capabilities and signed/integrity-protected snapshots are explicit');
   check('V110 trust and recovery gates', next.includes('createControlRegister') && next.includes('recordControlEvidence') && next.includes('evaluateRecoveryDrill') && next.includes('calculateSloStatus') && next.includes('createReleaseGate') && nextSql.includes('atlas_trust_control_evidence') && nextSql.includes('atlas_release_gates'), 'Trust evidence, DR, SLO and release gates are explicit');
 
+  const featureCatalog = await read('packages/atlas-feature-catalog/index.mjs');
+  const featureCatalogTest = await read('packages/atlas-feature-catalog/index.test.mjs');
+  check('V111 full feature catalog', featureCatalog.includes('FULL_FEATURE_CATALOG') && featureCatalog.includes('GHL_FEATURES') && featureCatalog.includes('N8N_FEATURES') && featureCatalogTest.includes('exhaustive enough'), 'GHL and n8n benchmark features are machine-mapped to stages and Atlas anchors');
+  const runtime = await read('packages/atlas-runtime/index.mjs');
+  const runtimeTest = await read('packages/atlas-runtime/index.test.mjs');
+  check('V111 durable runtime', runtime.includes('compileDurableWorkflow') && runtime.includes('checkpointExecution') && runtime.includes('createQueueJob') && runtime.includes('createConnectorSdkDefinition') && runtimeTest.includes('queue leases'), 'n8n-class workflow execution has deterministic compilation, checkpoint/resume, queue leases and connector invocation gates');
+  const product = await read('packages/atlas-product/index.mjs');
+  const productTest = await read('packages/atlas-product/index.test.mjs');
+  check('V111 product resource safety', product.includes('defineProductResource') && product.includes('planProductResourcePublish') && product.includes('createFeatureBundle') && productTest.includes('feature bundles'), 'GHL-class product resources are tenant-bound, checksummed and protected by publish/permission gates');
+
   const engagement = await read('packages/customer-operations/engagement.mjs');
   check('tenant-bound message renderer', engagement.includes('export function renderMessageTemplateVersion') && engagement.includes('Message template tenant does not match') && engagement.includes('Email HTML contains a tag or attribute outside the safe formatting allowlist') && engagement.includes('needs_data'), 'Template renderer is tenant-bound, context-escapes HTML, restricts markup and fails closed on missing fields');
 } catch (error) {
