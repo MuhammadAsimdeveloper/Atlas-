@@ -2,11 +2,11 @@
 
 Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
 
-## Current release: V103
+## Current release: V110
 
-V103 adds the Trust, Commerce & Connector Fabric: scoped third-party connections, A-to-B automations, financial spend controls and balanced ledger targets, freelancer/agency workspaces, deterministic SEO metadata, and high-value security step-up/dual-approval controls. It is the safety foundation for V104–V110 provider adapters, communications, websites, financial OS and trust certification.
+V104–V110 adds the provider adapter and sync fabric, production website/SEO publish gate, unified communication policy, USD financial operations, freelancer/agency work controls, explicit GHL capability coverage, integrity-protected snapshots, and trust/DR/SLO release gates. Live providers and managed production infrastructure remain deployment work.
 
-See [V103 capability matrix](docs/V103-CAPABILITY-MATRIX.md) and [V103 architecture](docs/V103-TRUST-COMMERCE-CONNECTOR-FABRIC.md).
+See [V104–V110 Production Hardening](docs/V104-V110-PRODUCTION-HARDENING.md).
 
 V102 adds the hardened target layer for CRM objects, customer automation nodes, booking calendars and bounded AI-agent execution. It is composed with the V91–V100 authority, automation, service-desk, SLA and voice foundations. The target modules and migration are deterministic contracts; real provider/API/database connections remain deployment work.
 
