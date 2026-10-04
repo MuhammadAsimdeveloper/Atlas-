@@ -45,6 +45,10 @@ node scripts/seo-check.mjs
 
 The generated files are in `dist/atlas-site/`; this folder is ignored by Git and should not be placed inside a source ZIP. Preview mode emits a deny-all `robots.txt`, does not create `sitemap.xml`, and adds no canonical URL.
 
+## Domain-independent preview and SEO deployment
+
+If Atlas does not have a public domain yet, keep preview builds on `noindex,nofollow`, keep the preview robots policy closed to crawling, and do not create a sitemap or canonical public origin. The application can be tested locally or on a temporary preview host without claiming search visibility. When a real public domain is selected, configure `ATLAS_PUBLIC_ORIGIN`, provision HTTPS, verify the property in Google Search Console and Bing Webmaster Tools, and only then enable public indexing.
+
 ## Enable indexing after launch
 
 After purchasing a domain, configure DNS, provision HTTPS, and choose the one canonical hostname (for example, `https://www.your-real-domain.com`). Run the public build with that origin:
