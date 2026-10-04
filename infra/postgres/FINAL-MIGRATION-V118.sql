@@ -206,9 +206,10 @@ BEGIN
   END IF;
   SELECT * INTO existing_map FROM public.atlas_integration_mappings
     WHERE tenant_id=p_tenant_id AND connection_id=p_connection_id AND provider_object_type='Client' AND external_id=p_external_id FOR UPDATE;
+  mapping_found := FOUND;
   PERFORM set_config('app.tenant_id',p_tenant_id::text,true);
   PERFORM set_config('app.actor_id',actor::text,true);
-  IF FOUND AND existing_map.source_updated_at IS NOT NULL AND p_source_updated_at IS NOT NULL AND p_source_updated_at <= existing_map.source_updated_at THEN
+  IF mapping_found AND existing_map.source_updated_at IS NOT NULL AND p_source_updated_at IS NOT NULL AND p_source_updated_at <= existing_map.source_updated_at THEN
     result_code:='skipped'; atlas_item_id:=existing_map.atlas_item_id;
     SELECT g.version INTO version FROM public.atlas_growth_items g WHERE g.tenant_id=p_tenant_id AND g.item_id=existing_map.atlas_item_id;
     RETURN NEXT; RETURN;
@@ -228,12 +229,6 @@ BEGIN
     ) VALUES (
       p_tenant_id,item,record_module,p_record->>'title',p_record->>'state',record_version,p_record->'payload',p_record->>'checksum',
       actor,actor,NULL,(p_record->>'createdAt')::timestamptz,(p_record->>'updatedAt')::timestamptz
-    );
-    INSERT INTO public.atlas_growth_item_versions(
-      tenant_id,item_id,version,module_key,title,state,payload,checksum,actor_id,created_at
-    ) VALUES (
-      p_tenant_id,item,record_version,record_module,p_record->>'title',p_record->>'state',p_record->'payload',p_record->>'checksum',
-      actor,(p_record->>'updatedAt')::timestamptz
     );
     result_code:='created';
   END IF;
@@ -276,6 +271,7 @@ DECLARE
   queue_key CHAR(64);
   operation TEXT;
   inserted BOOLEAN:=FALSE;
+  mapping_found BOOLEAN:=FALSE;
 BEGIN
   IF current_user <> 'atlas_integration_ingress' THEN RAISE EXCEPTION 'integration_ingress_required'; END IF;
   IF p_account_id IS NULL OR length(p_account_id) NOT BETWEEN 1 AND 512
@@ -404,6 +400,7 @@ BEGIN
     GRANT SELECT,INSERT,UPDATE ON atlas_integration_connections,atlas_integration_oauth_states,atlas_integration_mappings,atlas_integration_webhook_events,atlas_integration_tasks TO atlas_integration_ingress;
     GRANT SELECT,INSERT,UPDATE ON atlas_growth_items TO atlas_integration_ingress;
     GRANT SELECT,INSERT ON atlas_growth_item_versions,atlas_growth_item_events TO atlas_integration_ingress;
+    GRANT INSERT ON atlas_event_outbox TO atlas_integration_ingress;
     GRANT EXECUTE ON FUNCTION atlas_v115_append_outbox_event(UUID,UUID,TEXT,JSONB) TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_consume_oauth_state(CHAR) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_get_integration_contact(UUID,UUID,TEXT) OWNER TO atlas_integration_ingress;
