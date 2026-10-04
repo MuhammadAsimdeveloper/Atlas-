@@ -49,7 +49,7 @@ function jsonForHtml(value) {
 }
 
 function replaceMeta(html, name, content) {
-  const pattern = new RegExp("<meta\\s+name=[\\"']" + name + "[\\"'][^>]*>", 'i');
+  const pattern = new RegExp('<meta\\s+name="' + name + '"[^>]*>', 'i');
   const tag = '<meta name="' + name + '" content="' + escapeAttribute(content) + '">';
   return pattern.test(html) ? html.replace(pattern, tag) : html.replace('</head>', '    ' + tag + '\n  </head>');
 }
