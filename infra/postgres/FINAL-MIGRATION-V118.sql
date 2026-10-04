@@ -162,6 +162,17 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION atlas_v118_get_growth_record(p_tenant_id UUID,p_item_id UUID)
+RETURNS TABLE(item_id UUID,module_key TEXT,title TEXT,state TEXT,version INTEGER,payload JSONB,checksum CHAR(64),created_by UUID,updated_by UUID,created_at TIMESTAMPTZ,updated_at TIMESTAMPTZ)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+BEGIN
+  IF current_user NOT IN ('atlas_worker','atlas_integration_ingress') THEN RAISE EXCEPTION 'integration_worker_required'; END IF;
+  RETURN QUERY SELECT g.item_id,g.module_key,g.title,g.state,g.version,g.payload,g.checksum,g.created_by,g.updated_by,g.created_at,g.updated_at
+  FROM public.atlas_growth_items g
+  WHERE g.tenant_id=p_tenant_id AND g.item_id=p_item_id;
+END;
+$;
+
 CREATE OR REPLACE FUNCTION atlas_v118_get_integration_contact(
   p_tenant_id UUID,p_connection_id UUID,p_external_id TEXT
 )
@@ -409,6 +420,7 @@ BEGIN
     GRANT SELECT,INSERT ON atlas_growth_item_versions,atlas_growth_item_events TO atlas_integration_ingress;
     GRANT INSERT ON atlas_event_outbox TO atlas_integration_ingress;
     GRANT EXECUTE ON FUNCTION atlas_v115_append_outbox_event(UUID,UUID,TEXT,JSONB) TO atlas_integration_ingress;
+    ALTER FUNCTION atlas_v118_get_growth_record(UUID,UUID) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_consume_oauth_state(CHAR) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_get_integration_contact(UUID,UUID,TEXT) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_upsert_integration_contact(UUID,UUID,TEXT,TIMESTAMPTZ,JSONB) OWNER TO atlas_integration_ingress;
@@ -419,6 +431,7 @@ END
 $$;
 
 REVOKE ALL ON atlas_integration_connections,atlas_integration_oauth_states,atlas_integration_mappings,atlas_integration_webhook_events,atlas_integration_tasks,atlas_integration_deliveries FROM PUBLIC;
+REVOKE ALL ON FUNCTION atlas_v118_get_growth_record(UUID,UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v118_consume_oauth_state(CHAR) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v118_get_integration_contact(UUID,UUID,TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v118_upsert_integration_contact(UUID,UUID,TEXT,TIMESTAMPTZ,JSONB) FROM PUBLIC;
