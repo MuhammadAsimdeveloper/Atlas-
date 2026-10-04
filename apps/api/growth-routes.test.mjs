@@ -16,6 +16,7 @@ async function createTestApi({ tenantId = tenantA, email = ownerEmail, membershi
   const store={
     async overview(data) { seen.push(['overview',data]); return {status:'tenant_database_backed'}; },
     async list(data) { seen.push(['list',data]); return {items:[],canWrite:true}; },
+    async getWorkflowCatalog(data) { seen.push(['workflow_catalog',data]); return { executionAvailable:false, triggers:[{type:'contact.created'}], nodes:[{type:'trigger'},{type:'stop'}] }; },
     async listPublishedQualificationProfiles(data) { seen.push(['qualification_profiles',data]); return {items:[{id:'44444444-4444-4444-8444-444444444444',state:'published'}],canWrite:false}; },
     async get(data) { seen.push(['get',data]); return {id:data.id,tenantId:data.tenantId,module:data.module}; },
     async create(data) { seen.push(['create',data]); return {id:'22222222-2222-4222-8222-222222222222',tenantId:data.tenantId,module:data.module,payload:data.payload}; },
@@ -53,6 +54,25 @@ test('Growth routes use the authenticated active tenant and reject request-suppl
     assert.equal(creation.tenantId,tenantA);
     assert.equal(creation.actorId,actor);
     assert.equal(creation.publisherAuthority.globalRole,'platform_owner');
+  } finally {await api.close();}
+});
+
+test('workflow capability catalog is available only through the authenticated active tenant scope', async () => {
+  const api=await createTestApi();
+  try {
+    let response=await fetch(`${api.base}/api/v1/growth/workflows/catalog?tenantId=${tenantB}`,{headers:api.headers});
+    const catalog=await response.json();
+    assert.equal(response.status,200);
+    assert.equal(catalog.executionAvailable,false);
+    assert.deepEqual(catalog.nodes.map(node=>node.type),['trigger','stop']);
+    const scope=api.seen.find(([kind])=>kind==='workflow_catalog')[1];
+    assert.equal(scope.actorId,actor); assert.equal(scope.tenantId,tenantA);
+
+    const unauthenticated=await fetch(`${api.base}/api/v1/growth/workflows/catalog`);
+    assert.equal(unauthenticated.status,401);
+    const wrongMethod=await fetch(`${api.base}/api/v1/growth/workflows/catalog`,{method:'POST',headers:api.headers,body:JSON.stringify({})});
+    assert.equal(wrongMethod.status,405,'catalog is a read-only endpoint and is not a write command');
+    assert.equal(wrongMethod.headers.get('allow'),'GET');
   } finally {await api.close();}
 });
 

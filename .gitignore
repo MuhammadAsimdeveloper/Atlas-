@@ -4,6 +4,7 @@ dist/
 .env.*
 !.env.example
 data/
+work/
 *.log
 *.zip
 *.zip.sha256

@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const port = 43000 + Math.floor(Math.random() * 14000);
 const server = spawn(process.execPath, [path.join(root, 'apps', 'api', 'server.mjs')], {
   cwd: root,
-  env: { ...process.env, NODE_ENV: 'test', PORT: String(port), ATLAS_RELEASE: 'V115', ATLAS_DATABASE_URL: '', ATLAS_PUBLIC_ORIGIN: '', ATLAS_PLATFORM_OWNER_EMAIL: '' },
+  env: { ...process.env, NODE_ENV: 'test', PORT: String(port), ATLAS_RELEASE: 'V116', ATLAS_DATABASE_URL: '', ATLAS_PUBLIC_ORIGIN: '', ATLAS_PLATFORM_OWNER_EMAIL: '' },
   stdio: 'ignore', windowsHide: true
 });
 const base = `http://127.0.0.1:${port}`;
@@ -24,7 +24,7 @@ try {
   assert.equal(ready, true, 'Atlas API starts');
 
   const live = await get('/health/live');
-  assert.equal((await live.json()).release, 'V115');
+    assert.equal((await live.json()).release, 'V116');
   const homepage = await get('/');
   const html = await homepage.text();
   assert.equal(homepage.status, 200);
@@ -36,6 +36,9 @@ try {
   const module = await get('/auth.mjs');
   assert.equal(module.status, 200);
   assert.match(await module.text(), /csrf/);
+  const workflowEditor = await get('/workflow-studio.mjs');
+  assert.equal(workflowEditor.status, 200);
+  assert.match(await workflowEditor.text(), /createWorkflowStudio/);
   const styles = await get('/auth.css');
   assert.equal(styles.status, 200);
   assert.match(await styles.text(), /prefers-reduced-motion/);
@@ -60,7 +63,7 @@ try {
   const me = await get('/api/v1/me');
   assert.equal(me.status, 503);
   assert.equal((await me.json()).error, 'database_required');
-  console.log('Atlas API HTTP smoke: 10/10 checks passed (auth UI, assets, trial disclosure, status, readiness and fail-closed tenant routes).');
+  console.log('Atlas API HTTP smoke: 11/11 checks passed (auth UI, workflow studio asset, trial disclosure, status, readiness and fail-closed tenant routes).');
 } finally {
   server.kill();
 }

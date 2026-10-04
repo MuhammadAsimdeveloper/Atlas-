@@ -11,7 +11,7 @@ import { PostgresGrowthStore } from './growth-store.mjs';
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
 const runtime = env.NODE_ENV || 'development';
-const release = env.ATLAS_RELEASE || 'V115';
+const release = env.ATLAS_RELEASE || 'V116';
 const webAssets = new Map([
   ['/', ['../command-center/auth.html', 'text/html; charset=utf-8']],
   ['/login', ['../command-center/auth.html', 'text/html; charset=utf-8']],
@@ -23,6 +23,7 @@ const webAssets = new Map([
   ['/auth.css', ['../command-center/auth.css', 'text/css; charset=utf-8']],
   ['/auth-modal.css', ['../command-center/auth-modal.css', 'text/css; charset=utf-8']],
   ['/growth.mjs', ['../command-center/growth.mjs', 'text/javascript; charset=utf-8']],
+  ['/workflow-studio.mjs', ['../command-center/workflow-studio.mjs', 'text/javascript; charset=utf-8']],
   ['/growth.css', ['../command-center/growth.css', 'text/css; charset=utf-8']],
   ['/workspace.css', ['../command-center/workspace.css', 'text/css; charset=utf-8']]
 ]);

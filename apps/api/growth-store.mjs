@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
 import { createGrowthRecord, updateGrowthRecord, transitionGrowthRecord, verifyGrowthRecord, GROWTH_MODULES, planLeadStageMove, scoreLeadQualification } from '../../packages/growth-suite/index.mjs';
+import { WORKFLOW_NODE_CATALOG, WORKFLOW_TRIGGER_CATALOG } from '../../packages/atlas-target/workflow-catalog.mjs';
 
 const CRM_MODULES = new Set(['contacts', 'leads', 'pipelines', 'tasks']);
 const BUILDER_MODULES = new Set(GROWTH_MODULES.filter(module => !CRM_MODULES.has(module)));
@@ -86,6 +87,17 @@ export class PostgresGrowthStore {
       const records = rows.map(rowToRecord);
       if (records.some(record => !verifyGrowthRecord(record))) throw createAuthError(500, 'growth_integrity_failed');
       return { items: records, canWrite: false, limit: safeLimit, offset: 0 };
+    });
+  }
+
+  async getWorkflowCatalog({ actorId, tenantId }) {
+    return this.#transaction(async client => {
+      await this.#scope(client, { actorId, tenantId }, { module: 'workflows' });
+      return {
+        executionAvailable: false,
+        triggers: Object.values(WORKFLOW_TRIGGER_CATALOG),
+        nodes: Object.values(WORKFLOW_NODE_CATALOG)
+      };
     });
   }
 

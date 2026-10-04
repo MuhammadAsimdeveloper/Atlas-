@@ -71,6 +71,10 @@ The Paddle Billing path uses a backend-created checkout transaction, allowlisted
 
 V115 adds a durable Postgres queue, transactional outbox and interval scheduler with tenant-aware RLS, a separately restricted worker role, lease renewal/recovery, bounded exponential retries and registered-type worker loops. Growth Center changes append reference-only outbox events in their existing database transaction. This is execution infrastructure, not workflow execution parity: no default business handler, graph interpreter, durable wait/approval resume, execution replay UI, Redis queue adapter or live provider action is included. See [Execution Engine](EXECUTION-ENGINE.md) and the [master roadmap](ATLAS-MASTER-ROADMAP.md).
 
+## V116 authoring follow-through
+
+V116 adds a visual workflow editor over Atlas's canonical event and node catalogs, with tenant-authorized catalog access and existing checksummed revision saves. This adopts the product lesson that workflow authoring needs a structured canvas and inspectable node settings. It does not reproduce n8n/HighLevel branding and does not close the runtime gap: event ingestion, graph execution, durable waits, execution history, replay, credentials, and real integrations remain unimplemented or externally dependent. See [V116 Workflow Studio](V116-WORKFLOW-STUDIO.md).
+
 ## Review limits
 
 Vendor docs change frequently. The source pages were checked on 3 October 2026; plan availability and preview notices may change. This analysis does not reproduce n8n or HighLevel UI/branding. Atlas code-level coverage should be read with [the V115 feature matrix](COMPETITOR-FEATURE-MATRIX-2026-10.md); migrations are tested against ephemeral PGlite but have not been applied to managed production, and no provider delivery or scale benchmark is verified.

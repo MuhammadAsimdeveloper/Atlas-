@@ -1,6 +1,6 @@
 # Atlas API
 
-V115 runs the authenticated same-origin workspace and account API plus the PostgreSQL execution foundation. Set `ATLAS_DATABASE_URL` to restricted `atlas_app`, not the migration owner. If the database/schema are unavailable, readiness and authenticated routes fail closed.
+V116 runs the authenticated same-origin workspace and account API plus the PostgreSQL execution foundation and tenant-authorized workflow capability catalog. Set `ATLAS_DATABASE_URL` to restricted `atlas_app`, not the migration owner. If the database/schema are unavailable, readiness and authenticated routes fail closed.
 
 ## First database setup
 

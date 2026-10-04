@@ -1,3 +1,5 @@
+import { createWorkflowStudio } from './workflow-studio.mjs';
+
 const MODULES = [
   ['contacts','Contacts'],['leads','Leads'],['pipelines','Pipelines'],['tasks','Tasks'],['ai-qualification','AI Lead Qualification'],
   ['ai-follow-up','AI Follow-up'],['workflows','Workflow Builder'],['email-templates','Email Builder'],['funnels','Funnel Builder'],
@@ -6,6 +8,8 @@ const MODULES = [
 const $ = selector => document.querySelector(selector);
 const node = (tag, value, className = '') => { const output = document.createElement(tag); output.textContent = value; if (className) output.className = className; return output; };
 const state = { module: 'contacts', items: [], current: null, canWrite: false, busy: false, activated: false, searchTimer: null };
+const detailStudio = createWorkflowStudio($('#growth-workflow-studio'), api);
+let createStudio = null;
 const UUID_A = '11111111-1111-4111-8111-111111111111';
 const UUID_B = '22222222-2222-4222-8222-222222222222';
 
@@ -59,12 +63,14 @@ function setupCreatePanel() {
   const help = node('p', 'Start from a module example, then edit the JSON content. Replace example IDs with records from this workspace where a relationship is required.', 'field-help');
   const label = document.createElement('label'); label.textContent = 'Validated record content';
   const textarea = document.createElement('textarea'); textarea.id = 'growth-new-payload'; textarea.spellcheck = false; textarea.rows = 12; textarea.required = true; label.append(textarea);
+  const workflowHost = document.createElement('div'); workflowHost.id = 'growth-new-workflow-studio'; workflowHost.className = 'workflow-studio'; workflowHost.hidden = true;
+  createStudio = createWorkflowStudio(workflowHost, api);
   const actions = document.createElement('div'); actions.className = 'growth-create-actions';
   const cancel = node('button', 'Cancel', 'button subtle'); cancel.type = 'button'; cancel.addEventListener('click', () => { panel.hidden = true; });
   const create = node('button', 'Create draft', 'button primary'); create.type = 'button'; create.addEventListener('click', createRecord);
-  const sampleButton = node('button', 'Load module example', 'growth-sample-button'); sampleButton.type = 'button'; sampleButton.addEventListener('click', () => { textarea.value = starter(state.module); });
+  const sampleButton = node('button', 'Load module example', 'growth-sample-button'); sampleButton.type = 'button'; sampleButton.addEventListener('click', () => { textarea.value = starter(state.module); if (state.module === 'workflows') void createStudio.load(JSON.parse(textarea.value)); });
   const sampleRow = document.createElement('div'); sampleRow.className = 'growth-template-help'; sampleRow.append(help, sampleButton);
-  actions.append(cancel, create); panel.append(title, sampleRow, label, actions); columns.before(panel);
+  actions.append(cancel, create); panel.append(title, sampleRow, label, workflowHost, actions); columns.before(panel);
 }
 
 function moduleLabel(key) { return MODULES.find(([id]) => id === key)?.[1] || key; }
@@ -107,7 +113,11 @@ function showRecord(item) {
   $('#growth-version').textContent = `Version ${item.version} · ${item.state.replaceAll('_', ' ')}`;
   $('#growth-version').hidden = false; $('#growth-detail-empty').hidden = true; $('#growth-detail-form').hidden = false;
   $('#growth-payload').value = JSON.stringify(item.payload, null, 2);
-  $('#growth-save').disabled = !state.canWrite;
+  const isWorkflow = item.module === 'workflows';
+  $('#growth-payload-field').hidden = isWorkflow;
+  $('#growth-workflow-studio').hidden = !isWorkflow;
+  if (isWorkflow) void detailStudio.load(item.payload, { readOnly: !state.canWrite || ['published', 'scheduled'].includes(item.state) });
+  $('#growth-save').disabled = !state.canWrite || ['published', 'scheduled'].includes(item.state);
   const note = ['published', 'scheduled'].includes(item.state) ? 'Pause this item before editing its content.' : providerNote(item.module);
   $('#growth-provider-note').textContent = note;
   const action = recordAction(item); const lifecycle = $('#growth-lifecycle');
@@ -255,7 +265,7 @@ async function refresh() { await Promise.all([loadOverview(), loadBilling(), loa
 
 async function createRecord() {
   try {
-    const payload = JSON.parse($('#growth-new-payload').value);
+    const payload = state.module === 'workflows' ? createStudio.read() : JSON.parse($('#growth-new-payload').value);
     const result = await api(`/growth/${state.module}`, { method: 'POST', body: { payload } });
     $('#growth-create').hidden = true; state.current = result.item;
     await loadRecords({ keepSelection: false });
@@ -267,7 +277,7 @@ async function createRecord() {
 async function saveRecord(event) {
   event.preventDefault(); if (!state.current || !state.canWrite) return;
   try {
-    const payload = JSON.parse($('#growth-payload').value);
+    const payload = state.current.module === 'workflows' ? detailStudio.read() : JSON.parse($('#growth-payload').value);
     const result = await api(`/growth/${state.module}/${state.current.id}`, { method: 'PATCH', body: { expectedVersion: state.current.version, payload } });
     state.current = result.item; await loadRecords({ keepSelection: true }); showRecord(result.item); notice('A new immutable revision was saved.', 'success');
   } catch (error) { notice(error instanceof SyntaxError ? 'Record content must be valid JSON.' : error.message, 'error'); }
@@ -302,7 +312,12 @@ $('#growth-module').addEventListener('change', async event => {
 $('#growth-refresh').addEventListener('click', refresh);
 $('#growth-new').addEventListener('click', () => {
   if (!state.canWrite) { notice('Your workspace role can view this area but cannot create records.', 'error'); return; }
-  setupCreatePanel(); $('#growth-new-payload').value = starter(state.module); $('#growth-create').hidden = false; $('#growth-create').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setupCreatePanel(); $('#growth-new-payload').value = starter(state.module);
+  const isWorkflow = state.module === 'workflows';
+  $('#growth-new-payload').closest('label').hidden = isWorkflow;
+  $('#growth-new-workflow-studio').hidden = !isWorkflow;
+  if (isWorkflow) void createStudio.load(JSON.parse($('#growth-new-payload').value));
+  $('#growth-create').hidden = false; $('#growth-create').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
 $('#growth-search').addEventListener('input', () => { clearTimeout(state.searchTimer); state.searchTimer = setTimeout(() => loadRecords({ keepSelection: true }), 240); });
 $('#growth-detail-form').addEventListener('submit', saveRecord);

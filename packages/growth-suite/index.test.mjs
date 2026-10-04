@@ -38,6 +38,12 @@ test('contact consent defaults off, payload fields are allowlisted and checksums
   assert.equal(verifyGrowthRecord({...contact,title:'Tampered'}),false);
 });
 
+test('invalid workflow graphs fail as bounded client validation errors', () => {
+  assert.throws(() => createGrowthRecord({ tenantId, module: 'workflows', id: recordId, actorId, payload: {
+    name: 'Bad graph', graph: { nodes: [{ id: 'start', type: 'trigger', config: { eventType: 'contact.created' } }, { id: 'end', type: 'stop' }], edges: [{ from: 'start', to: 'missing' }] }
+  } }), error => error.status === 400 && error.code === 'invalid_workflow_graph');
+});
+
 test('task revisions maintain state, enforce optimistic locking and block terminal edits', () => {
   const task=createGrowthRecord({tenantId,module:'tasks',id:recordId,actorId,payload:{title:'Call lead',contactId:actorId,status:'open'}});
   const updated=updateGrowthRecord({record:task,tenantId,actorId,expectedVersion:1,payload:{title:'Call lead',contactId:actorId,status:'in_progress'}});

@@ -130,6 +130,11 @@ export function createGrowthApi({ store, authStore, env = process.env, fetchImpl
         const portal = await createPaddlePortalSession({ customerId: current.customerId, subscriptionId: current.subscriptionId, env, fetchImpl });
         return send(res, 201, { portal }, env);
       }
+      if (path === '/api/v1/growth/workflows/catalog') {
+        if (req.method !== 'GET') return send(res, 405, { error: 'method_not_allowed' }, env, { allow: 'GET' });
+        if (typeof store.getWorkflowCatalog !== 'function') throw createAuthError(503, 'workflow_catalog_unavailable');
+        return send(res, 200, await store.getWorkflowCatalog(who), env);
+      }
       const match = path.match(/^\/api\/v1\/growth\/([a-z-]+)(?:\/([0-9a-f-]+)(?:\/([a-z-]+))?)?$/i);
       if (!match) return send(res, 404, { error: 'not_found' }, env);
       const [, module, id, action] = match;

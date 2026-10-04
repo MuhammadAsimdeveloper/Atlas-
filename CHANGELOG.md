@@ -1,3 +1,10 @@
+## 116.0.0 — Visual workflow authoring
+- Added a laptop-first visual workflow editor inside the authenticated workspace for triggers, node settings, connection paths and ports, backed by the existing checksummed/versioned graph contract.
+- Added a read-only workflow catalog endpoint. It resolves the current session and active tenant and enforces the workspace’s workflow-read permission before returning canonical event/node metadata.
+- Invalid workflow definitions now return a bounded 400 validation error; no invalid graph can be stored as a successful draft.
+- The Studio clearly marks adapter requirements and states that workflow jobs are not connected. Publishing remains configuration lifecycle state and does not claim execution.
+- Added API authorization and invalid-graph tests, server asset smoke coverage, V116 release checks and V116 implementation-status documentation.
+
 ## 115.0.0 — Durable runtime foundation
 - Added tenant-bound PostgreSQL job, transactional event outbox and interval scheduler tables with forced RLS and reference-only payload validation.
 - Added separate non-bypass/non-inheriting `atlas_worker` grants and database role checks. The API can enqueue only for the active tenant and cannot claim or mutate jobs.

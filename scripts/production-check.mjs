@@ -11,6 +11,10 @@ check('production compose reference', await exists('infra/docker-compose.product
 check('V115 execution runtime services', await exists('apps/api/runtime-store.mjs') && await exists('apps/worker/runtime.mjs') && await exists('apps/worker/main.mjs') && await exists('infra/postgres/FINAL-MIGRATION-V115.sql') && await exists('infra/postgres/API-ROLE-GRANTS-V115.sql'), 'PostgreSQL queue/outbox/scheduler and restricted worker runtime source exists');
 check('environment template', await exists('.env.example'), 'Required configuration is documented');
 check('V114 tenant Growth Center and billing service', await exists('apps/api/growth-store.mjs') && await exists('apps/api/growth-routes.mjs') && await exists('apps/api/paddle-billing.mjs'), 'Authenticated CRM, builder and Paddle billing services exist');
+check('V116 visual workflow authoring surface', await exists('apps/command-center/workflow-studio.mjs') && await exists('docs/V116-WORKFLOW-STUDIO.md'), 'Workflow Studio assets and honest runtime boundary documentation exist');
+const growthRoutes = await readFile(path.join(root,'apps/api/growth-routes.mjs'),'utf8');
+const growthStore = await readFile(path.join(root,'apps/api/growth-store.mjs'),'utf8');
+check('V116 tenant-authorized workflow capability catalog', growthRoutes.includes("path === '/api/v1/growth/workflows/catalog'") && growthStore.includes('getWorkflowCatalog') && growthStore.includes("{ module: 'workflows' }"), 'Workflow catalog reads require a current authenticated workspace membership and module permission');
 const api = await readFile(path.join(root,'apps/api/server.mjs'),'utf8');
 const dbConfig = await readFile(path.join(root,'apps/api/database-config.mjs'),'utf8');
 check('secure HTTP defaults', api.includes('x-content-type-options') && api.includes('x-frame-options') && api.includes('cache-control'), 'Security response headers are set');
@@ -32,8 +36,6 @@ check('tenant authority from trusted session only', auth.includes('store.getSess
 const identitySql = await readFile(path.join(root,'infra/postgres/FINAL-MIGRATION-V112.sql'),'utf8');
 check('forced RLS identity schema', identitySql.includes('atlas_organization_memberships') && identitySql.includes('atlas_auth_sessions') && identitySql.includes('atlas_auth_tokens') && identitySql.includes('FORCE ROW LEVEL SECURITY') && !/platform_owner/i.test(identitySql), 'Identity and tenant tables enforce RLS without a customer platform-owner role');
 check('runtime/migration role split', grants.includes('atlas_app') && migrationRunner.includes('ATLAS_MIGRATION_DATABASE_URL') && migrationRunner.includes('ATLAS_ALLOW_SHARED_MIGRATION_ROLE'), 'Database grants separate restricted runtime API privileges from schema migration authority');
-const growthRoutes = await readFile(path.join(root,'apps/api/growth-routes.mjs'),'utf8');
-const growthStore = await readFile(path.join(root,'apps/api/growth-store.mjs'),'utf8');
 const growthSql = await readFile(path.join(root,'infra/postgres/FINAL-MIGRATION-V114.sql'),'utf8');
 const growthGrants = await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V114.sql'),'utf8');
 check('single platform-owner identity remains separate', growthRoutes.includes('resolveAtlasAuthority') && growthStore.includes('atlas_organization_memberships') && growthStore.includes('organization_not_found') && !/platformOwner|globalRole/.test(growthStore), 'Even a platform-owner session must have a fresh tenant membership to read or mutate customer Growth Center data');

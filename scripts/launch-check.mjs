@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const required = ['README.md', 'RELEASE-MANIFEST.txt', 'docs/LAUNCH-READINESS.md', 'docs/14-DAY-FREE-TRIAL.md', 'docs/ATLAS-MASTER-ROADMAP.md', 'docs/EXECUTION-ENGINE.md', 'docs/PRODUCTION-ARCHITECTURE.md', 'apps/marketing-site/index.html', 'apps/marketing-site/styles.css', 'apps/command-center/index.html', 'apps/command-center/app.mjs', 'scripts/build-site.mjs', 'scripts/seo-check.mjs', '.github/workflows/ci.yml'];
+const required = ['README.md', 'RELEASE-MANIFEST.txt', 'docs/LAUNCH-READINESS.md', 'docs/14-DAY-FREE-TRIAL.md', 'docs/ATLAS-MASTER-ROADMAP.md', 'docs/EXECUTION-ENGINE.md', 'docs/V116-WORKFLOW-STUDIO.md', 'docs/PRODUCTION-ARCHITECTURE.md', 'apps/marketing-site/index.html', 'apps/marketing-site/styles.css', 'apps/command-center/index.html', 'apps/command-center/app.mjs', 'apps/command-center/workflow-studio.mjs', 'scripts/build-site.mjs', 'scripts/seo-check.mjs', '.github/workflows/ci.yml'];
 for (const file of required) await access(path.join(root, file));
 const marketing = await readFile(path.join(root, 'apps/marketing-site/index.html'), 'utf8');
 const release = await readFile(path.join(root, 'RELEASE-MANIFEST.txt'), 'utf8');

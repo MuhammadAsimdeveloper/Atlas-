@@ -225,7 +225,9 @@ export function validateGrowthPayload({ module, tenantId, itemId, version = 1, p
     exactKeys(data, ['name', 'graph'], 'Workflow');
     const graphInput = data.graph;
     exactKeys(graphInput, ['nodes', 'edges'], 'Workflow graph');
-    const graph = createWorkflowGraph({ tenantId, id: itemId, version, name: data.name, nodes: graphInput.nodes, edges: graphInput.edges });
+    let graph;
+    try { graph = createWorkflowGraph({ tenantId, id: itemId, version, name: data.name, nodes: graphInput.nodes, edges: graphInput.edges }); }
+    catch { fail('Workflow graph is invalid. Check its node settings, trigger, connections and terminal paths.', 'invalid_workflow_graph'); }
     return { name: graph.name, graph };
   }
 

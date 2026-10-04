@@ -1,25 +1,28 @@
-ATLAS V115.0.0 — Durable runtime, integrated workspace and verified trial release
+ATLAS V116.0.0 — Durable runtime, visual workflow authoring and verified trial release
 
 Implemented
 - Added a tenant-scoped PostgreSQL job queue, transactional Growth Center outbox, interval scheduler, idempotency, bounded retry/dead-letter handling, lease renewal/recovery and a graceful worker loop.
 - Added a distinct `atlas_worker` role that can process queue metadata but has no access to customer business tables. The optional worker profile requires an externally reviewed handler module and receives a minimal explicit environment without the API `.env` secrets.
 - Integrated account and workspace settings, responsive CRM/automation-style navigation, synchronized module headings, real tenant-backed Growth Center routes and explicit unavailable states for not-yet-connected services.
 - Added a Paddle-verified 14-day free trial, server-side recurring-price validation, sticky tenant trial-use tracking, duplicate subscription/trial guards and authenticated customer-portal links for payment management and cancellation.
+- Added the authenticated visual Workflow Studio, tenant-authorized trigger/node catalog endpoint, graph validation error handling, and versioned graph save controls. The Studio states that workflow runs are not connected.
 - Preserved the configured verified Khan-only platform-owner boundary and tenant-scoped company administrators.
 - Added migration/RLS integration coverage, Paddle fixture tests, worker runtime tests, release checks, production deployment notes and an implementation status roadmap.
-- No default workflow graph or provider handlers ship; this release does not execute workflows or send email/SMS/social messages and does not claim capacity for millions of users.
+- No workflow graph executor or provider handlers ship; this release does not execute workflows or send email/SMS/social messages and does not claim capacity for millions of users.
 
 Verification (Node v24.19.0 on Windows)
-- `node --test --test-concurrency=1`: PASS — 190 tests, 190 passed, 0 failed.
+- `node --test --test-concurrency=1`: PASS — 192 tests, 192 passed, 0 failed.
 - `node scripts/check.mjs`: PASS — all discovered JavaScript modules passed syntax checks.
-- `node scripts/doctor.mjs`: PASS — 67/67 invariants.
-- `node scripts/production-check.mjs`: PASS — 27/27 checks.
-- `node scripts/docs-check.mjs`: PASS — 56 Markdown files, 0 errors.
+- `node scripts/doctor.mjs`: PASS — 70/70 invariants.
+- `node scripts/production-check.mjs`: PASS — 29/29 checks.
+- `node scripts/docs-check.mjs`: PASS — 57 Markdown files, 0 errors.
 - `node scripts/smoke-http.mjs`: PASS — 5/5 static preview checks.
-- `node scripts/smoke-api-http.mjs`: PASS — 10/10 authenticated API fail-closed, workspace and billing disclosure checks.
+- `node scripts/smoke-api-http.mjs`: PASS — 11/11 authenticated API fail-closed, Workflow Studio asset, workspace and billing disclosure checks.
+- Headless Chrome Workflow Studio smoke: PASS — renders the editor, inserts a node, serializes the chosen trigger, and validates the browser-produced graph through the real Growth payload contract.
 - `node scripts/seo-check.mjs`: PASS — 38 assertions; `node scripts/launch-check.mjs`: PASS — 6/6 checks.
 - `node scripts/build-site.mjs`: PASS — preview built with indexing disabled.
-- `pnpm dlx npm@11 audit --audit-level=moderate`: PASS — 0 vulnerabilities.
+- `npm audit --audit-level=moderate`: PASS — 0 vulnerabilities.
+- `npm ci`: PASS — locked install succeeded, 0 vulnerabilities.
 - `git diff --check`: PASS — no whitespace errors.
 - GitHub Actions CI installs the locked runtime and test dependencies before running the Node 20/22 verification matrix.
 - Docker image build: NOT RUN — Docker CLI is unavailable in this environment.
@@ -31,8 +34,8 @@ Not verified / external work
 - The workspace navigation includes real records where services exist and clear unavailable explanations where they do not. Full n8n/HighLevel product parity, active graph execution, execution/replay UI, full inbox and agency administration remain incomplete.
 
 Artifact
-- `atlas-v115.0.0-final.zip` contains the source release without `.git`, `node_modules`, local state, build output or environment secrets.
-- `atlas-v115.0.0-final.zip.sha256` contains its SHA-256 digest.
+- `atlas-v116.0.0-source-release.zip` contains the source release without `.git`, `node_modules`, local state, build output or environment secrets.
+- `atlas-v116.0.0-source-release.zip.sha256` contains its SHA-256 digest.
 
 ATLAS V114.0.0 — Consolidated final repository release
 
