@@ -79,7 +79,8 @@ check('V118 production secret gate',
 check('V118 Jobber OAuth and webhook security',
   v118Jobber.includes('code_challenge') &&
   v118Jobber.includes('refreshJobberToken') &&
-  v118Jobber.includes('X') === false ? true : true,
+  v118Jobber.includes('verifyJobberWebhook') &&
+  v118Jobber.includes('x-jobber-graphql-version'),
   'Jobber adapter contains PKCE/token lifecycle code; route-level HMAC verification is checked separately');
 check('V118 Jobber async webhook boundary',
   v118Routes.includes('/api/v1/integrations/webhooks/jobber') &&
