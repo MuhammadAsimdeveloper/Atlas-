@@ -179,7 +179,7 @@ export function renderPublicSitemap(origin, entries=[{path:'/',lastmod:PUBLIC_LA
   const urls = entries.map(entry => {
     const path = typeof entry.path === 'string' ? entry.path : '';
     if (!path.startsWith('/') || /[?#<>&"'\s]/.test(path)) throw new TypeError('Sitemap path invalid.');
-    const lastmod = typeof entry.lastmod === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(entry.lastmod) ? entry.lastmod : null;
+    const lastmod = typeof entry.lastmod === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry.lastmod) ? entry.lastmod : null;
     return '  <url><loc>' + canonical + path + '</loc>' + (lastmod ? '<lastmod>' + lastmod + '</lastmod>' : '') + '</url>';
   }).join('\n');
   return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + '\n</urlset>\n';
