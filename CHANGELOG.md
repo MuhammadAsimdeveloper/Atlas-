@@ -1,3 +1,10 @@
+## Unreleased — Deep SEO and Search Readiness
+- Reworked the public marketing metadata pipeline with intent-aligned title/description generation, canonical URL, robots preview directives, Open Graph/Twitter cards, social preview artwork, optional Search Console/Bing verification and WebSite/Organization/WebPage/SoftwareApplication/FAQ JSON-LD.
+- Added controlled sitemap `lastmod`, path validation and deployment-time verification/freshness inputs while preserving preview noindex boundaries.
+- Added reusable `packages/atlas-seo` page/site readiness scoring for metadata, intent, content depth/uniqueness, internal discovery, structured data, image alt coverage and page-experience inputs.
+- Added SEO readiness reporting to website publish plans and strengthened the marketing page's search-intent hierarchy, use-case coverage and internal navigation.
+- Added regression coverage and doctor checks for the deep SEO contract.
+
 ## 112.0.0 — PostgreSQL Identity and Tenant Foundation
 - Replaced the V111 contract-only HTTP shell with a real, PostgreSQL-backed account API: signup, email verification/resend, password sign-in/reset, session revocation, profile update, organization creation/selection, member listing, invitations, invitation acceptance and tenant custom roles.
 - Added scrypt password hashes, random one-use token hashes, strict same-origin and CSRF validation, HttpOnly SameSite session cookies, account/IP rate limits, bounded JSON bodies and generic credential/reset responses.
