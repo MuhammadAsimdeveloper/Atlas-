@@ -134,7 +134,6 @@ export function renderPublicIndex(html, origin, {
   const additions = [
     '<link rel="canonical" href="' + escapeAttribute(pageUrl) + '">',
     '<link rel="sitemap" type="application/xml" href="/sitemap.xml">',
-    '<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">',
     '<meta name="application-name" content="Atlas">',
     '<meta name="referrer" content="strict-origin-when-cross-origin">',
     '<meta property="og:type" content="website">',
@@ -179,7 +178,7 @@ export function renderPublicSitemap(origin, entries=[{path:'/',lastmod:PUBLIC_LA
   if (!Array.isArray(entries) || entries.length < 1) throw new TypeError('Sitemap entries are required.');
   const urls = entries.map(entry => {
     const path = typeof entry.path === 'string' ? entry.path : '';
-    if (!path.startsWith('/') || /[<>&"']/.test(path)) throw new TypeError('Sitemap path invalid.');
+    if (!path.startsWith('/') || /[?#<>&"'\s]/.test(path)) throw new TypeError('Sitemap path invalid.');
     const lastmod = typeof entry.lastmod === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(entry.lastmod) ? entry.lastmod : null;
     return '  <url><loc>' + canonical + path + '</loc>' + (lastmod ? '<lastmod>' + lastmod + '</lastmod>' : '') + '</url>';
   }).join('\\n');
