@@ -10,6 +10,7 @@ function jsonResponse(value, status = 200) {
 
 test('Jobber health handler calls account API and marks the connection healthy', async () => {
   const health = [];
+  const taskStates = [];
   globalThis.fetch = async (url, options) => {
     assert.equal(url, 'https://api.getjobber.com/api/graphql');
     assert.equal(options.headers.authorization, 'Bearer jobber-access');
@@ -19,7 +20,9 @@ test('Jobber health handler calls account API and marks the connection healthy',
   try {
     const integrationStore = {
       async workerGetTask() { return { tenant_id:'00000000-0000-4000-8000-000000000002', task_id:'00000000-0000-4000-8000-000000000001', connection_id:'00000000-0000-4000-8000-000000000003', operation:'jobber.health', provider_id:'jobber', auth_mode:'oauth2', status:'connected', config:{ graphqlVersion:'2026-01-01' }, connection_status:'connected', connection_created_by:'00000000-0000-4000-8000-000000000004' }; },
-      async workerMarkTask(task, status, result, error) { assert.equal(status,'succeeded'); assert.equal(error,null); assert.equal(result.status,'healthy'); },
+      async workerMarkTask(task, status, result, error) {
+        taskStates.push({ status, result, error });
+      },
       async workerGetValidJobberSecret({ refresh }) {
         void refresh;
         return { secret:{ accessToken:'jobber-access' }, connection:{} };
@@ -31,7 +34,10 @@ test('Jobber health handler calls account API and marks the connection healthy',
       { kind:'integration_task', id:'00000000-0000-4000-8000-000000000001', version:1 },
       { tenantId:'00000000-0000-4000-8000-000000000002', taskId:'00000000-0000-4000-8000-000000000001', attempt:0 }
     );
-    void result;
+    assert.equal(result.status, 'healthy');
+    assert.deepEqual(taskStates.map(item => item.status), ['processing', 'succeeded']);
+    assert.equal(taskStates[1].result.status, 'healthy');
+    assert.equal(taskStates[1].error, null);
   } finally {
     globalThis.fetch = originalFetch;
   }
