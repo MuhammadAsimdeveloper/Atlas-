@@ -40,7 +40,7 @@ function tokenPayload(body) {
     tokenType: typeof body.token_type === 'string' ? body.token_type : 'Bearer',
     expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? Math.min(expiresIn, 86_400) : 3600,
     warning: typeof body.warning === 'string' ? body.warning.slice(0, 500) : null,
-    scope: typeof body.scope === 'string' ? body.scope.split(/\\s+/).filter(Boolean).slice(0, 100) : []
+    scope: typeof body.scope === 'string' ? body.scope.split(/\s+/).filter(Boolean).slice(0, 100) : []
   };
 }
 
