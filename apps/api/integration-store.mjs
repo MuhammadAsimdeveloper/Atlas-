@@ -172,6 +172,113 @@ export class PostgresIntegrationStore {
     return this.cipher.decrypt(connection.secret_ciphertext);
   }
 
+  decryptOAuthVerifier(stateRow) {
+    if (!stateRow?.code_verifier_ciphertext) throw createAuthError(400, 'oauth_state_invalid');
+    const secret = this.cipher.decrypt(stateRow.code_verifier_ciphertext);
+    if (!secret || typeof secret.verifier !== 'string' || secret.verifier.length < 32) throw createAuthError(400, 'oauth_state_invalid');
+    return secret.verifier;
+  }
+
+  async createZapierConnection({ actorId, tenantId, displayName, targetUrl, signingSecret = null }) {
+    const label = typeof displayName === 'string' && displayName.trim() ? displayName.normalize('NFKC').trim().slice(0,160) : 'Zapier';
+    const url = safeUrl(targetUrl, 'targetUrl');
+    const host = url.hostname.toLowerCase();
+    if (!(host === 'hooks.zapier.com' || host.endsWith('.zapier.com') || host.endsWith('.zapier.app'))) {
+      throw createAuthError(400, 'zapier_target_not_allowed', 'Use a Zapier webhook URL from hooks.zapier.com, *.zapier.com or *.zapier.app.');
+    }
+    if (signingSecret !== null && (typeof signingSecret !== 'string' || signingSecret.length < 16 || signingSecret.length > 512)) {
+      throw createAuthError(400, 'zapier_signing_secret_invalid', 'Signing secret must be 16-512 characters when supplied.');
+    }
+    const inboundKey = randomBytes(32).toString('base64url');
+    const secretCiphertext = this.cipher.encrypt({
+      targetUrl: url.toString(),
+      inboundKey,
+      signingSecret: signingSecret || null
+    });
+    const connectionId = randomUUID();
+    const row = await this.#transaction({ actorId, tenantId }, async client => {
+      const { rows } = await client.query(`
+        INSERT INTO atlas_integration_connections(
+          tenant_id,connection_id,provider_id,auth_mode,status,display_name,external_account_id,external_account_name,
+          scopes,secret_ciphertext,config,last_health_status,last_health_at,last_error_code,created_by
+        ) VALUES($1,$2,'zapier','webhook','connected',$3,NULL,NULL,'{}',$4,$5::jsonb,'unknown',NULL,NULL,$6)
+        RETURNING connection_id,provider_id,auth_mode,status,display_name,created_at,updated_at`,
+        [tenantId, connectionId, label, secretCiphertext, JSON.stringify({ delivery: 'POST_JSON', inbound: true }), actorId]
+      );
+      return rows[0];
+    }, { manage: true });
+    return { ...row, inboundKey, inboundUrl: this.#publicUrl(`/api/v1/integrations/webhooks/zapier/${inboundKey}`) };
+  }
+
+  #publicUrl(path) {
+    const base = safeUrl(this.env.ATLAS_PUBLIC_ORIGIN, 'ATLAS_PUBLIC_ORIGIN');
+    return new URL(path, base).toString();
+  }
+
+  async workerGetValidJobberSecret({ tenantId, connectionId, refresh }) {
+    assertUuid(tenantId, 'tenantId'); assertUuid(connectionId, 'connectionId');
+    if (typeof refresh !== 'function') throw new TypeError('A Jobber refresh function is required.');
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`atlas-jobber-refresh:${connectionId}`]);
+      const result = await client.query('SELECT * FROM atlas_integration_connections WHERE tenant_id=$1 AND connection_id=$2 FOR UPDATE', [tenantId, connectionId]);
+      const connection = result.rows[0];
+      if (!connection) throw createAuthError(404, 'integration_connection_not_found');
+      const secret = this.decryptSecret(connection);
+      const expiry = Date.parse(secret.accessTokenExpiresAt || '');
+      if (Number.isFinite(expiry) && expiry > Date.now() + 120_000) {
+        await client.query('COMMIT');
+        return { connection, secret };
+      }
+      if (!secret.refreshToken) throw createAuthError(401, 'jobber_reauth_required');
+      const tokens = await refresh(secret.refreshToken);
+      const expiresIn = Number(tokens.expiresIn);
+      const expiresAt = new Date(Date.now() + Math.max(60, Math.min(86_400, Number.isFinite(expiresIn) ? expiresIn : 3600)) * 1000).toISOString();
+      const encrypted = this.cipher.encrypt({
+        ...secret,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        tokenType: tokens.tokenType || secret.tokenType || 'Bearer',
+        accessTokenExpiresAt: expiresAt,
+        refreshTokenUpdatedAt: new Date().toISOString()
+      });
+      await client.query(
+        `UPDATE atlas_integration_connections SET secret_ciphertext=$3,status='connected',last_error_code=NULL,updated_at=now()
+         WHERE tenant_id=$1 AND connection_id=$2`, [tenantId, connectionId, encrypted]
+      );
+      await client.query('COMMIT');
+      return { connection: { ...connection, secret_ciphertext: encrypted, status: 'connected' }, secret: { ...secret, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, tokenType: tokens.tokenType || secret.tokenType || 'Bearer', accessTokenExpiresAt: expiresAt } };
+    } catch (error) {
+      try { await client.query('ROLLBACK'); } catch { /* Preserve refresh failure. */ }
+      throw error;
+    } finally { client.release(); }
+  }
+
+  async workerListZapierConnections({ tenantId }) {
+    assertUuid(tenantId, 'tenantId');
+    const { rows } = await this.pool.query(`
+      SELECT * FROM atlas_integration_connections
+      WHERE tenant_id=$1 AND provider_id='zapier' AND auth_mode='webhook' AND status='connected'`, [tenantId]);
+    return rows;
+  }
+
+  async ingestJobberWebhook({ accountId, externalEventKey, topic, externalObjectId = null, payload }) {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM atlas_v118_ingest_jobber_webhook($1,$2::char(64),$3,$4,$5::jsonb)',
+      [accountId, externalEventKey, topic, externalObjectId, JSON.stringify(payload)]
+    );
+    return rows[0];
+  }
+
+  async ingestZapierWebhook({ webhookKeyHash, externalEventKey, payload }) {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM atlas_v118_ingest_zapier_webhook($1::char(64),$2::char(64),$3::jsonb)',
+      [webhookKeyHash, externalEventKey, JSON.stringify(payload)]
+    );
+    return rows[0];
+  }
+
   async workerSaveTokens({ tenantId, connectionId, tokens }) {
     const expiresIn = Number(tokens.expiresIn);
     const expiresAt = new Date(Date.now() + Math.max(60, Math.min(86_400, Number.isFinite(expiresIn) ? expiresIn : 3600)) * 1000).toISOString();
