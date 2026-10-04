@@ -14,7 +14,7 @@ import { createIntegrationCipher } from '../../packages/atlas-integrations/secre
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
 const runtime = env.NODE_ENV || 'development';
-const release = env.ATLAS_RELEASE || 'V117';
+const release = env.ATLAS_RELEASE || 'V118';
 const webAssets = new Map([
   ['/', ['../command-center/auth.html', 'text/html; charset=utf-8']],
   ['/login', ['../command-center/auth.html', 'text/html; charset=utf-8']],
