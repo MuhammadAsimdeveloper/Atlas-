@@ -309,9 +309,12 @@ export async function createHandlers({ runtimeStore, integrationStore, env = pro
       return { status: 'received', webhookEventId: webhookEventId || null };
     }
     if (task.operation !== 'zapier.send_test') throw Object.assign(new Error(`Unsupported Zapier integration operation: ${task.operation}`), { code: 'integration_operation_unsupported', status: 400 });
-    const connections = await integrationStore.workerListZapierConnections({ tenantId: task.tenant_id });
+    const connection = await integrationStore.workerGetConnection({ tenantId: task.tenant_id, connectionId: task.connection_id });
+    if (connection.provider_id !== 'zapier' || connection.auth_mode !== 'webhook' || connection.status !== 'connected') {
+      providerError('The selected Zapier connection is not available for testing.', 'integration_connection_unavailable', 409);
+    }
     const sent = [];
-    for (const connection of connections) {
+    {
       const secret = integrationStore.decryptSecret(connection);
       const testId = task.task_id;
       const payload = { source: 'Atlas', type: 'integration.test', testId, workspace: { id: task.tenant_id }, message: 'Atlas ↔ Zapier connection test' };
