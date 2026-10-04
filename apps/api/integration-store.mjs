@@ -415,6 +415,16 @@ export class PostgresIntegrationStore {
     );
   }
 
+  async workerAttachMapping({ tenantId, connectionId, providerObjectType = 'Client', externalId, atlasModule = 'contacts', atlasItemId, sourceUpdatedAt = null }) {
+    assertUuid(tenantId, 'tenantId'); assertUuid(connectionId, 'connectionId'); assertUuid(atlasItemId, 'atlasItemId');
+    if (typeof externalId !== 'string' || !externalId.trim()) throw new TypeError('externalId is required.');
+    await this.pool.query(
+      'SELECT atlas_v118_attach_integration_mapping($1,$2,$3,$4,$5,$6,$7)',
+      [tenantId, connectionId, providerObjectType, externalId.trim(), atlasModule, atlasItemId, sourceUpdatedAt ? new Date(sourceUpdatedAt) : null]
+    );
+    return { providerObjectType, externalId: externalId.trim(), atlasModule, atlasItemId };
+  }
+
   async workerGetMappedContact({ tenantId, connectionId, externalId }) {
     const { rows } = await this.pool.query(
       'SELECT * FROM atlas_v118_get_integration_contact($1,$2,$3)', [tenantId, connectionId, externalId]
