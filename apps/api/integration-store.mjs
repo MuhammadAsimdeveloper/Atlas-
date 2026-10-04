@@ -255,6 +255,42 @@ export class PostgresIntegrationStore {
     } finally { client.release(); }
   }
 
+  async workerGetGrowthRecord({ tenantId, itemId }) {
+    assertUuid(tenantId, 'tenantId'); assertUuid(itemId, 'itemId');
+    const { rows } = await this.pool.query(
+      'SELECT * FROM atlas_v118_get_growth_record($1,$2)', [tenantId, itemId]
+    );
+    return rows[0] || null;
+  }
+
+  async workerBeginZapierDelivery({ tenantId, connectionId, eventId, eventType }) {
+    assertUuid(tenantId, 'tenantId'); assertUuid(connectionId, 'connectionId'); assertUuid(eventId, 'eventId');
+    const { rows } = await this.pool.query(`
+      INSERT INTO atlas_integration_deliveries(tenant_id,connection_id,event_id,event_type,status,attempts)
+      VALUES($1,$2,$3,$4,'pending',1)
+      ON CONFLICT(connection_id,event_id) DO UPDATE SET
+        attempts=CASE WHEN atlas_integration_deliveries.status='delivered' THEN atlas_integration_deliveries.attempts ELSE atlas_integration_deliveries.attempts+1 END,
+        status=CASE WHEN atlas_integration_deliveries.status='delivered' THEN 'delivered' ELSE 'pending' END,
+        updated_at=now()
+      RETURNING status,delivered_at,attempts`, [tenantId, connectionId, eventId, eventType]);
+    const row = rows[0];
+    return { shouldSend: row?.status !== 'delivered' && !row?.delivered_at, attempts: Number(row?.attempts || 0) };
+  }
+
+  async workerCompleteZapierDelivery({ tenantId, connectionId, eventId, responseStatus }) {
+    await this.pool.query(`
+      UPDATE atlas_integration_deliveries
+      SET status='delivered',response_status=$4,delivered_at=now(),last_error_code=NULL,updated_at=now()
+      WHERE tenant_id=$1 AND connection_id=$2 AND event_id=$3`, [tenantId, connectionId, eventId, responseStatus]);
+  }
+
+  async workerFailZapierDelivery({ tenantId, connectionId, eventId, responseStatus = null, errorCode = 'zapier_delivery_failed' }) {
+    await this.pool.query(`
+      UPDATE atlas_integration_deliveries
+      SET status='failed',response_status=$4,last_error_code=$5,updated_at=now()
+      WHERE tenant_id=$1 AND connection_id=$2 AND event_id=$3`, [tenantId, connectionId, eventId, responseStatus, errorCode]);
+  }
+
   async workerListZapierConnections({ tenantId }) {
     assertUuid(tenantId, 'tenantId');
     const { rows } = await this.pool.query(`
