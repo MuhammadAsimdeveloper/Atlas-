@@ -49,7 +49,7 @@ function jsonForHtml(value) {
 }
 
 function replaceMeta(html, name, content) {
-  const pattern = new RegExp('<meta\\s+name=["\\']' + name + '["\\'][^>]*>', 'i');
+  const pattern = new RegExp("<meta\\s+name=[\\"']" + name + "[\\"'][^>]*>", 'i');
   const tag = '<meta name="' + name + '" content="' + escapeAttribute(content) + '">';
   return pattern.test(html) ? html.replace(pattern, tag) : html.replace('</head>', '    ' + tag + '\n  </head>');
 }
@@ -57,7 +57,7 @@ function replaceMeta(html, name, content) {
 function replaceTitle(html, title) {
   return /<title>[^<]*<\/title>/i.test(html)
     ? html.replace(/<title>[^<]*<\/title>/i, '<title>' + escapeAttribute(title) + '</title>')
-    : html.replace('</head>', '    <title>' + escapeAttribute(title) + '\n  </head>');
+    : html.replace('</head>', '    <title>' + escapeAttribute(title) + '</title>\n  </head>');
 }
 
 export function renderPublicIndex(html, origin, {
