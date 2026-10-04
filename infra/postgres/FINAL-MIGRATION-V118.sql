@@ -309,9 +309,10 @@ BEGIN
   )
   ON CONFLICT (connection_id,external_event_key) DO NOTHING;
   IF NOT FOUND THEN
-    SELECT tenant_id,connection_id,webhook_event_id INTO tenant_id,connection_id,webhook_event_id
-      FROM public.atlas_integration_webhook_events
-      WHERE connection_id=connection.connection_id AND external_event_key=p_external_event_key;
+    SELECT e.tenant_id,e.connection_id,e.webhook_event_id
+      INTO tenant_id,connection_id,webhook_event_id
+      FROM public.atlas_integration_webhook_events e
+      WHERE e.connection_id=connection.connection_id AND e.external_event_key=p_external_event_key;
     duplicate:=TRUE; queued:=FALSE; disconnected:=FALSE; RETURN NEXT; RETURN;
   END IF;
   tenant_id:=connection.tenant_id; connection_id:=connection.connection_id; webhook_event_id:=event_id;
@@ -380,8 +381,10 @@ BEGIN
     connection.tenant_id,connection.connection_id,event_id,p_external_event_key,'hook.received',p_payload
   ) ON CONFLICT(connection_id,external_event_key) DO NOTHING;
   IF NOT FOUND THEN
-    SELECT tenant_id,connection_id,webhook_event_id INTO tenant_id,connection_id,webhook_event_id
-      FROM public.atlas_integration_webhook_events WHERE connection_id=connection.connection_id AND external_event_key=p_external_event_key;
+    SELECT e.tenant_id,e.connection_id,e.webhook_event_id
+      INTO tenant_id,connection_id,webhook_event_id
+      FROM public.atlas_integration_webhook_events e
+      WHERE e.connection_id=connection.connection_id AND e.external_event_key=p_external_event_key;
     duplicate:=TRUE; queued:=FALSE; RETURN NEXT; RETURN;
   END IF;
   task_id:=gen_random_uuid();
@@ -424,11 +427,24 @@ BEGIN
     ALTER FUNCTION atlas_v118_consume_oauth_state(CHAR) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_get_integration_contact(UUID,UUID,TEXT) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_upsert_integration_contact(UUID,UUID,TEXT,TIMESTAMPTZ,JSONB) OWNER TO atlas_integration_ingress;
+  END IF;
+END
+$;
+
+DO $
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='atlas_integration_ingress') THEN
+    ALTER FUNCTION atlas_v118_get_growth_record(UUID,UUID) OWNER TO atlas_integration_ingress;
+    ALTER FUNCTION atlas_v118_consume_oauth_state(CHAR) OWNER TO atlas_integration_ingress;
+    ALTER FUNCTION atlas_v118_get_integration_contact(UUID,UUID,TEXT) OWNER TO atlas_integration_ingress;
+    ALTER FUNCTION atlas_v118_upsert_integration_contact(UUID,UUID,TEXT,TIMESTAMPTZ,JSONB) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_ingest_jobber_webhook(TEXT,CHAR,TEXT,TEXT,JSONB) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_ingest_zapier_webhook(CHAR,CHAR,JSONB) OWNER TO atlas_integration_ingress;
   END IF;
 END
-$$;
+$;
+
+
 
 REVOKE ALL ON atlas_integration_connections,atlas_integration_oauth_states,atlas_integration_mappings,atlas_integration_webhook_events,atlas_integration_tasks,atlas_integration_deliveries FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v118_get_growth_record(UUID,UUID) FROM PUBLIC;
