@@ -194,6 +194,7 @@ export function createPublishPlan({ site, mode='preview', artifactHash, verified
     robots:page.indexable ? 'index,follow' : 'noindex,nofollow',
     indexable:page.indexable,
     sitemapIncluded:mode==='public' ? page.indexable : false,
+    https:site.origin.startsWith('https://'),
     structuredDataTypes:page.structuredData.map(item=>typeof item==='object' ? item['@type'] : '').filter(Boolean),
     ...(page.seo || {})
   }));
