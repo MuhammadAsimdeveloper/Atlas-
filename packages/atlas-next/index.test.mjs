@@ -33,13 +33,22 @@ test('V105 website publish plan prevents unsafe public publication', () => {
   const site = createSiteDefinition({
     tenantId:'t1',
     origin:'https://acme.example',
-    pages:[{path:'/',title:'Acme Home',description:'Acme services',indexable:true},
-           {path:'/services',title:'Services',description:'Acme services',indexable:true}]
+    pages:[
+      {path:'/',title:'Acme Home',description:'Acme services',indexable:true,seo:{
+        h1:'Acme Home',headings:[{level:2,text:'Services'}],bodyText:'Acme services '.repeat(80),
+        focusKeywords:['Acme services'],internalLinks:5,structuredDataTypes:['Organization'],mobileFriendly:true,
+        updatedRecently:true,transparentClaims:true
+      }},
+      {path:'/services',title:'Services',description:'Acme services',indexable:true,seo:{h1:'Services',internalLinks:1}}
+    ]
   });
   assert.equal(createDomainBinding({tenantId:'t1',domain:'acme.example',verification:'dns_txt',verified:true}).verified,true);
   const preview = createPublishPlan({site,mode:'preview',artifactHash:'a1'});
   assert.equal(preview.robots,'noindex,nofollow');
-  assert.equal(createPublishPlan({site,mode:'public',artifactHash:'a2',verifiedDomain:true}).sitemapEntries.length,2);
+  const publicPlan=createPublishPlan({site,mode:'public',artifactHash:'a2',verifiedDomain:true});
+  assert.equal(publicPlan.sitemapEntries.length,2);
+  assert.equal(publicPlan.seoReadiness.pageCount,2);
+  assert.ok(publicPlan.seoReadiness.score > 0);
   const insecureSite = createSiteDefinition({tenantId:'t1',origin:'http://acme.example',pages:[{path:'/',title:'Acme',description:'Acme',indexable:false}]});
   assert.throws(() => createPublishPlan({site:insecureSite,mode:'public',artifactHash:'a3',verifiedDomain:true}),/HTTPS/);
 });
