@@ -77,7 +77,7 @@ export class PostgresIntegrationStore {
     });
   }
 
-  async getConnection({ actorId, tenantId, connectionId }) {
+  async getConnection({ actorId, tenantId, connectionId, manage = false }) {
     assertUuid(connectionId, 'connectionId');
     return this.#transaction({ actorId, tenantId }, async client => {
       const { rows } = await client.query(`
@@ -423,6 +423,16 @@ export class PostgresIntegrationStore {
       [tenantId, connectionId, providerObjectType, externalId.trim(), atlasModule, atlasItemId, sourceUpdatedAt ? new Date(sourceUpdatedAt) : null]
     );
     return { providerObjectType, externalId: externalId.trim(), atlasModule, atlasItemId };
+  }
+
+  async workerGetMappingForAtlasItem({ tenantId, connectionId, atlasItemId, providerObjectType = 'Client' }) {
+    assertUuid(tenantId, 'tenantId'); assertUuid(connectionId, 'connectionId'); assertUuid(atlasItemId, 'atlasItemId');
+    const { rows } = await this.pool.query(`
+      SELECT external_id,provider_object_type,atlas_module,atlas_item_id,source_updated_at
+      FROM atlas_integration_mappings
+      WHERE tenant_id=$1 AND connection_id=$2 AND provider_object_type=$3 AND atlas_item_id=$4
+      LIMIT 1`, [tenantId, connectionId, providerObjectType, atlasItemId]);
+    return rows[0] || null;
   }
 
   async workerGetMappedContact({ tenantId, connectionId, externalId }) {
