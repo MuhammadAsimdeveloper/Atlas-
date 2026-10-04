@@ -319,7 +319,7 @@ BEGIN
   INSERT INTO public.atlas_integration_mappings(
     tenant_id,connection_id,provider_object_type,external_id,atlas_module,atlas_item_id,source_updated_at
   ) VALUES (p_tenant_id,p_connection_id,'Client',p_external_id,'contacts',item,p_source_updated_at)
-  ON CONFLICT (tenant_id,connection_id,'Client',external_id) DO UPDATE SET
+  ON CONFLICT (tenant_id,connection_id,provider_object_type,external_id) DO UPDATE SET
     atlas_item_id=EXCLUDED.atlas_item_id,source_updated_at=EXCLUDED.source_updated_at,updated_at=now();
   event_id:=gen_random_uuid();
   INSERT INTO public.atlas_growth_item_events(
