@@ -32,8 +32,22 @@ test('freelancer workspaces separate permissions from payment approval', () => {
 });
 
 test('SEO metadata and high-value security actions fail closed', () => {
- const seo=generateSeoMetadata({title:'Atlas CRM',description:'Business OS',canonicalUrl:'https://atlas.example.com',siteName:'Atlas',keywords:['CRM','automation']});
- assert.equal(seo.robots,'index,follow');
+ const seo=generateSeoMetadata({
+   title:'Atlas CRM',
+   description:'Business OS',
+   canonicalUrl:'https://atlas.example.com/',
+   siteName:'Atlas',
+   imageUrl:'https://atlas.example.com/social-card.svg',
+   imageAlt:'Atlas customer operations',
+   keywords:['CRM','automation']
+ });
+ assert.equal(seo.robots,'index,follow,max-image-preview:large');
+ assert.equal(seo.canonicalUrl,'https://atlas.example.com');
+ assert.equal(seo.twitterCard,'summary_large_image');
+ assert.equal(seo.imageAlt,'Atlas customer operations');
+ assert.equal(seo.verification.google,null);
+ assert.throws(()=>generateSeoMetadata({title:'x',description:'y',canonicalUrl:'https://atlas.example.com/?q=1',siteName:'Atlas'}),/canonicalUrl invalid/);
+ assert.throws(()=>generateSeoMetadata({title:'x',description:'y',canonicalUrl:'https://atlas.example.com',siteName:'Atlas',robots:'index,follow,all'}),/robots policy invalid/);
  const sec=createSecurityControlPlane({tenantId:'t1'});
  assert.equal(assessHighValueAction({controlPlane:sec,action:'charge',amount:500}).code,'STEP_UP_REQUIRED');
  assert.equal(assessHighValueAction({controlPlane:sec,action:'charge',amount:500,hasRecentStepUp:true}).allowed,true);
