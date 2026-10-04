@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f5f7fb">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Atlas workspace</title>
+  <link rel="stylesheet" href="/auth.css">
+  <link rel="stylesheet" href="/auth-modal.css">
+  <script type="module" src="/auth.mjs"></script>
+</head>
+<body>
+  <main id="auth-shell" class="auth-shell">
+    <section class="auth-card" aria-labelledby="auth-title">
+      <a class="brand" href="/" aria-label="Atlas home"><span class="brand-mark">A</span><span>Atlas<small>Business OS</small></span></a>
+      <div class="auth-heading"><span class="eyebrow">Your work, connected</span><h1 id="auth-title">Welcome back</h1><p id="auth-description">Sign in to your secure company workspace.</p></div>
+      <div id="auth-notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <form id="login-form" class="form-stack">
+        <label>Email address<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required></label>
+        <button class="button primary" type="submit">Sign in</button>
+        <button class="text-button" type="button" data-view="forgot">Forgot password?</button>
+      </form>
+      <form id="signup-form" class="form-stack" hidden>
+        <label>Your name<input name="displayName" autocomplete="name" maxlength="120" required></label>
+        <label>Company or workspace<input name="organizationName" autocomplete="organization" maxlength="120" required></label>
+        <label>Business type<select name="industry" required><option value="home_services">Home services · HVAC, plumbing, electrical</option><option value="appointment_services">Appointment services · clinics, dental, salons</option><option value="professional_services">Professional services</option><option value="agency">Agency or multi-location</option><option value="other">Other</option></select></label>
+        <label>Business time zone<select name="timeZone" required><option value="America/Los_Angeles">Pacific</option><option value="America/Denver">Mountain</option><option value="America/Phoenix">Arizona</option><option value="America/Chicago">Central</option><option value="America/New_York">Eastern</option><option value="America/Anchorage">Alaska</option><option value="Pacific/Honolulu">Hawaii</option><option value="UTC">UTC</option></select><span class="field-help">Used later for business hours, reminders and appointment workflows.</span></label>
+        <label>Email address<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+        <label>Password<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required><span class="field-help">Use at least 12 characters.</span></label>
+        <button class="button primary" type="submit">Create workspace</button>
+      </form>
+      <form id="forgot-form" class="form-stack" hidden>
+        <label>Email address<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+        <button class="button primary" type="submit">Send reset link</button>
+        <button class="text-button" type="button" data-view="login">Back to sign in</button>
+      </form>
+      <form id="reset-form" class="form-stack" hidden>
+        <label>New password<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required><span class="field-help">Use at least 12 characters.</span></label>
+        <button class="button primary" type="submit">Save password</button>
+      </form>
+      <div class="auth-switch" id="auth-switch"><span>New to Atlas?</span> <button class="text-button" type="button" data-view="signup">Create an account</button></div>
+      <p class="auth-privacy">Each company has an isolated workspace. Workspace administrators cannot access Atlas platform controls.</p>
+    </section>
+  </main>
+
+  <div id="workspace" class="workspace" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Atlas workspace home"><span class="brand-mark">A</span><span>Atlas<small>Business OS</small></span></a>
+      <label class="switcher-label" for="workspace-picker">Workspace</label>
+      <select id="workspace-picker" class="workspace-picker" aria-label="Choose workspace"></select>
+      <nav class="nav" aria-label="Workspace navigation">
+        <button class="nav-item active" type="button" data-panel="overview"><span aria-hidden="true">⌂</span> Overview</button>
+        <button class="nav-item" type="button" data-panel="team"><span aria-hidden="true">♙</span> Team & access</button>
+      </nav>
+      <div class="sidebar-note"><span class="status-dot"></span><span>Workspace data is live</span></div>
+      <div class="side-owner"><span id="user-avatar" class="avatar">A</span><span id="sidebar-user"></span></div>
+    </aside>
+    <main class="main-content">
+      <header class="topbar">
+        <div><div class="eyebrow" id="breadcrumb">Workspace overview</div><h1 id="page-title">Overview</h1></div>
+        <div class="account-tools"><span id="active-role" class="role-pill"></span><button id="logout-button" class="button subtle" type="button">Sign out</button></div>
+      </header>
+      <div id="workspace-notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <section id="overview-panel" class="panel-section" aria-labelledby="page-title">
+        <div class="welcome-card"><div><span class="eyebrow">Company workspace</span><h2 id="welcome-title"></h2><p>Your workspace is ready. Connect your customer, communication and automation tools as you build them.</p></div><span class="welcome-symbol" aria-hidden="true">✦</span></div>
+        <div class="metric-grid" aria-label="Live workspace metrics">
+          <article class="metric-card"><span>Active team members</span><strong id="metric-members">—</strong><small>Current workspace</small></article>
+          <article class="metric-card"><span>Pending invitations</span><strong id="metric-invites">—</strong><small>Awaiting acceptance</small></article>
+          <article class="metric-card"><span>Activity this week</span><strong id="metric-activity">—</strong><small>Recorded workspace events</small></article>
+        </div>
+        <section class="content-card module-card"><div class="section-heading"><div><span class="eyebrow">Coming online as modules connect</span><h2>Customer operations</h2></div><span class="live-tag"><span class="status-dot"></span> Core account data live</span></div>
+          <div class="module-grid">
+            <article class="module"><span class="module-icon">◎</span><div><strong>CRM & sales</strong><p>Contacts, pipelines and opportunities</p></div><span class="module-state">Not connected</span></article>
+            <article class="module"><span class="module-icon">✦</span><div><strong>AI agents</strong><p>Customer support and approved actions</p></div><span class="module-state">Not connected</span></article>
+            <article class="module"><span class="module-icon">↗</span><div><strong>Automations</strong><p>Workflows, messages and schedules</p></div><span class="module-state">Not connected</span></article>
+            <article class="module"><span class="module-icon">▤</span><div><strong>Billing & growth</strong><p>Plans, usage and account revenue</p></div><span class="module-state">Not connected</span></article>
+          </div>
+          <p class="truth-note">These product areas appear as unavailable until their database-backed features and service connections are enabled. No sample performance is shown as real.</p>
+        </section>
+      </section>
+      <section id="team-panel" class="panel-section" hidden aria-labelledby="page-title">
+        <div class="content-card"><div class="section-heading"><div><span class="eyebrow">People in this workspace</span><h2>Team members</h2></div><span id="team-count" class="live-tag"></span></div><div class="table-scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Access</th><th>Status</th></tr></thead><tbody id="member-rows"></tbody></table></div></div>
+        <div class="two-column">
+          <div class="content-card" id="invite-card"><span class="eyebrow">Grow your team</span><h2>Invite a teammate</h2><form id="invite-form" class="form-stack compact"><label>Email address<input name="email" type="email" autocomplete="email" maxlength="254" required></label><label>Workspace role<select name="roleKey" id="invite-role"><option value="member">Member</option><option value="viewer">Viewer</option><option value="billing_admin">Billing administrator</option><option value="admin">Administrator</option></select></label><button class="button primary" type="submit">Send invitation</button></form><p class="field-help">Workspace roles only. No company role grants Atlas platform-owner access.</p></div>
+          <div class="content-card"><span class="eyebrow">Open invitations</span><h2>Invitations</h2><div id="invitation-list" class="simple-list"></div><div id="invitation-empty" class="empty-state">No pending invitations.</div></div>
+        </div>
+        <div class="content-card" id="role-card"><div class="section-heading"><div><span class="eyebrow">Fine-grained workspace access</span><h2>Custom roles</h2></div></div><form id="role-form" class="role-form"><label>Role name<input name="name" maxlength="64" required></label><label>Role key<input name="key" pattern="[a-z0-9][a-z0-9-]{0,48}" maxlength="49" placeholder="support-agent" required><span class="field-help">Use lowercase letters, numbers and hyphens.</span></label><fieldset><legend>Permissions</legend><div id="permission-options" class="permission-grid"></div></fieldset><button class="button secondary" type="submit">Create custom role</button></form><div id="role-list" class="role-list"></div></div>
+      </section>
+      <footer class="workspace-footer"><span>Atlas · Secure business workspace</span><span id="footer-status">Ready</span></footer>
+    </main>
+  </div>
+  <dialog id="workspace-dialog" class="workspace-dialog" aria-labelledby="workspace-dialog-title">
+    <form id="create-workspace-form" class="form-stack">
+      <span class="eyebrow">New workspace</span><h2 id="workspace-dialog-title">Create a company workspace</h2>
+      <p class="field-help">Your account becomes the owner of this isolated workspace.</p>
+      <label>Company or workspace name<input name="name" maxlength="120" required></label>
+      <div id="dialog-notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <div class="dialog-actions"><button id="cancel-workspace" class="button subtle" type="button">Cancel</button><button class="button primary" type="submit">Create workspace</button></div>
+    </form>
+  </dialog>
+</body>
+</html>

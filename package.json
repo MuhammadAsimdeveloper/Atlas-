@@ -1,7 +1,7 @@
 {
   "name": "atlas-business-os",
   "private": true,
-  "version": "111.0.0",
+  "version": "112.0.0",
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1",
@@ -9,15 +9,22 @@
     "doctor": "node scripts/doctor.mjs",
     "security:check": "node scripts/doctor.mjs",
     "docs:check": "node scripts/docs-check.mjs",
-    "smoke:e2e": "node scripts/smoke-http.mjs",
+    "smoke:e2e": "node scripts/smoke-http.mjs && node scripts/smoke-api-http.mjs",
     "preview": "node scripts/preview.mjs",
     "build:site": "node scripts/build-site.mjs",
     "seo:check": "node scripts/seo-check.mjs",
     "launch:check": "node scripts/launch-check.mjs",
     "start:api": "node apps/api/server.mjs",
-    "production:check": "node scripts/production-check.mjs"
+    "production:check": "node scripts/production-check.mjs",
+    "db:migrate": "node scripts/migrate.mjs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
   }
 }

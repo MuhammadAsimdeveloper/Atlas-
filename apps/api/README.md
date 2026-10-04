@@ -1,14 +1,34 @@
-# Atlas API boundary
+# Atlas API
 
-This process owns HTTP hardening, health endpoints and the production configuration gate. Tenant endpoints must sit behind authenticated session resolution and a PostgreSQL transaction adapter.
+V112 runs the authenticated same-origin workspace and account API. Set `ATLAS_DATABASE_URL` to the restricted runtime PostgreSQL role, not the migration owner. If the database/schema are unavailable, readiness and authenticated routes fail closed.
 
-Required production secrets:
-- ATLAS_DATABASE_URL
-- ATLAS_SESSION_SECRET
-- ATLAS_ACTION_APPROVAL_KEY (32+ bytes)
-- ATLAS_PLATFORM_OWNER_EMAIL
-- ATLAS_PUBLIC_ORIGIN (HTTPS)
+## First database setup
 
-Never accept tenant IDs, memberships, roles, platform-owner flags or provider credentials from request bodies. Resolve them from the authenticated session and trusted database state, then set SET LOCAL app.tenant_id inside every tenant transaction.
+1. Create a migration role that may apply schema and a separate runtime role with `NOSUPERUSER NOBYPASSRLS`.
+2. Set `ATLAS_MIGRATION_DATABASE_URL` and run `npm run db:migrate`.
+3. Create the restricted `atlas_app` role and apply `infra/postgres/API-ROLE-GRANTS-V112.sql` as the database owner.
+4. Set `ATLAS_DATABASE_URL` to the `atlas_app` connection. Keep passwords/certificates in the deployment secret manager.
+5. Configure Khan's verified owner email, a 32-byte session secret, the 32-byte action approval key, a real HTTPS public origin, and Postmark sender credentials before production startup. Production Postgres connections always verify TLS certificates; set `ATLAS_DATABASE_SSL_CA_FILE` to the provider's PEM root certificate path mounted from deployment configuration. URL `sslmode` options cannot disable verification. Set `ATLAS_TRUST_PROXY=true` only behind an HTTPS edge configured to overwrite `X-Real-IP`; production requests without one valid IP fail closed so all visitors do not share a single throttling bucket.
 
-The readiness endpoint reports configuration readiness only until the database adapter is connected.
+The migration runner applies the versioned SQL files in numeric order, serializes migration operations with a PostgreSQL advisory lock and stores each file's SHA-256. It refuses to modify a migration already recorded as applied. API deployment does not run migrations automatically.
+
+## Request authority
+
+The API derives identity from the server-side opaque session cookie, then loads active organization memberships from PostgreSQL. Tenant routes re-check the actor's active membership and role before using a tenant transaction. Tenant selection is changed only after the session actor is confirmed as a member. Request-body tenant IDs, roles, owner flags and provider secrets are never used as authority.
+
+Only a verified session whose normalized email matches `ATLAS_PLATFORM_OWNER_EMAIL` receives platform-owner authority through the trusted resolver. The database has tenant roles only; company owner/admin roles can never promote themselves to global access.
+
+Every tenant query uses server-controlled transaction-local `app.actor_id` and `app.tenant_id` contexts. Runtime privileges must not include `BYPASSRLS`, superuser or table ownership. See [`API-ROLE-GRANTS-V112.sql`](../../infra/postgres/API-ROLE-GRANTS-V112.sql) and the [V112 setup/security guide](../../docs/V112-IDENTITY-TENANT-FOUNDATION.md).
+
+## Session and email controls
+
+- Seven-day random opaque session cookies; only a SHA-256 digest is persisted.
+- `HttpOnly`, `SameSite=Strict`; `Secure` and `__Host-` cookie names in production.
+- Same-origin request check plus double-submit CSRF cookie/header bound to a session digest.
+- Passwords use scrypt with fixed reviewed parameters; email verification/reset/invitation values are random, one-time, expiring tokens stored by digest.
+- PostgreSQL-backed IP and account rate-limit keys are hashed and shared across API replicas.
+- Postmark handles production transactional email. Console links are development-only and are not used in production.
+
+## Operational checks
+
+`GET /health/live` checks process health. `GET /health/ready` checks PostgreSQL connectivity and the V112 identity schema and can require `X-Atlas-Health-Token`. Readiness does not prove managed database failover, mail delivery, worker capacity or user-scale performance. Configure API pool bounds to match managed database connection limits and route clients through a trusted HTTPS edge.

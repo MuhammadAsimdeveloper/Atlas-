@@ -1,4 +1,39 @@
-ATLAS V111.0.0 — GHL/n8n Workflow Capability Registry and Retry Safety
+ATLAS V112.0.0 — PostgreSQL Identity and Tenant Foundation
+
+Implemented
+- Authenticated account API: signup, email verification/resend, password sign-in, reset/logout, profile, workspace create/select, team list, invitation create/accept and tenant custom-role list/create.
+- PostgreSQL identity and multi-tenancy schema with forced row-level security, one-use hashed tokens, opaque sessions, tenant-scoped membership/invitations/roles, shared auth rate limits and append-only audit events.
+- Platform-owner authority remains only a server-resolved verified email for Khan. No company role, signup field or request property can grant global access.
+- Responsive same-origin workspace web UI with real member/invitation/audit dashboard counts, and clear unavailable labels for disconnected CRM, AI/agents, workflow, messaging and revenue modules.
+- Migration runner with advisory lock, checksum records and separate migration/runtime database connections. Production readiness queries PostgreSQL and checks the V112 identity schema.
+- Production API and migration database pools enforce TLS certificate verification, ignore URL-level TLS downgrades, support a mounted private CA and bound pool size. Runtime-role grants reject superuser, BYPASSRLS, role inheritance and ownership of tenant identity tables.
+- Rate-limit and IP identifiers use HMAC-SHA-256 keyed by the server secret. The full migration chain exposed and fixed a reserved identifier in V90 and an unavailable JSON helper in V96.
+- Production authentication throttling requires a valid edge-supplied client IP. Duplicate signup races remain enumeration-safe; each tenant/email may have only one pending invite, and superseded invitations are accurately shown as replaced.
+- PGlite migration/RLS integration test and HTTP authentication end-to-end tests. Node-postgres is a pinned runtime dependency; PGlite is test-only.
+- Current official HighLevel/n8n findings are documented in docs/V112-IDENTITY-TENANT-FOUNDATION.md.
+
+Verification (Node v24.19.0 on Windows)
+- `node --test --test-concurrency=1`: PASS — 160 tests, 160 passed, 0 failed; includes full ordered migration application, actual V112 runtime-grant script, cross-tenant RLS and invite-replacement checks against ephemeral PGlite.
+- Focused V112 auth/database-config tests: PASS — 13 passed, 0 failed.
+- `node scripts/check.mjs`: PASS — all discovered JavaScript modules passed syntax checks.
+- `node scripts/doctor.mjs`: PASS — 52/52 invariants.
+- `node scripts/production-check.mjs`: PASS — 15/15 checks.
+- `node scripts/docs-check.mjs`: PASS — 48 Markdown files, 0 errors.
+- `git diff --check`: PASS — no whitespace errors in tracked diffs; release staging also checks newly added files.
+- HTTP end-to-end smoke: PASS — static command-center 5/5 and authenticated API 8/8 checks. Authenticated API smoke verifies fail-closed behavior without a database.
+- `node scripts/build-site.mjs`: PASS — preview built with `noindex` and deny-all robots; no domain was invented.
+- `node scripts/seo-check.mjs`: PASS — 33 assertions.
+- `node scripts/launch-check.mjs`: PASS — 4/4 checks.
+- `npm audit --audit-level=moderate` (via bundled npm 11): PASS — 0 vulnerabilities found.
+
+Not verified / external work
+- The V112 migration and RLS test use ephemeral PostgreSQL-compatible PGlite; no managed PostgreSQL service has been configured or used.
+- TLS is unit-tested and enforced in connection configuration, but no live database certificate/CA handshake or managed-provider backup/restore was tested.
+- Postmark delivery is implemented as an adapter but no production sender/domain/token exists; local console mail links are development-only.
+- The deployment has no public domain (per the project owner), Redis, object storage/CDN/WAF, OTel collection, worker fleet or load/failover/restore evidence. No millions-of-users capacity claim is verified.
+- AI agent/chatbot provider calls, live booking/calendar integrations, workflow execution workers, general customer email/SMS/social delivery, payments, TOTP/2FA, SSO/OAuth, API tokens, account disable/removal and automatic expired-auth-row retention cleanup remain future implementation work. Existing AI/workflow/chat contracts and service-business recipes do not mean those providers are connected.
+
+## Previous release: ATLAS V111.0.0 — GHL/n8n Workflow Capability Registry and Retry Safety
 
 Implemented
 - Shared canonical workflow event registry: 134 typed event names with event family, ingress trust policy, idempotency expectation and payload policy.

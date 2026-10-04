@@ -2,7 +2,15 @@
 
 Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
 
-## Current release: V111
+## Current release: V112
+
+V112 adds a live PostgreSQL-backed identity and organization foundation: account creation, email verification, password reset, secure sessions, CSRF protection, shared database auth rate limits, tenant selection, workspace/member/invitation/custom-role APIs, and an authenticated laptop-first workspace. The dashboard only reports live member, invitation and audit counts; CRM, agent, workflow, communication and revenue metrics remain visibly unavailable until connected.
+
+Only Khan's configured and verified owner email receives global Atlas authority. The user/org schema contains no platform-owner role, and company owners/admins remain tenant-scoped. V112 ships a checksum-tracked migration runner, forced-RLS identity tables and restricted runtime-role grants. The migration and tenant policy are exercised against an ephemeral PostgreSQL-compatible test database, but have not been applied to a managed production database.
+
+See [V112 identity and tenant foundation](docs/V112-IDENTITY-TENANT-FOUNDATION.md) for setup, API contracts, authority rules, current GHL/n8n research and unconnected infrastructure.
+
+## Previous release: V111
 
 V111 expands the workflow registry against current HighLevel workflow trigger/action documentation and n8n orchestration/agent patterns. The graph compiler validates a canonical 134-event catalog and 86 policy-classified node types, rejects credentials/private message content and direct recipient/URL values even inside reference fields, bounds retries and timeouts, and keeps stable idempotency across attempts. High-risk approvals are bound to the exact tenant, graph, execution, node and action key, expire quickly, and require trusted verification. AI tool objects reject accessors without invoking them. This remains a hardened contract layer; external actions still need authenticated APIs, durable persistence, worker execution and provider adapters.
 
@@ -80,7 +88,7 @@ V93 hardens the customer-operations layer with immutable message-template versio
 - Customer agents use evaluation-gated immutable releases, channel/segment routing, time-aware availability, handoff rules, bounded tool calls, exact-scope approval and explicitly consented short-term memory.
 - Messaging intents require fresh policy, consent, suppression and frequency evidence; workers must recheck these immediately before provider delivery.
 - Business recipe descriptors cover lead intake/follow-up, appointment reminders and no-show recovery, missed calls, after-call follow-up, service reviews, failed payments, abandoned checkout and course onboarding.
-- The command-center is an accessible laptop-first sample-data preview; it does not connect to an authenticated API or provider.
+- The legacy `/app/` command-center surface is an accessible laptop-first sample-data preview. The V112 workspace is a separate authenticated API-backed surface and does not use those sample rows as live data.
 
 ## Authority boundary
 
@@ -100,26 +108,28 @@ Configure Khan's verified owner identity through deployment secrets. The setting
 
 ## Run locally
 
-Requires Node.js 20 or newer. The source declares no third-party npm packages.
+Requires Node.js 20 or newer and npm. Install the locked runtime/test dependencies before running checks.
 
 ```sh
+npm ci
 node --test
 node scripts/check.mjs
 node scripts/docs-check.mjs
 node scripts/doctor.mjs
-node scripts/smoke-http.mjs
+npm run smoke:e2e
+npm audit --audit-level=moderate
 node scripts/preview.mjs
 ```
 
-Open the local address printed by the preview process. UI figures, plans and action inbox rows are sample values. Do not treat the preview as live SaaS data.
+For the authenticated workspace, configure a development Postgres connection, apply `npm run db:migrate`, then run `npm run start:api` and open `http://localhost:8080/`. Development email verification links are printed to the API terminal. The older `npm run preview` demo continues to use illustrative metrics, plans and action rows and must not be treated as live SaaS data.
 
 ## Production readiness boundary
 
-This repository contains deterministic domain contracts, tests, SQL migration targets and a static preview. It does not ship a complete authenticated API, account signup/login, real email/SMS/WhatsApp/social/voice adapters, calendar booking, payment checkout, campaign delivery, live tenant console, KMS-backed memory adapter, production Redis worker service or production observability exporter. Local JSON/state is development-only.
+V112 ships an authenticated account/tenant API, Postgres persistence contracts, account screens, role-scoped organization controls and live core account metrics. Production PostgreSQL connections enforce TLS certificate verification; use `ATLAS_DATABASE_SSL_CA_FILE` when the managed provider requires a private root CA. Production auth throttling also requires `ATLAS_TRUST_PROXY=true` behind an HTTPS edge that overwrites `X-Real-IP`. It does not yet ship TOTP/2FA, SSO/OAuth, API keys, tenant user lifecycle controls, production queue workers, CRM/chat/workflow API surfaces, model/agent provider execution, real SMS/WhatsApp/social/voice adapters, calendar provider sync, payment checkout, campaign delivery, a KMS-backed memory adapter or production observability exporter. Local JSON/state remains development-only.
 
 Target deployment architecture: managed PostgreSQL with forced tenant RLS; managed Redis/queue; separately scaled authenticated API, webhook ingress and workers; managed secret manager/KMS; object storage and CDN for attachments; WAF/rate limits; OpenTelemetry collection; tested backups, restores, load, failover and SLOs. No millions-of-users capacity claim is verified by this repository.
 
-Apply SQL targets in order: V80, V85, V90, V91, V92, V93, V94, V95, V96, V99, V100, V102, then V103. SQL has not been run against a live PostgreSQL service in this workspace. API and worker roles must not have `BYPASSRLS`, and `app.tenant_id` must be set from authenticated membership in every tenant transaction.
+Apply SQL targets in order with `npm run db:migrate`: V80, V85, V90–V96, V99, V100, V102–V112. The migration runner checks immutable SHA-256 migration records and serializes migration sessions. SQL has not been applied to a managed production PostgreSQL service in this workspace. Use distinct migration and runtime connections; API and worker roles must not have `BYPASSRLS`, and each `app.tenant_id` must be set from authenticated membership in the tenant transaction.
 
 For GHL/n8n/monday/HubSpot analysis and explicit feature gaps, see [October 2026 competitor benchmark](docs/COMPETITOR-BENCHMARK-2026-10.md). For the V95 duplicate-case behavior see [V95 Case Intelligence](docs/V95-CASE-INTELLIGENCE.md); the [V94 Copilot and Service Desk](docs/V94-COPILOT-SERVICE-DESK.md) document describes the underlying contracts.
 

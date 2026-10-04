@@ -1,3 +1,15 @@
+## 112.0.0 — PostgreSQL Identity and Tenant Foundation
+- Replaced the V111 contract-only HTTP shell with a real, PostgreSQL-backed account API: signup, email verification/resend, password sign-in/reset, session revocation, profile update, organization creation/selection, member listing, invitations, invitation acceptance and tenant custom roles.
+- Added scrypt password hashes, random one-use token hashes, strict same-origin and CSRF validation, HttpOnly SameSite session cookies, account/IP rate limits, bounded JSON bodies and generic credential/reset responses.
+- Added forced-RLS identity, organization, membership, custom role, session, one-use token, rate-limit and immutable audit tables. Platform-owner authority remains a server-resolved verified Khan email and does not exist as a customer role or writable field.
+- Added a migration runner with advisory locking and immutable SHA-256 migration records, plus separate restricted runtime-role grants. Production readiness now verifies database connectivity and the identity schema.
+- Production API and migration connections now remove URL-level TLS overrides and enforce certificate validation, with optional mounted private-CA support; runtime grants reject superuser/BYPASSRLS/role-inheriting/table-owning `atlas_app` configurations.
+- IP and account rate-limit identifiers now use secret-keyed HMAC-SHA-256 digests. The complete migration-chain integration test also caught and fixed a reserved identifier in V90 and an unavailable JSON helper reference in V96.
+- Production auth throttling requires a valid client IP from the configured trusted edge. Concurrent signup email races stay enumeration-safe, and only one pending invitation can exist per tenant/email at a time.
+- Added a responsive authenticated workspace UI for account creation, sign-in, live core dashboard metrics, workspace switching, team invitations and custom roles. Service-business onboarding captures industry and timezone; disconnected CRM, AI, workflow, communications and revenue modules are labeled unavailable.
+- Added current HighLevel/n8n architecture notes and mapped the need for event-driven agent starts, CRM actions, structured agent-to-workflow results, execution retries, scoped sharing and promotion to existing Atlas V93–V111 contracts and future integration work.
+- Added HTTP auth end-to-end tests and an ephemeral PostgreSQL-compatible V112 migration/RLS test. This workspace has no production database, mail sender, public domain, or deployed scale/failover environment.
+
 ## 111.0.0 — GHL/n8n Workflow Capability Registry and Retry Safety
 - Added one shared, vendor-neutral 134-event workflow trigger catalog covering HighLevel's documented CRM, event, appointment, opportunity, affiliate, course, payment, commerce, IVR, social, community, certificate, communication, review, ads and AI-agent lifecycle events.
 - Expanded the graph node catalog to 86 policy-classified node types for CRM and pipeline operations, multi-channel communications, integrations, scheduling, arrays/batching, AI, payments, marketing, affiliate/course/community, IVR, approval and sub-workflow patterns.

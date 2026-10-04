@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS atlas_queue_jobs (
 CREATE INDEX IF NOT EXISTS idx_atlas_queue_jobs_claim ON atlas_queue_jobs(tenant_id, queue, status, available_at);
 
 CREATE TABLE IF NOT EXISTS atlas_slo_windows (
-  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, service TEXT NOT NULL, window TEXT NOT NULL,
+  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, service TEXT NOT NULL, "window" TEXT NOT NULL,
   good_events BIGINT NOT NULL DEFAULT 0, total_events BIGINT NOT NULL DEFAULT 0,
   target NUMERIC(8,6) NOT NULL, burn_rate NUMERIC(12,6) NOT NULL DEFAULT 0,
   within_slo BOOLEAN NOT NULL DEFAULT true, observed_at TIMESTAMPTZ NOT NULL DEFAULT now()

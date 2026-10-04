@@ -1,0 +1,131 @@
+import assert from 'node:assert/strict';
+import { readFile, readdir } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import test from 'node:test';
+import { PGlite } from '@electric-sql/pglite';
+import { PostgresAuthStore } from './postgres-auth-store.mjs';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const migration = await readFile(path.join(root, 'infra/postgres/FINAL-MIGRATION-V112.sql'), 'utf8');
+
+test('all PostgreSQL migrations apply in order and V112 tenant policies constrain a non-bypass runtime role', async () => {
+  const db = new PGlite();
+  try {
+    const migrationDirectory = path.join(root, 'infra/postgres');
+    const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
+    assert.equal(files.at(-1), 'FINAL-MIGRATION-V112.sql');
+    for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
+    await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V112.sql'), 'utf8'));
+    await db.exec('SET ROLE atlas_app;');
+
+    const makeOrg = async ({ actor, email, tenant, name, slug }) => {
+      await db.exec('BEGIN');
+      await db.query("SELECT set_config('app.auth_email',$1,true)", [email]);
+      await db.query('INSERT INTO atlas_auth_users(user_id,email,display_name,password_hash,email_verified_at) VALUES ($1,$2,$3,$4,now())', [actor,email,name,'scrypt$test']);
+      await db.query("SELECT set_config('app.actor_id',$1,true)", [actor]);
+      await db.query('INSERT INTO atlas_organizations(tenant_id,name,slug,created_by) VALUES ($1,$2,$3,$4)', [tenant,name,slug,actor]);
+      await db.query("SELECT set_config('app.tenant_id',$1,true)", [tenant]);
+      await db.query("INSERT INTO atlas_organization_memberships(tenant_id,user_id,role_key) VALUES ($1,$2,'owner')", [tenant,actor]);
+      await db.query('COMMIT');
+    };
+
+    const userA = '11111111-1111-4111-8111-111111111111';
+    const tenantA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const userB = '22222222-2222-4222-8222-222222222222';
+    const tenantB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    await makeOrg({ actor: userA, email: 'owner-a@example.net', tenant: tenantA, name: 'Owner A', slug: 'owner-a' });
+    await makeOrg({ actor: userB, email: 'owner-b@example.net', tenant: tenantB, name: 'Owner B', slug: 'owner-b' });
+
+    await db.exec('BEGIN');
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [userA]);
+    await db.query("SELECT set_config('app.tenant_id',$1,true)", [tenantA]);
+    const organizations = await db.query('SELECT tenant_id,name FROM atlas_organizations ORDER BY name');
+    assert.deepEqual(organizations.rows.map(row => row.tenant_id), [tenantA]);
+    const users = await db.query('SELECT email FROM atlas_auth_users ORDER BY email');
+    assert.deepEqual(users.rows.map(row => row.email), ['owner-a@example.net']);
+    await assert.rejects(db.query('INSERT INTO atlas_organizations(tenant_id,name,slug,created_by) VALUES ($1,$2,$3,$4)', ['cccccccc-cccc-4ccc-8ccc-cccccccccccc','Foreign','foreign-org',userB]));
+    await db.exec('ROLLBACK');
+
+    const forced = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_organization_memberships'::regclass");
+    assert.equal(forced.rows[0].relrowsecurity, true);
+    assert.equal(forced.rows[0].relforcerowsecurity, true);
+    const runtime = await db.query("SELECT rolsuper,rolbypassrls,rolcreatedb,rolcreaterole FROM pg_roles WHERE rolname='atlas_app'");
+    assert.equal(runtime.rows[0].rolsuper, false);
+    assert.equal(runtime.rows[0].rolbypassrls, false);
+    assert.equal(runtime.rows[0].rolcreatedb, false);
+    assert.equal(runtime.rows[0].rolcreaterole, false);
+    const identityColumns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_name='atlas_auth_users'");
+    assert.equal(identityColumns.rows.some(row => row.column_name === 'platform_owner'), false);
+  } finally {
+    await db.close();
+  }
+});
+
+test('Postgres auth store completes tenant account, invitation, dashboard, reset and session lifecycle under RLS', async () => {
+  const db = new PGlite();
+  const now = () => new Date();
+  try {
+    await db.exec(migration);
+    await db.exec(`CREATE ROLE atlas_auth_runtime NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;
+      GRANT SELECT,INSERT,UPDATE ON atlas_auth_users,atlas_organizations,atlas_organization_roles,atlas_organization_memberships,atlas_auth_tokens,atlas_auth_rate_limits TO atlas_auth_runtime;
+      GRANT SELECT,INSERT,UPDATE,DELETE ON atlas_auth_sessions TO atlas_auth_runtime;
+      GRANT SELECT,INSERT ON atlas_auth_audit_events TO atlas_auth_runtime;
+      SET ROLE atlas_auth_runtime;`);
+    const pool = { connect: async () => ({ query: (...args) => db.query(...args), release() {} }), query: (...args) => db.query(...args), end: async () => {} };
+    const store = new PostgresAuthStore(pool, { clock: now });
+    const expiresAt = () => new Date(now().getTime() + 30 * 60_000);
+    const accountA = { email:'owner-a@atlas.test', displayName:'Owner A', organizationName:'Northstar HVAC', industryKey:'home_services', timeZone:'America/Los_Angeles', passwordHash:'scrypt$16384$8$1$dummy$dummy', verificationTokenHash:'a'.repeat(64), expiresAt:expiresAt() };
+    const accountB = { email:'member-b@atlas.test', displayName:'Member B', organizationName:'Bright Dental', industryKey:'appointment_services', timeZone:'America/New_York', passwordHash:'scrypt$16384$8$1$dummy$dummy', verificationTokenHash:'b'.repeat(64), expiresAt:expiresAt() };
+    const createdA = await store.createAccount(accountA);
+    const createdB = await store.createAccount(accountB);
+    assert.equal(createdA.created, true); assert.equal(createdB.created, true);
+    assert.equal((await store.findUserForLogin(accountA.email)).emailVerified, false);
+    assert.equal((await store.verifyEmail({ tokenHash:accountA.verificationTokenHash })).emailVerified, true);
+    assert.equal((await store.verifyEmail({ tokenHash:accountA.verificationTokenHash })), null, 'verification token is single-use');
+    await store.verifyEmail({ tokenHash:accountB.verificationTokenHash });
+
+    const role = await store.createCustomRole({ userId:createdA.userId, tenantId:createdA.tenantId, roleId:'33333333-3333-4333-8333-333333333333', role:{ key:'custom:support-coordinator',name:'Support coordinator',permissions:['inbox.read','inbox.respond'] } });
+    const inviteHash = 'c'.repeat(64);
+    await store.createInvitation({ userId:createdA.userId, tenantId:createdA.tenantId, email:accountB.email, roleKey:role.key, customRoleId:role.id, tokenHash:inviteHash, expiresAt:expiresAt() });
+    assert.equal((await store.listInvitations({ userId:createdA.userId, tenantId:createdA.tenantId }))[0].status, 'pending');
+    const replacementInviteHash = '8'.repeat(64);
+    await store.createInvitation({ userId:createdA.userId, tenantId:createdA.tenantId, email:accountB.email, roleKey:role.key, customRoleId:role.id, tokenHash:replacementInviteHash, expiresAt:expiresAt() });
+    const currentInvitations = await store.listInvitations({ userId:createdA.userId, tenantId:createdA.tenantId });
+    assert.deepEqual(currentInvitations.map(invite => invite.status).sort(), ['pending', 'replaced']);
+    await assert.rejects(store.acceptInvitation({ userId:createdB.userId, email:accountB.email, tokenHash:inviteHash }), { code:'invalid_or_expired_invitation' });
+    const accepted = await store.acceptInvitation({ userId:createdB.userId, email:accountB.email, tokenHash:replacementInviteHash });
+    assert.equal(accepted.id, createdA.tenantId);
+    assert.equal(accepted.role, 'custom:support-coordinator');
+    assert.equal((await store.listMembers({ userId:createdA.userId, tenantId:createdA.tenantId })).length, 2);
+    assert.equal((await store.listCustomRoles({ userId:createdB.userId, tenantId:createdA.tenantId })).length, 1);
+    await assert.rejects(store.getDashboard({ userId:createdA.userId, tenantId:createdB.tenantId }), { code:'organization_not_found' });
+
+    const csrf = 'd'.repeat(64); const sessionHash = 'e'.repeat(64);
+    const session = await store.createSession({ userId:createdA.userId, sessionHash, csrfHash:csrf, expiresAt:expiresAt(), userAgent:'integration test', ipHash:null });
+    assert.equal(session.tenantId, createdA.tenantId);
+    const dashboard = await store.getDashboard({ userId:createdA.userId, tenantId:createdA.tenantId });
+    assert.equal(dashboard.organization.industry, 'home_services');
+    assert.equal(dashboard.metrics.activeMembers, 2);
+    assert.equal(dashboard.metrics.pendingInvitations, 0);
+    const identity = await store.getSession({ sessionHash });
+    assert.equal(identity.user.email, accountA.email);
+    assert.equal(identity.memberships.length, 1);
+    const changedProfile = await store.updateProfile({ userId:createdA.userId, displayName:'Khan Owner' });
+    assert.equal(changedProfile.displayName, 'Khan Owner');
+
+    const rateKey = 'f'.repeat(64);
+    assert.equal(await store.consumeRateLimit({ key:rateKey, now:now(), windowSeconds:60, limit:2 }), true);
+    assert.equal(await store.consumeRateLimit({ key:rateKey, now:now(), windowSeconds:60, limit:2 }), true);
+    assert.equal(await store.consumeRateLimit({ key:rateKey, now:now(), windowSeconds:60, limit:2 }), false);
+
+    const resetHash = '9'.repeat(64);
+    assert.equal(await store.issuePasswordReset({ email:accountA.email, tokenHash:resetHash, expiresAt:expiresAt() }), true);
+    await store.resetPassword({ tokenHash:resetHash, passwordHash:'scrypt$16384$8$1$new$hash' });
+    assert.equal(await store.getSession({ sessionHash }), null, 'password reset revokes existing sessions');
+    assert.equal(await store.revokeSession({ sessionHash }), false);
+  } finally {
+    await db.close();
+  }
+});

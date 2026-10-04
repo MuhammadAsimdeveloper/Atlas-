@@ -3,6 +3,11 @@
 -- Resolve calendar revisions using trusted tenant storage; never use a JSON-provided snapshot.
 BEGIN;
 
+CREATE OR REPLACE FUNCTION atlas_v96_jsonb_object_length(value JSONB)
+RETURNS INTEGER LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE AS $$
+  SELECT count(*)::integer FROM jsonb_object_keys(value)
+$$;
+
 CREATE TABLE IF NOT EXISTS atlas_support_business_calendars (
   tenant_id TEXT NOT NULL,
   calendar_id TEXT NOT NULL,
@@ -10,7 +15,7 @@ CREATE TABLE IF NOT EXISTS atlas_support_business_calendars (
   time_zone TEXT NOT NULL CHECK (length(time_zone) BETWEEN 1 AND 100),
   weekly_hours JSONB NOT NULL CHECK (jsonb_typeof(weekly_hours) = 'object'),
   holidays JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(holidays) = 'array' AND jsonb_array_length(holidays) <= 5000),
-  date_overrides JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(date_overrides) = 'object' AND jsonb_object_length(date_overrides) <= 1000),
+  date_overrides JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(date_overrides) = 'object' AND atlas_v96_jsonb_object_length(date_overrides) <= 1000),
   content_sha256 TEXT NOT NULL CHECK (content_sha256 ~ '^[a-f0-9]{64}$'),
   created_by TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

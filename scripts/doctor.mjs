@@ -11,11 +11,30 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '111.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
-  check('no runtime package dependencies', Object.keys(pkg.dependencies || {}).length === 0 && Object.keys(lock.packages?.['']?.dependencies || {}).length === 0, 'No third-party runtime packages are declared');
+  check('release metadata', pkg.version === '112.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   const authority = await read('packages/atlas-core/authority.mjs');
   check('single-owner authority', authority.includes("actor?.emailVerified === true") && authority.includes('verifiedActorEmail === configuredOwner') && authority.includes('trustedAuthorities.add(authority)'), 'Global owner requires verified configured identity and an internally resolved authority object');
+
+  const authContracts = await read('apps/api/auth-contracts.mjs');
+  const authRoutes = await read('apps/api/auth-routes.mjs');
+  const authStore = await read('apps/api/postgres-auth-store.mjs');
+  const authMigration = await read('infra/postgres/FINAL-MIGRATION-V112.sql');
+  const roleGrants = await read('infra/postgres/API-ROLE-GRANTS-V112.sql');
+  const authSchemaTest = await read('apps/api/postgres-auth-schema.test.mjs');
+  check('V112 secure authentication', authContracts.includes('scrypt$16384$8$1$') && authContracts.includes("'SameSite=Strict'") && authContracts.includes('function verifyCsrf') && authContracts.includes('function isAllowedOrigin') && authRoutes.includes("'/api/v1/auth/signup'") && authRoutes.includes("'/api/v1/auth/password/reset'"), 'Password hashes, one-use opaque tokens, same-origin/CSRF checks, bounded account endpoints and session cookies are explicit');
+  check('V112 trusted edge rate limits', authRoutes.includes('isIP(candidate) !== 0') && authRoutes.includes('trusted_client_ip_unavailable'), 'Production requires valid client IPs from a trusted edge for distributed authentication limits');
+  check('V112 tenant database foundation', authMigration.includes('atlas_auth_users') && authMigration.includes('atlas_organizations') && authMigration.includes('atlas_organization_memberships') && authMigration.includes('atlas_organization_roles') && authMigration.includes('atlas_auth_audit_events') && (authMigration.match(/FORCE ROW LEVEL SECURITY/g) || []).length >= 8 && authStore.includes("set_config($1, $2, true)"), 'Identity, tenant memberships, custom roles, sessions, tokens, rate limits and audit events use transaction-local scope and forced RLS');
+  check('V112 runtime privileges and RLS integration', roleGrants.includes('atlas_app') && roleGrants.includes('rolbypassrls') && roleGrants.includes('pg_auth_members') && roleGrants.includes('REVOKE UPDATE, DELETE, TRUNCATE ON atlas_auth_audit_events') && authSchemaTest.includes('all PostgreSQL migrations apply in order') && authSchemaTest.includes('NOBYPASSRLS'), 'Migration owner and unprivileged API role are split and all shipped SQL is exercised against ephemeral PostgreSQL');
+  check('V112 platform-owner separation', !/platform_owner|platformOwner/i.test(authMigration) && !/platform_owner|platformOwner/i.test(roleGrants) && authRoutes.includes('ownerEmail: env.ATLAS_PLATFORM_OWNER_EMAIL') && authRoutes.includes('authority.globalRole === \'platform_owner\''), 'No tenant DB or runtime grant can mint global authority; only the verified configured owner resolver can');
+  const apiServer = await read('apps/api/server.mjs');
+  check('V112 actual readiness and authenticated API', apiServer.includes('authStore.ping()') && apiServer.includes('authenticatedApi: Boolean(authApi)') && apiServer.includes("'/health/ready'"), 'Readiness checks a connected PostgreSQL identity schema and tenant endpoints fail closed without it');
+  const ui = await read('apps/command-center/auth.html');
+  const uiScript = await read('apps/command-center/auth.mjs');
+  check('V112 live account workspace UI', ui.includes('id="workspace"') && ui.includes('id="invite-form"') && uiScript.includes("request('/dashboard/summary')") && uiScript.includes("result.delivery === 'sent'") && ui.includes('Not connected'), 'Signup, team/role controls, actual account metrics and disconnected product areas are represented without sample values');
+  const migrationRunner = await read('scripts/migrate.mjs');
+  check('V112 checksum-tracked migrations', migrationRunner.includes('pg_advisory_lock') && migrationRunner.includes('sha256') && migrationRunner.includes('changed after it was applied') && migrationRunner.includes('ATLAS_MIGRATION_DATABASE_URL'), 'Migration process serializes schema changes, checks immutable checksums and requires a separate production migration connection');
 
   const v92 = await read('infra/postgres/FINAL-MIGRATION-V92.sql');
   check('encrypted memory schema', v92.includes('encrypted_value BYTEA NOT NULL') && !/\bplaintext_value\b/i.test(v92), 'Memory facts have ciphertext storage and no plaintext value field');
@@ -47,7 +66,10 @@ try {
   check('no RLS bypass grant', !/\b(?:ALTER\s+ROLE|GRANT)[^;]*\bBYPASSRLS\b/i.test(sqlWithoutComments), 'Migrations do not grant BYPASSRLS');
 
   const docs = await read('README.md');
-  check('production boundary documented', docs.includes('No millions-of-users capacity claim is verified') && docs.includes('Local JSON/state is development-only'), 'Capacity and local-state limits are stated explicitly');
+  check('production boundary documented', docs.includes('No millions-of-users capacity claim is verified') && /Local JSON\/state (?:is|remains) development-only/.test(docs), 'Capacity and local-state limits are stated explicitly');
+  const databaseConfig = await read('apps/api/database-config.mjs');
+  const databaseConfigTest = await read('apps/api/database-config.test.mjs');
+  check('production PostgreSQL transport security', databaseConfig.includes('rejectUnauthorized: true') && databaseConfig.includes('ATLAS_DATABASE_SSL_CA_FILE') && databaseConfigTest.includes('always verifies TLS'), 'Production API and migration connections verify PostgreSQL server certificates');
   const seo = await read('scripts/seo.mjs');
   const marketing = await read('apps/marketing-site/index.html');
   const commandCenter = await read('apps/command-center/index.html');
