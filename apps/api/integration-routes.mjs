@@ -256,6 +256,24 @@ export function createIntegrationApi({ authStore, integrationStore = null, env =
         }), env);
       }
 
+      const jobberContactMatch = path.match(/^\/api\/v1\/integrations\/connections\/([0-9a-f-]{36})\/jobber\/contact$/);
+      if (jobberContactMatch && req.method === 'POST') {
+        await requireMutation(req, who);
+        const body = await readJson(req);
+        exact(body, ['atlasItemId']);
+        if (!/^[0-9a-f-]{36}$/i.test(body.atlasItemId || '')) throw createAuthError(400, 'atlas_contact_id_invalid');
+        const connection = await store.getConnection({ actorId: who.actorId, tenantId: who.tenantId, connectionId: jobberContactMatch[1], manage: true });
+        if (connection.provider_id !== 'jobber' || connection.status !== 'connected') throw createAuthError(409, 'jobber_connection_unavailable');
+        const task = await store.createTask({
+          actorId: who.actorId,
+          tenantId: who.tenantId,
+          connectionId: jobberContactMatch[1],
+          operation: 'jobber.upsert_client',
+          request: { atlasItemId: body.atlasItemId },
+        });
+        return send(res, 202, { task }, env);
+      }
+
       const connectionMatch = path.match(/^\/api\/v1\/integrations\/connections\/([0-9a-f-]{36})\/(health|sync|test|disconnect)$/);
       if (connectionMatch) {
         await requireMutation(req, who);
