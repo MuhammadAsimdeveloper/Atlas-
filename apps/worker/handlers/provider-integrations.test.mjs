@@ -18,6 +18,8 @@ test('Jobber health handler calls account API and marks the connection healthy',
   };
   try {
     const integrationStore = {
+      async workerGetTask() { return { tenant_id:'00000000-0000-4000-8000-000000000002', task_id:'00000000-0000-4000-8000-000000000001', connection_id:'00000000-0000-4000-8000-000000000003', operation:'jobber.health', provider_id:'jobber', auth_mode:'oauth2', status:'connected', config:{ graphqlVersion:'2026-01-01' }, connection_status:'connected', connection_created_by:'00000000-0000-4000-8000-000000000004' }; },
+      async workerMarkTask(task, status, result, error) { assert.equal(status,'succeeded'); assert.equal(error,null); assert.equal(result.status,'healthy'); },
       async workerGetValidJobberSecret({ refresh }) {
         void refresh;
         return { secret:{ accessToken:'jobber-access' }, connection:{} };
