@@ -1,3 +1,12 @@
+## 118.0.0 — Live Provider Connections and Execution
+- Added tenant-scoped encrypted provider connection storage with one-use OAuth state, PKCE verifier protection, connection health state, external-ID mappings, webhook receipts, integration tasks and idempotent delivery records.
+- Added a live Jobber adapter for OAuth 2.0 + PKCE, token refresh/rotation protection, GraphQL account/client reads and client create/edit primitives, HMAC webhook verification and background client synchronization.
+- Added a live Zapier webhook adapter with per-workspace inbound endpoints, optional signed outbound events, test delivery and connection/event delivery idempotency.
+- Added API lifecycle routes for Jobber OAuth start/callback, Jobber webhooks, Zapier webhooks, provider connections, health/sync/test/disconnect actions and Zapier connection setup.
+- Added V118 worker handlers, restricted integration database role, forced-RLS migration and production readiness checks.
+- Updated the Integrations workspace to show real connection state and provide Jobber/Zapier connection controls.
+- Only Jobber and Zapier are live worker adapters in V118. HubSpot, Salesforce, Zoho CRM, Pipedrive, HighLevel, monday.com, ServiceTitan, Housecall Pro, Freshsales and Close remain catalog-only.
+
 ## 117.0.0 — Provider Integration Center
 
 - Added a provider-neutral integration catalog covering Jobber, Zapier, HubSpot, Salesforce, Zoho CRM, Pipedrive, HighLevel, monday.com, ServiceTitan, Housecall Pro, Freshsales and Close.
