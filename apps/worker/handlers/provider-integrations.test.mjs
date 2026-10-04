@@ -57,6 +57,7 @@ test('Zapier send_test targets only the selected connection', async () => {
           tenant_id:'00000000-0000-4000-8000-000000000002',
           connection_id:'00000000-0000-4000-8000-000000000003',
           provider_id:'zapier',
+          operation:'zapier.send_test',
           auth_mode:'webhook',
           status:'connected'
         };
