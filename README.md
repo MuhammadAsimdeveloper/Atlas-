@@ -2,9 +2,9 @@
 
 Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
 
-## Current release: V112
+## Current release: V114
 
-V112 adds a live PostgreSQL-backed identity and organization foundation: account creation, email verification, password reset, secure sessions, CSRF protection, shared database auth rate limits, tenant selection, workspace/member/invitation/custom-role APIs, and an authenticated laptop-first workspace. The dashboard only reports live member, invitation and audit counts; CRM, agent, workflow, communication and revenue metrics remain visibly unavailable until connected.
+V114 is the consolidated final repository release. It keeps the current mainline implementation as the single source of truth, normalizes release metadata to 114.0.0, and removes obsolete packaged-version ambiguity. The repository's historical migration and engineering documentation is retained for traceability. account creation, email verification, password reset, secure sessions, CSRF protection, shared database auth rate limits, tenant selection, workspace/member/invitation/custom-role APIs, and an authenticated laptop-first workspace. The dashboard only reports live member, invitation and audit counts; CRM, agent, workflow, communication and revenue metrics remain visibly unavailable until connected.
 
 Only Khan's configured and verified owner email receives global Atlas authority. The user/org schema contains no platform-owner role, and company owners/admins remain tenant-scoped. V112 ships a checksum-tracked migration runner, forced-RLS identity tables and restricted runtime-role grants. The migration and tenant policy are exercised against an ephemeral PostgreSQL-compatible test database, but have not been applied to a managed production database.
 
