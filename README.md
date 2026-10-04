@@ -4,11 +4,11 @@ Atlas is a laptop-first, multi-tenant business operations foundation for CRM, cu
 
 ## Current release: V114
 
-V114 is the consolidated final repository release. It keeps the current mainline implementation as the single source of truth, normalizes release metadata to 114.0.0, and removes obsolete packaged-version ambiguity. The repository's historical migration and engineering documentation is retained for traceability. account creation, email verification, password reset, secure sessions, CSRF protection, shared database auth rate limits, tenant selection, workspace/member/invitation/custom-role APIs, and an authenticated laptop-first workspace. The dashboard only reports live member, invitation and audit counts; CRM, agent, workflow, communication and revenue metrics remain visibly unavailable until connected.
+V114 is the consolidated final repository release and the single source of truth for the current Atlas implementation. Package metadata is normalized to 114.0.0. Historical migration and engineering documentation is retained for traceability, but obsolete packaged-version archives are not part of the final source tree.
 
-Only Khan's configured and verified owner email receives global Atlas authority. The user/org schema contains no platform-owner role, and company owners/admins remain tenant-scoped. V112 ships a checksum-tracked migration runner, forced-RLS identity tables and restricted runtime-role grants. The migration and tenant policy are exercised against an ephemeral PostgreSQL-compatible test database, but have not been applied to a managed production database.
+The current implementation includes the authenticated account and tenant foundation, workspace/member/invitation/custom-role flows, PostgreSQL migration and RLS support, and the existing CRM, customer-service, automation, AI-agent, revenue and governed-action contracts. External provider credentials and managed production infrastructure remain deployment concerns.
 
-See [V112 identity and tenant foundation](docs/V112-IDENTITY-TENANT-FOUNDATION.md) for setup, API contracts, authority rules, current GHL/n8n research and unconnected infrastructure.
+See the V112 identity and tenant foundation documentation for the detailed identity/API contracts and infrastructure boundaries.
 
 ## Previous release: V111
 
