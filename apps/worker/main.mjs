@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { createIntegrationCipher } from '../../packages/atlas-integrations/secrets.mjs';
+import { PostgresIntegrationStore } from '../api/integration-store.mjs';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createPostgresPoolConfig } from '../api/database-config.mjs';
@@ -8,16 +10,13 @@ import { AtlasQueueWorker } from './runtime.mjs';
 const env = process.env;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const handlersDirectory = path.resolve(here, 'handlers');
-const moduleName = env.ATLAS_WORKER_HANDLERS_MODULE;
+const moduleName = env.ATLAS_WORKER_HANDLERS_MODULE || 'provider-integrations.mjs';
 if (!moduleName || !/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*\.mjs$/.test(moduleName)) {
   throw new Error('Set ATLAS_WORKER_HANDLERS_MODULE to a reviewed .mjs file under apps/worker/handlers.');
 }
 const handlersPath = path.resolve(handlersDirectory, moduleName);
 if (!handlersPath.startsWith(`${handlersDirectory}${path.sep}`)) throw new Error('Worker handler module must stay inside apps/worker/handlers.');
 const loadedHandlers = await import(pathToFileURL(handlersPath).href);
-const jobHandlers = loadedHandlers.jobHandlers || {};
-const eventHandlers = loadedHandlers.eventHandlers || {};
-if (!Object.keys(jobHandlers).length && !Object.keys(eventHandlers).length) throw new Error('Worker handler module must export jobHandlers and/or eventHandlers.');
 
 const databaseUrl = env.ATLAS_WORKER_DATABASE_URL || (env.NODE_ENV === 'production' ? '' : env.ATLAS_DATABASE_URL);
 if (!databaseUrl) throw new Error('Set ATLAS_WORKER_DATABASE_URL to a distinct atlas_worker connection in production.');
@@ -30,6 +29,15 @@ pool.on('error', () => process.stderr.write('Atlas worker database pool error.\n
 
 const store = new PostgresRuntimeStore(pool);
 await store.assertSafeWorkerRole();
+const integrationStore = env.ATLAS_INTEGRATION_ENCRYPTION_KEY
+  ? new PostgresIntegrationStore(pool, { cipher: createIntegrationCipher(env.ATLAS_INTEGRATION_ENCRYPTION_KEY), env })
+  : null;
+const builtHandlers = typeof loadedHandlers.createHandlers === 'function'
+  ? await loadedHandlers.createHandlers({ runtimeStore: store, integrationStore, env })
+  : loadedHandlers;
+const jobHandlers = builtHandlers.jobHandlers || {};
+const eventHandlers = builtHandlers.eventHandlers || {};
+if (!Object.keys(jobHandlers).length && !Object.keys(eventHandlers).length) throw new Error('Worker handler module must export jobHandlers/eventHandlers or createHandlers().');
 const worker = new AtlasQueueWorker({
   store,
   workerId: env.ATLAS_WORKER_ID || `worker-${randomUUID()}`,
