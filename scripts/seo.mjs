@@ -66,6 +66,9 @@ export function renderPublicIndex(html, origin, {
   lastModified=PUBLIC_LAST_MODIFIED,
 } = {}) {
   const canonical = validatePublicOrigin(origin);
+  if (typeof lastModified !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(lastModified)) {
+    throw new TypeError('lastModified must be an ISO calendar date (YYYY-MM-DD).');
+  }
   if (!html.includes('data-atlas-seo-mode="template"') || !html.includes('<!-- Public canonical, social metadata and JSON-LD are injected by scripts/build-site.mjs. -->')) {
     throw new Error('Marketing page is missing the expected SEO template marker.');
   }
