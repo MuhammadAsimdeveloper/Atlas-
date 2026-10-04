@@ -7,7 +7,7 @@ const text=(v,l,m=240)=>{if(typeof v!=='string'||!v.trim()||v.length>m||/[\r\n\u
 const tenant=v=>text(v,'tenantId',180);
 
 const SECRET_PATTERN=/(password|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key|credential|authorization|cookie|card[_-]?number|cvv)/i;
-const PROMPT_INJECTION=/(ignore (all|any|previous) instructions|reveal (system|developer) prompt|disable safety|bypass (security|approval)|exfiltrat|do anything now)/i;
+const PROMPT_INJECTION=/(ignore (all|any|previous) (previous )?instructions|reveal (system|developer) prompt|disable safety|bypass (security|approval)|exfiltrat|do anything now)/i;
 
 export const AGENT_TYPES=Object.freeze(['assistant','conversation','workflow','research','sales','support','voice','orchestrator']);
 export const AI_RISK=Object.freeze({read:'read',generate:'low',write:'write',external:'high',financial:'critical'});
@@ -33,13 +33,15 @@ export function defineAgent({
   if(!Number.isSafeInteger(maxTokens)||maxTokens<1||maxTokens>1_000_000)throw new Error('maxTokens invalid');
   if(!Number.isSafeInteger(budgetMinor)||budgetMinor<0)throw new Error('budgetMinor invalid');
   const body={tenantId,agentId,name,type,version,instructions,models:normalizedModels,tools:normalizedTools,maxToolCalls,maxTokens,budgetMinor,requiresHumanApprovalFor:[...new Set(requiresHumanApprovalFor)].sort()};
-  const releaseId='agent_'+hash(body).slice(0,28);
-  const material={...body,releaseId};
-  return freeze({...material,checksum:hash(material)});
+  const checksum=hash(body);
+  const releaseId='agent_'+checksum.slice(0,28);
+  return freeze({...body,releaseId,checksum});
 }
 
 export function planAgentToolCall({agent,actor,tool,args={},risk='read',approval=null,remainingBudgetMinor=0,callNumber=1}={}){
-  if(!agent||agent.checksum!==hash({...agent,checksum:undefined}))throw new Error('agent checksum invalid');
+  if(!agent||typeof agent!=='object')throw new Error('agent checksum invalid');
+  const {releaseId,checksum,...material}=agent;
+  if(typeof checksum!=='string'||checksum!==hash(material)||releaseId!=='agent_'+checksum.slice(0,28))throw new Error('agent checksum invalid');
   if(actor?.tenantId!==agent.tenantId)return {allowed:false,code:'TENANT_BOUNDARY_VIOLATION'};
   tool=text(tool,'tool');
   if(!agent.tools.includes(tool))return {allowed:false,code:'TOOL_NOT_GRANTED'};
