@@ -50,7 +50,16 @@ export async function buildSite(options = {}) {
     await cp(path.join(marketingDir, entry.name), path.join(outputDir, entry.name), { recursive: true });
   }
   const marketingHtml = await readFile(path.join(marketingDir, 'index.html'), 'utf8');
-  await writeFile(path.join(outputDir, 'index.html'), mode === 'public' ? renderPublicIndex(marketingHtml, origin) : makeNoindex(marketingHtml), 'utf8');
+  const publicMetaOptions = {
+    googleSiteVerification: process.env.ATLAS_GOOGLE_SITE_VERIFICATION || '',
+    bingSiteVerification: process.env.ATLAS_BING_SITE_VERIFICATION || '',
+    lastModified: process.env.ATLAS_SITE_LASTMOD || undefined,
+  };
+  await writeFile(
+    path.join(outputDir, 'index.html'),
+    mode === 'public' ? renderPublicIndex(marketingHtml, origin, publicMetaOptions) : makeNoindex(marketingHtml),
+    'utf8'
+  );
   const appOutput = path.join(outputDir, 'app');
   await cp(appDir, appOutput, { recursive: true });
   const appHtmlPath = path.join(appOutput, 'index.html');
