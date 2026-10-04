@@ -1,3 +1,8 @@
+## 114.0.0 — Consolidated final repository release
+- Marked 114.0.0 as the single current release line.
+- Normalized repository metadata so package and lockfile versions agree.
+- Kept historical engineering and migration records for traceability while removing ambiguity around obsolete packaged releases.
+
 ## Unreleased — Deep SEO and Search Readiness
 - Reworked the public marketing metadata pipeline with intent-aligned title/description generation, canonical URL, robots preview directives, Open Graph/Twitter cards, social preview artwork, optional Search Console/Bing verification and WebSite/Organization/WebPage/SoftwareApplication/FAQ JSON-LD.
 - Added controlled sitemap `lastmod`, path validation and deployment-time verification/freshness inputs while preserving preview noindex boundaries.
