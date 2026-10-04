@@ -40,5 +40,6 @@ GRANT EXECUTE ON FUNCTION atlas_v118_consume_oauth_state(CHAR) TO atlas_app;
 GRANT EXECUTE ON FUNCTION atlas_v118_ingest_jobber_webhook(TEXT,CHAR,TEXT,TEXT,JSONB) TO atlas_app;
 GRANT EXECUTE ON FUNCTION atlas_v118_ingest_zapier_webhook(CHAR,CHAR,JSONB) TO atlas_app;
 GRANT EXECUTE ON FUNCTION atlas_v118_get_growth_record(UUID,UUID) TO atlas_worker;
+GRANT EXECUTE ON FUNCTION atlas_v118_attach_integration_mapping(UUID,UUID,TEXT,TEXT,TEXT,UUID,TIMESTAMPTZ) TO atlas_worker;
 GRANT EXECUTE ON FUNCTION atlas_v118_get_integration_contact(UUID,UUID,TEXT) TO atlas_worker;
 GRANT EXECUTE ON FUNCTION atlas_v118_upsert_integration_contact(UUID,UUID,TEXT,TIMESTAMPTZ,JSONB) TO atlas_worker;
