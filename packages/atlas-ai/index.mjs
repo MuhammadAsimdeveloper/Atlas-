@@ -10,7 +10,7 @@ const SECRET_PATTERN=/(password|secret|api[_-]?key|access[_-]?token|refresh[_-]?
 const PROMPT_INJECTION=/(ignore (all|any|previous) (previous )?instructions|reveal (system|developer) prompt|disable safety|bypass (security|approval)|exfiltrat|do anything now)/i;
 
 export const AGENT_TYPES=Object.freeze(['assistant','conversation','workflow','research','sales','support','voice','orchestrator']);
-export const AI_RISK=Object.freeze({read:'read',generate:'low',write:'write',external:'high',financial:'critical'});
+export const AI_RISK=Object.freeze({read:'read',generate:'low',write:'write',external:'external',financial:'financial',critical:'critical'});
 
 function safeObject(value,label,maxKeys=100){
   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>maxKeys)throw new Error(label+' invalid');
