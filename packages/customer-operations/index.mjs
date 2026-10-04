@@ -6,6 +6,7 @@ export * from './service-desk.mjs';
 export * from './engagement.mjs';
 export * from './voice-operations.mjs';
 export * from './voice-quality.mjs';
+export * from './agent-evaluation.mjs';
 
 export const CUSTOMER_CHANNELS = Object.freeze(['email', 'sms', 'whatsapp', 'facebook', 'instagram', 'webchat', 'voice']);
 export const DEPLOYMENT_STATES = Object.freeze(['draft', 'canary', 'active', 'paused', 'archived']);
@@ -281,15 +282,37 @@ export function authorizeCustomerAgentTools({ deployment, actor, agent, skill, r
   return evaluateCapability({ actor, agent, skill, requestedTools: requested, approvalEvidence });
 }
 
-function validEvaluation(evaluation, { tenantId, agentId, now, minimumCases }) {
+export function agentDeploymentFingerprint(deployment) {
+  if (!deployment || typeof deployment !== 'object' || !deployment.tenantId || !deployment.agentId || deployment.status !== 'draft') throw new Error('Agent deployment fingerprint requires a tenant-bound draft');
+  return digest({
+    id: deployment.id, tenantId: deployment.tenantId, agentId: deployment.agentId,
+    version: deployment.version, status: deployment.status, routes: deployment.routes,
+    minKnowledgeCoverage: deployment.minKnowledgeCoverage,
+    maxConsecutiveFailures: deployment.maxConsecutiveFailures,
+    maxAgentTurns: deployment.maxAgentTurns,
+    maxFrustrationScore: deployment.maxFrustrationScore,
+    allowedTools: deployment.allowedTools, memoryPolicy: deployment.memoryPolicy
+  });
+}
+
+export function agentPromotionFingerprint({ previousRelease, targetCoveragePercent } = {}) {
+  if (!previousRelease || !verifyAgentDeploymentRelease(previousRelease) || !Number.isSafeInteger(targetCoveragePercent) || targetCoveragePercent < 1 || targetCoveragePercent > 100) throw new Error('Agent promotion fingerprint requires a verified release and bounded target coverage');
+  return digest({ tenantId: previousRelease.tenantId, agentId: previousRelease.agentId, releaseId: previousRelease.releaseId, releaseChecksum: previousRelease.checksum, targetCoveragePercent });
+}
+
+function validEvaluation(evaluation, { tenantId, agentId, now, minimumCases, minimumScore = 95, candidateFingerprint, evaluationVerifier }) {
   if (!evaluation || evaluation.tenantId !== tenantId || evaluation.agentId !== agentId) return { ok: false, reason: 'evaluation_scope_mismatch' };
   const evaluatedAt = Date.parse(evaluation.evaluatedAt);
   const current = Number(now);
   const validTime = Number.isFinite(evaluatedAt) && Number.isFinite(current) && evaluatedAt <= current + 60_000 && evaluatedAt >= current - 7 * 86400000;
-  const ok = validTime && Number.isFinite(evaluation.score) && evaluation.score >= 95 && evaluation.score <= 100 &&
+  let trusted = false;
+  try {
+    trusted = typeof evaluationVerifier === 'function' && evaluationVerifier(evaluation, { tenantId, agentId, candidateFingerprint, now: current }) === true;
+  } catch { trusted = false; }
+  const ok = trusted && validTime && Number.isFinite(evaluation.score) && evaluation.score >= minimumScore && evaluation.score <= 100 &&
     Number.isSafeInteger(evaluation.sampleCount) && evaluation.sampleCount >= minimumCases &&
     evaluation.criticalFailures === 0 && Number.isFinite(evaluation.errorRate) && evaluation.errorRate >= 0 && evaluation.errorRate <= 0.02;
-  return { ok, reason: ok ? null : 'evaluation_release_gate_failed' };
+  return { ok, reason: ok ? null : trusted ? 'evaluation_release_gate_failed' : 'evaluation_evidence_untrusted' };
 }
 
 function requirePublisher(authority, tenantId) {
@@ -299,10 +322,10 @@ function requirePublisher(authority, tenantId) {
   return requireTenantRole(authority, tenantId, ['owner', 'admin']);
 }
 
-export function publishAgentDeployment({ deployment, publisherAuthority, evaluation, now = Date.now(), releaseId = crypto.randomUUID() } = {}) {
+export function publishAgentDeployment({ deployment, publisherAuthority, evaluation, evaluationVerifier = null, now = Date.now(), releaseId = crypto.randomUUID() } = {}) {
   if (!deployment || deployment.status !== 'draft') throw new Error('Only an unpublished deployment draft can be published');
   requirePublisher(publisherAuthority, deployment.tenantId);
-  const gate = validEvaluation(evaluation, { tenantId: deployment.tenantId, agentId: deployment.agentId, now, minimumCases: 20 });
+  const gate = validEvaluation(evaluation, { tenantId: deployment.tenantId, agentId: deployment.agentId, now, minimumCases: 20, candidateFingerprint: agentDeploymentFingerprint(deployment), evaluationVerifier });
   if (!gate.ok) throw Object.assign(new Error('A current, tenant-bound evaluation must pass before canary publish'), { code: gate.reason });
   const routes = deployment.routes.map(route => ({ ...route, coveragePercent: Math.min(route.coveragePercent, 10) }));
   const snapshot = { ...deployment, routes, status: 'canary' };
@@ -319,11 +342,11 @@ export function verifyAgentDeploymentRelease(release) {
   return digest(snapshot) === release.checksum;
 }
 
-export function promoteAgentDeployment({ previousRelease, publisherAuthority, evaluation, targetCoveragePercent, now = Date.now(), releaseId = crypto.randomUUID() } = {}) {
+export function promoteAgentDeployment({ previousRelease, publisherAuthority, evaluation, evaluationVerifier = null, targetCoveragePercent, now = Date.now(), releaseId = crypto.randomUUID() } = {}) {
   if (!previousRelease || !['canary', 'active'].includes(previousRelease.status)) throw new Error('Only a live canary or active release can be promoted');
   if (!verifyAgentDeploymentRelease(previousRelease)) throw new Error('Cannot promote a deployment release with an invalid integrity checksum');
   requirePublisher(publisherAuthority, previousRelease.tenantId);
-  const gate = validEvaluation(evaluation, { tenantId: previousRelease.tenantId, agentId: previousRelease.agentId, now, minimumCases: 50 });
+  const gate = validEvaluation(evaluation, { tenantId: previousRelease.tenantId, agentId: previousRelease.agentId, now, minimumCases: 50, candidateFingerprint: agentPromotionFingerprint({ previousRelease, targetCoveragePercent }), evaluationVerifier });
   if (!gate.ok) throw Object.assign(new Error('Fresh production-like evaluation evidence is required to increase coverage'), { code: gate.reason });
   const target = intRange(targetCoveragePercent, 'targetCoveragePercent', 1, 100);
   const current = Math.max(...previousRelease.routes.map(route => route.coveragePercent));

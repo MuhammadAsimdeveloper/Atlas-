@@ -2,14 +2,16 @@ import { createServer } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createAuthApi } from './auth-routes.mjs';
+import { createGrowthApi } from './growth-routes.mjs';
 import { createPostgresPoolConfig } from './database-config.mjs';
 import { createMailer } from './mail.mjs';
 import { PostgresAuthStore } from './postgres-auth-store.mjs';
+import { PostgresGrowthStore } from './growth-store.mjs';
 
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
 const runtime = env.NODE_ENV || 'development';
-const release = env.ATLAS_RELEASE || 'V112';
+const release = env.ATLAS_RELEASE || 'V114';
 const webAssets = new Map([
   ['/', ['../command-center/auth.html', 'text/html; charset=utf-8']],
   ['/login', ['../command-center/auth.html', 'text/html; charset=utf-8']],
@@ -19,7 +21,9 @@ const webAssets = new Map([
   ['/accept-invitation', ['../command-center/auth.html', 'text/html; charset=utf-8']],
   ['/auth.mjs', ['../command-center/auth.mjs', 'text/javascript; charset=utf-8']],
   ['/auth.css', ['../command-center/auth.css', 'text/css; charset=utf-8']],
-  ['/auth-modal.css', ['../command-center/auth-modal.css', 'text/css; charset=utf-8']]
+  ['/auth-modal.css', ['../command-center/auth-modal.css', 'text/css; charset=utf-8']],
+  ['/growth.mjs', ['../command-center/growth.mjs', 'text/javascript; charset=utf-8']],
+  ['/growth.css', ['../command-center/growth.css', 'text/css; charset=utf-8']]
 ]);
 
 function json(res, status, body, headers = {}) {
@@ -59,12 +63,16 @@ assertProductionConfig();
 let pool = null;
 let authStore = null;
 let authApi = null;
+let growthStore = null;
+let growthApi = null;
 if (env.ATLAS_DATABASE_URL) {
   const { Pool } = await import('pg');
   pool = new Pool(await createPostgresPoolConfig(env, { application_name: `atlas-api-${release.toLowerCase()}` }));
   pool.on('error', error => process.stderr.write(`Atlas database pool error: ${error.message}\n`));
   authStore = new PostgresAuthStore(pool);
+  growthStore = new PostgresGrowthStore(pool);
   authApi = createAuthApi({ store: authStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
+  growthApi = createGrowthApi({ store: growthStore, authStore, env });
 }
 
 const server = createServer(async (req, res) => {
@@ -80,9 +88,13 @@ const server = createServer(async (req, res) => {
       return json(res, 503, { status: 'blocked', database: 'unavailable', schema: 'unknown' });
     }
   }
-  if (req.method === 'GET' && url.pathname === '/api/v1/status') return json(res, 200, { product: 'Atlas', release, environment: runtime, mode: 'authenticated-api', authenticatedApi: Boolean(authApi), database: authStore ? 'configured' : 'missing', message: authApi ? 'Authentication and tenant API routes are enabled.' : 'Configure PostgreSQL to enable authenticated routes.' });
+  if (req.method === 'GET' && url.pathname === '/api/v1/status') return json(res, 200, { product: 'Atlas', release, environment: runtime, mode: 'authenticated-api', authenticatedApi: Boolean(authApi), growthApi: Boolean(growthApi), database: authStore ? 'configured' : 'missing', message: growthApi ? 'Authentication, tenant-scoped Growth Center and billing routes are enabled.' : 'Configure PostgreSQL and apply all versioned migrations to enable authenticated product routes.' });
   if (authApi) {
     const handled = await authApi.handle(req, res);
+    if (handled) return;
+  }
+  if (growthApi) {
+    const handled = await growthApi.handle(req, res);
     if (handled) return;
   }
   if (url.pathname.startsWith('/api/')) return json(res, authApi ? 404 : 503, { error: authApi ? 'not_found' : 'database_required' });

@@ -8,9 +8,9 @@ Current n8n docs present agents as project artifacts built from a model, instruc
 
 **Atlas already has:** tenant-scoped agents and skills; tool capability intersection; bounded model/tool loops; safe human handoff; approval evidence; encrypted-memory persistence contracts with explicit consent; evaluation-gated immutable releases; canary promotion; customer channels and workflow-to-agent calls.
 
-**Atlas gaps:** no session browser, no selective result streaming, no JSON-schema-constrained agent output, no recursive agent delegation or scheduled agent service. Add those only with explicit max depth/fan-out, same-tenant published release pins, per-tenant quotas, cancellation, trace ancestry and approval propagation. Never let delegation inherit capabilities beyond the intersection of the caller's tenant authority, the agent, and the delegated skill.
+**Atlas gaps:** no session browser, no selective result streaming, no live JSON-schema-constrained agent output, no recursive agent delegation or scheduled agent service. V113 adds a deterministic scenario-based release evaluator with mandatory safety coverage and signed candidate-bound evidence, but no connected provider, persisted evaluation dataset or UI. Add interactive or delegated execution only with explicit max depth/fan-out, same-tenant published release pins, per-tenant quotas, cancellation, trace ancestry and approval propagation. Never let delegation inherit capabilities beyond the intersection of the caller's tenant authority, the agent, and the delegated skill.
 
-Sources: [n8n agent lifecycle, sessions, schedules and workflow calls](https://docs.n8n.io/build/build-and-manage-agents), [human approval for selected tools](https://docs.n8n.io/build/integrate-ai/ai-examples/human-in-the-loop-for-tools).
+Sources: [n8n agent lifecycle, sessions, schedules, tool approvals, channels and workflow calls](https://docs.n8n.io/build/build-and-manage-agents.md), [human fallback and human approval patterns](https://docs.n8n.io/build/integrate-ai/ai-examples/human-in-the-loop-for-tools.md).
 
 ## 2. Workflow authoring, modularity and release
 
@@ -20,7 +20,7 @@ n8n workflows combine trigger and action nodes, mapping expressions, branches, w
 
 **Atlas gaps:** no visual graph editor, arbitrary safe expression/data mapping, template gallery with tenant-aware prerequisites, side-by-side diff, draft simulation over sample events, stored execution timeline or run retry UI. Build a plan-first authoring flow that asks for missing facts, emits a deterministic diff, validates connector/secret references, and previews paths before a tenant admin publishes. Separate *saved draft*, *published release*, and *currently running execution* states.
 
-Source: [n8n workflow executions and retry modes](https://docs.n8n.io/build/understand-workflows/understand-executions/view-all-executions), [n8n source control and environments](https://docs.n8n.io/administer/use-source-control-and-environments), [sub-workflow modularization](https://docs.n8n.io/build/flow-logic/convert-to-sub-workflows).
+Source: [n8n workflow executions and retry modes](https://docs.n8n.io/build/understand-workflows/understand-executions/view-all-executions.md), [n8n source control and environments](https://docs.n8n.io/administer/use-source-control-and-environments.md), [sub-workflow calls](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executeworkflow.md).
 
 ## 3. Queue and ingress architecture
 
@@ -32,7 +32,7 @@ The current queue docs also document worker concurrency and graceful shutdown, r
 
 **Atlas gaps:** no deployed queue consumer, Redis adapter, webhook fleet, durable scheduler, worker autoscaler, separate ingress/API deployment, or measured connection/concurrency budgets. Production path: authenticated API and webhook verifier write minimal tenant-scoped commands to managed PostgreSQL/Redis; workers reload pinned releases and credentials from trusted storage; large files and response bodies use object storage references; UI/API, webhook ingress, and workers scale independently. Add per-tenant fairness and quota isolation, graceful drain, lease-loss recovery, queue-depth/age alerts, poison-message controls, and tested replay/restore before claiming scale.
 
-Sources: [n8n queue architecture, webhooks, multi-main and response relay](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/enable-queue-mode), [external binary and execution storage](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/use-external-storage), [performance and concurrency](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/measure-performance), [execution tracing](https://docs.n8n.io/deploy/host-n8n/keep-n8n-running/trace-executions-with-opentelemetry).
+Sources: [n8n queue architecture, webhooks, worker health and concurrency](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/enable-queue-mode.md), [external binary and execution storage](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/use-external-storage.md), [performance and concurrency](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/measure-performance.md), [execution tracing](https://docs.n8n.io/deploy/host-n8n/keep-n8n-running/trace-executions-with-opentelemetry.md).
 
 ## 4. Credentials, access and security auditing
 
@@ -40,7 +40,7 @@ n8n credential references are attached to tools/nodes while actual credentials a
 
 Atlas should preserve the stronger SaaS tenant boundary in its own runtime: provider credentials belong in an external secret service keyed by tenant/provider/connection; workflow and agent releases include references and capability requirements only. Resolve secrets just in time inside isolated adapters. Do not place secret bytes in model context, workflow payloads, execution output, logs, events, templates or exported definitions. Maintain connector health/revocation, permission drift and webhook-auth audits as tenant-visible controls; keep platform-wide policies exclusive to Khan.
 
-Sources: [n8n credential storage and external secret-store guidance](https://docs.n8n.io/administer/manage-credentials), [n8n instance security audit](https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/run-security-audits).
+Sources: [n8n credential storage](https://docs.n8n.io/administer/manage-credentials.md), [secure credential sharing](https://docs.n8n.io/administer/manage-credentials/share-credentials-securely.md), [external secret stores](https://docs.n8n.io/administer/manage-credentials/use-external-secret-stores.md), [n8n instance security audit](https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/run-security-audits.md).
 
 ## 5. Evaluations, guardrails and observability
 
@@ -50,7 +50,7 @@ Atlas already scores evaluation cases, rejects cross-tenant traces and gates age
 
 V100 adds that loop for voice operations: a fixed booking/intake rubric, structured evidence refs, policy/disclosure critical failures, deterministic coaching codes, and per-release outcome, handoff and duration summaries. Readiness only recommends a governance review; it does not become a tool grant or publication capability. This adapts n8n's evaluation and execution replay concepts to Atlas's tenant and privacy boundaries without inheriting n8n's UI or execution-data model.
 
-Sources: [n8n evaluation and guardrail nodes](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.evaluation), [n8n run-security-audits](https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/run-security-audits), [n8n all-execution inspection](https://docs.n8n.io/build/understand-workflows/understand-executions/view-all-executions).
+Sources: [n8n quick and metric-based AI workflow evaluations](https://docs.n8n.io/build/integrate-ai/test-and-improve-ai-workflows.md), [guardrail node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-langchain.guardrails.md), [n8n run-security-audits](https://docs.n8n.io/deploy/host-n8n/configure-n8n/security/run-security-audits.md), [n8n all-execution inspection](https://docs.n8n.io/build/understand-workflows/understand-executions/view-all-executions.md).
 
 ## 6. Atlas decisions from this review
 
@@ -61,6 +61,12 @@ Sources: [n8n evaluation and guardrail nodes](https://docs.n8n.io/integrations/b
 5. Keep interactive agents out of production queue claims until an isolated runtime, bounded fan-out, session store, cancellation, queue fairness, backpressure and recovery have been implemented and tested.
 6. V96 implemented immutable, timezone/holiday/DST-aware support calendars. V98 adds safe tenant message rendering, V99 adds the voice call lifecycle and V100 adds structured call quality/coaching. The visual workflow/agent session browser, scheduled voice reports, live provider execution logs, breach/escalation scheduler, calendar administration UI and real message delivery remain deployment/product work.
 
+## V114 implementation follow-through
+
+V114 addresses one of the highest-priority n8n/GHL gaps by connecting 13 CRM, AI configuration and growth-builder record types to authenticated PostgreSQL APIs. It adds checksummed revision history, append-only activity, optimistic version checks, idempotent record creation, relationship checks, per-module permission filtering and an operator-facing workspace. Workflow and follow-up definitions remain saved drafts; the service does not claim a queue executor, wait resumption, schedule trigger, provider send or run-replay inspector.
+
+The Paddle Billing path uses a backend-created checkout transaction, allowlisted checkout origin, configured price mapping, raw-body HMAC webhook validation and duplicate/stale subscription event protection. It implements subscription state ingestion and checkout handoff, not the broader n8n credential vault or HighLevel SaaS commerce/entitlement stack. Managed provider services, runtime credentials, subscription feature enforcement and actual message/social providers remain external deployment and implementation work. See [V114 Growth Center](V114-GROWTH-CENTER.md) for route, migration and role details.
+
 ## Review limits
 
-Vendor docs change frequently. The source pages were checked on 3 October 2026; plan availability and preview notices may change. This analysis does not reproduce n8n or HighLevel UI/branding. Atlas code-level coverage should be read with `docs/DEEP-AUDIT-V96.md`; no production deployment, provider delivery, SQL migration run, or scale benchmark is implied.
+Vendor docs change frequently. The source pages were checked on 3 October 2026; plan availability and preview notices may change. This analysis does not reproduce n8n or HighLevel UI/branding. Atlas code-level coverage should be read with [the V114 feature matrix](COMPETITOR-FEATURE-MATRIX-2026-10.md); migrations are tested against ephemeral PGlite but have not been applied to managed production, and no provider delivery or scale benchmark is verified.

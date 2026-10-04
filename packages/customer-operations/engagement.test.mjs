@@ -208,7 +208,7 @@ test('workflow CRM field and tag actions are tenant scoped, idempotent and resum
 
 test('published customer-agent releases can be invoked by workflows and resumed with scoped outcomes', () => {
   const agentDraft = createAgentDeployment({ id: 'support-deploy', tenantId, agentId: 'support-agent', routes: [{ id: 'webchat', channel: 'webchat', coveragePercent: 100 }] });
-  const agentRelease = publishAgentDeployment({ deployment: agentDraft, publisherAuthority: authority, evaluation: { tenantId, agentId: 'support-agent', score: 98, sampleCount: 20, errorRate: 0, criticalFailures: 0, evaluatedAt: new Date(now).toISOString() }, now, releaseId: 'support-agent-v1' });
+  const agentRelease = publishAgentDeployment({ deployment: agentDraft, publisherAuthority: authority, evaluation: { tenantId, agentId: 'support-agent', score: 98, sampleCount: 20, errorRate: 0, criticalFailures: 0, evaluatedAt: new Date(now).toISOString() }, evaluationVerifier: () => true, now, releaseId: 'support-agent-v1' });
   const draft = createAutomationWorkflowDraft({ id: 'support-agent-flow', tenantId, name: 'AI support and escalation', triggerType: 'message.received', steps: [
     { id: 'support-agent', type: 'invoke_agent', agentRef: { deploymentId: agentRelease.id, releaseId: agentRelease.releaseId, version: agentRelease.version }, inputMap: { contact: 'contactRef', conversation: 'conversationRef' } },
     { id: 'answer-branch', type: 'branch', source: 'lastAgentOutcome', operator: 'equals', value: 'answered', thenStepId: 'complete-task', elseStepId: 'handoff-task' },

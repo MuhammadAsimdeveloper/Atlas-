@@ -1,14 +1,18 @@
-## 114.0.0 — Consolidated final repository release
-- Marked 114.0.0 as the single current release line.
-- Normalized repository metadata so package and lockfile versions agree.
-- Kept historical engineering and migration records for traceability while removing ambiguity around obsolete packaged releases.
+## 114.0.0 — Consolidated Growth Center and SEO release
+- Consolidated repository and package metadata on release 114.0.0 while preserving historical engineering and migration records.
+- Connected tenant-scoped Growth Center records and builders for contacts, leads, pipelines, tasks, qualification profiles, follow-up sequences, workflow definitions, email templates, funnels, websites, social posts, affiliate campaigns and reputation policies.
+- Added PostgreSQL revisions and audit events, Paddle checkout and signed subscription webhooks, and tenant-scoped agent evaluation evidence gates.
+- Expanded the public marketing SEO pipeline with canonical metadata, social cards, structured data, controlled sitemap freshness and a reusable SEO readiness evaluator. Preview builds remain noindex.
+- Provider delivery, workflow workers, AI inference, scheduling, SaaS entitlements, affiliate payouts, public domains, managed infrastructure and production capacity remain deployment/product work; they are not represented as connected.
 
-## Unreleased — Deep SEO and Search Readiness
-- Reworked the public marketing metadata pipeline with intent-aligned title/description generation, canonical URL, robots preview directives, Open Graph/Twitter cards, social preview artwork, optional Search Console/Bing verification and WebSite/Organization/WebPage/SoftwareApplication/FAQ JSON-LD.
-- Added controlled sitemap `lastmod`, path validation and deployment-time verification/freshness inputs while preserving preview noindex boundaries.
-- Added reusable `packages/atlas-seo` page/site readiness scoring for metadata, intent, content depth/uniqueness, internal discovery, structured data, image alt coverage and page-experience inputs.
-- Added SEO readiness reporting to website publish plans and strengthened the marketing page's search-intent hierarchy, use-case coverage and internal navigation.
-- Added regression coverage and doctor checks for the deep SEO contract.
+## 113.0.0 — Customer-Agent Evaluation and Complete Competitor Feature Inventory
+- Added a scenario-based agent evaluation suite and bounded concurrent runner with mandatory prompt-injection, sensitive-data, human-handoff and out-of-scope coverage.
+- Evaluation results retain only scenario IDs/tags, bounded issue codes, counts, cost/latency measurements and checksummed HMAC evidence; prompts, answers, model errors, knowledge text and tool arguments are omitted.
+- Agent canary publish and traffic promotion now require a trusted evaluation verifier and evidence bound to the exact draft fingerprint or prior release plus target coverage. Unsigned caller-supplied scores fail closed.
+- Added adversarial tests for tenant/key/candidate binding, hostile object/accessor output, unscoped citations, undeclared and write tools, provider errors, cost overrun and release-gate rejection.
+- Added a source-linked inventory comparing HighLevel's major SaaS/CRM/marketing/AI feature families and n8n's workflow/agent/integration/scaling families with live, contractual, preview and missing Atlas coverage.
+- Confirmed the Khan-only platform-owner boundary. No global authority is created by evaluation signatures, tenant membership or client-submitted identity fields.
+- No model/channel provider, evaluation storage, Agent Studio UI, workflow engine, durable worker or production signer is connected by this domain release.
 
 ## 112.0.0 — PostgreSQL Identity and Tenant Foundation
 - Replaced the V111 contract-only HTTP shell with a real, PostgreSQL-backed account API: signup, email verification/resend, password sign-in/reset, session revocation, profile update, organization creation/selection, member listing, invitations, invitation acceptance and tenant custom roles.

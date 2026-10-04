@@ -371,8 +371,12 @@ export class PostgresAuthStore {
 
   async ping() {
     await this.pool.query('SELECT 1');
-    const { rows } = await this.pool.query("SELECT to_regclass('public.atlas_auth_users') AS auth_schema");
-    return Boolean(rows[0]?.auth_schema);
+    const { rows } = await this.pool.query(`SELECT
+      to_regclass('public.atlas_auth_users') AS auth_schema,
+      to_regclass('public.atlas_growth_items') AS growth_schema,
+      to_regclass('public.atlas_growth_item_versions') AS versions_schema,
+      to_regclass('public.atlas_paddle_subscriptions') AS billing_schema`);
+    return Boolean(rows[0]?.auth_schema && rows[0]?.growth_schema && rows[0]?.versions_schema && rows[0]?.billing_schema);
   }
 
   async close() { await this.pool.end(); }

@@ -4,11 +4,19 @@ Atlas is a laptop-first, multi-tenant business operations foundation for CRM, cu
 
 ## Current release: V114
 
-V114 is the consolidated final repository release and the single source of truth for the current Atlas implementation. Package metadata is normalized to 114.0.0. Historical migration and engineering documentation is retained for traceability, but obsolete packaged-version archives are not part of the final source tree.
+V114 is the consolidated final repository release and the single source of truth for the current Atlas implementation. Package metadata is normalized to 114.0.0. Historical migration and engineering documentation is retained for traceability.
 
-The current implementation includes the authenticated account and tenant foundation, workspace/member/invitation/custom-role flows, PostgreSQL migration and RLS support, and the existing CRM, customer-service, automation, AI-agent, revenue and governed-action contracts. External provider credentials and managed production infrastructure remain deployment concerns.
+V114 connects the Growth Center modules to authenticated tenant-scoped PostgreSQL APIs and a laptop-first workspace UI: Contacts, Leads, Pipelines, Tasks, AI Lead Qualification profiles, AI Follow-up sequences, Workflow definitions, Email templates, Funnels, Websites, Social Planner posts, Affiliate campaigns and Reputation policies. Records have module validation, consent defaults, checksums, idempotent creation, optimistic revisions and append-only events. Paddle plan checkout and signed subscription webhooks are wired behind owner/admin/billing permissions. Read the V114 Growth Center guide at docs/V114-GROWTH-CENTER.md and the HighLevel/n8n feature matrix at docs/COMPETITOR-FEATURE-MATRIX-2026-10.md.
 
-See the V112 identity and tenant foundation documentation for the detailed identity/API contracts and infrastructure boundaries.
+V114 makes customer records and builder definitions live after the migration and managed database are configured. AI inference/chat sessions, email/SMS delivery, active workflow/follow-up workers, social publishing, public websites, affiliate attribution/payouts, review collection, SaaS plan enforcement and a full customer inbox still need providers and service surfaces. No user-facing label implies a provider is connected when it is not. This release does not verify millions-of-users capacity.
+
+## Previous release: V113
+
+V113 adds a scenario-based agent evaluation runner for customer-facing AI releases. It requires prompt-injection, sensitive-data, human-handoff and out-of-scope test coverage, emits only redacted result metadata, signs evaluation evidence server-side and binds the evidence to the exact agent draft or promotion target. Publishing and traffic promotion now fail closed unless the trusted API/service layer verifies the report. Read the V113 agent evaluation guide at docs/V113-AGENT-EVALUATIONS.md and the current HighLevel/n8n feature inventory at docs/COMPETITOR-FEATURE-MATRIX-2026-10.md.
+
+The feature inventory documents that broad product coverage is not runtime parity: active workflow execution, schedules, real channel/provider connections, Agent Studio and a full customer inbox remain work in progress. A feature catalog entry does not mean a service is connected.
+
+See the V112 identity and tenant foundation at docs/V112-IDENTITY-TENANT-FOUNDATION.md for the detailed identity/API contracts and infrastructure boundaries.
 
 ## Previous release: V111
 
@@ -88,7 +96,7 @@ V93 hardens the customer-operations layer with immutable message-template versio
 - Customer agents use evaluation-gated immutable releases, channel/segment routing, time-aware availability, handoff rules, bounded tool calls, exact-scope approval and explicitly consented short-term memory.
 - Messaging intents require fresh policy, consent, suppression and frequency evidence; workers must recheck these immediately before provider delivery.
 - Business recipe descriptors cover lead intake/follow-up, appointment reminders and no-show recovery, missed calls, after-call follow-up, service reviews, failed payments, abandoned checkout and course onboarding.
-- The legacy `/app/` command-center surface is an accessible laptop-first sample-data preview. The V112 workspace is a separate authenticated API-backed surface and does not use those sample rows as live data.
+- The legacy `/app/` command-center surface is an accessible laptop-first sample-data preview. The V114 workspace is a separate authenticated API-backed surface and does not use those sample rows as live data.
 
 ## Authority boundary
 
@@ -125,11 +133,11 @@ For the authenticated workspace, configure a development Postgres connection, ap
 
 ## Production readiness boundary
 
-V112 ships an authenticated account/tenant API, Postgres persistence contracts, account screens, role-scoped organization controls and live core account metrics. Production PostgreSQL connections enforce TLS certificate verification; use `ATLAS_DATABASE_SSL_CA_FILE` when the managed provider requires a private root CA. Production auth throttling also requires `ATLAS_TRUST_PROXY=true` behind an HTTPS edge that overwrites `X-Real-IP`. It does not yet ship TOTP/2FA, SSO/OAuth, API keys, tenant user lifecycle controls, production queue workers, CRM/chat/workflow API surfaces, model/agent provider execution, real SMS/WhatsApp/social/voice adapters, calendar provider sync, payment checkout, campaign delivery, a KMS-backed memory adapter or production observability exporter. Local JSON/state remains development-only.
+V112 established the authenticated account/tenant API, Postgres identity, account screens and role-scoped organization controls. V114 extends this with tenant-scoped CRM/builder records and Paddle checkout/subscription state. Production PostgreSQL connections enforce TLS certificate verification; use `ATLAS_DATABASE_SSL_CA_FILE` when the managed provider requires a private root CA. Production auth throttling requires `ATLAS_TRUST_PROXY=true` behind an HTTPS edge that overwrites `X-Real-IP`. TOTP/2FA, SSO/OAuth, API keys, tenant user lifecycle controls, production queue workers, customer chat sessions/inbox, model/agent provider execution, real email/SMS/WhatsApp/social/voice adapters, calendar provider sync, Paddle entitlements/customer portal, KMS-backed memory and production observability exporter remain future work. Local JSON/state remains development-only.
 
 Target deployment architecture: managed PostgreSQL with forced tenant RLS; managed Redis/queue; separately scaled authenticated API, webhook ingress and workers; managed secret manager/KMS; object storage and CDN for attachments; WAF/rate limits; OpenTelemetry collection; tested backups, restores, load, failover and SLOs. No millions-of-users capacity claim is verified by this repository.
 
-Apply SQL targets in order with `npm run db:migrate`: V80, V85, V90–V96, V99, V100, V102–V112. The migration runner checks immutable SHA-256 migration records and serializes migration sessions. SQL has not been applied to a managed production PostgreSQL service in this workspace. Use distinct migration and runtime connections; API and worker roles must not have `BYPASSRLS`, and each `app.tenant_id` must be set from authenticated membership in the tenant transaction.
+Apply SQL targets in order with `npm run db:migrate`: V80, V85, V90–V96, V99, V100, V102–V114. The migration runner checks immutable SHA-256 migration records and serializes migration sessions. V114 migration and RLS behavior are exercised against ephemeral PGlite, but SQL has not been applied to a managed production PostgreSQL service in this workspace. Apply the V114 runtime grants as a database owner after migrating. Use distinct migration and runtime connections; API and worker roles must not have `BYPASSRLS`, and each `app.tenant_id` must be set from authenticated membership in the tenant transaction.
 
 For GHL/n8n/monday/HubSpot analysis and explicit feature gaps, see [October 2026 competitor benchmark](docs/COMPETITOR-BENCHMARK-2026-10.md). For the V95 duplicate-case behavior see [V95 Case Intelligence](docs/V95-CASE-INTELLIGENCE.md); the [V94 Copilot and Service Desk](docs/V94-COPILOT-SERVICE-DESK.md) document describes the underlying contracts.
 

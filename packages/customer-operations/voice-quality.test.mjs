@@ -21,6 +21,7 @@ const deployment = createAgentDeployment({
 const release = publishAgentDeployment({
   deployment, publisherAuthority: authority,
   evaluation: { tenantId, agentId: 'voice-agent-quality', score: 96, sampleCount: 24, errorRate: 0.01, criticalFailures: 0, evaluatedAt: new Date(now).toISOString() },
+  evaluationVerifier: () => true,
   now, releaseId: 'quality-agent-release-v1'
 });
 

@@ -10,12 +10,13 @@ const publisherAuthority = resolveAtlasAuthority({
   tenantId, memberships: [{ id: 'm-a', actorId: 'admin-a', tenantId, role: 'admin', status: 'active' }], ownerEmail: 'khan@example.test'
 });
 const evaluation = overrides => ({ tenantId, agentId: 'support-agent', score: 98, sampleCount: 30, errorRate: 0.01, criticalFailures: 0, evaluatedAt: new Date(at).toISOString(), ...overrides });
+const testEvaluationVerifier = () => true;
 const deployment = (overrides = {}) => createAgentDeployment({
   id: 'deploy-a', tenantId, agentId: 'support-agent', version: 1,
   routes: [{ id: 'webchat', channel: 'webchat', coveragePercent: 100, workingHours: { mode: 'during', timezone: 'America/Los_Angeles', windows: [{ days: [1], start: '08:00', end: '17:00' }] } }],
   ...overrides
 });
-const release = (overrides = {}) => publishAgentDeployment({ deployment: deployment(), publisherAuthority, evaluation: evaluation(), now: at, releaseId: 'release-a', ...overrides });
+const release = (overrides = {}) => publishAgentDeployment({ deployment: deployment(), publisherAuthority, evaluation: evaluation(), evaluationVerifier: testEvaluationVerifier, now: at, releaseId: 'release-a', ...overrides });
 
 test('deployment configuration is bounded and rejects phone/email destinations as secrets', () => {
   assert.throws(() => deployment({ routes: [{ channel: 'fax' }] }), /Unsupported customer channel/);
@@ -29,11 +30,11 @@ test('deployment configuration is bounded and rejects phone/email destinations a
 
 test('publishing requires tenant admin authority and fresh, tenant-bound evaluation evidence', () => {
   const draft = deployment();
-  assert.throws(() => publishAgentDeployment({ deployment: draft, publisherAuthority: resolveAtlasAuthority({ actor: { id: 'guest', authenticated: true }, tenantId, ownerEmail: 'khan@example.test' }), evaluation: evaluation(), now: at }), /Tenant membership/);
-  assert.throws(() => publishAgentDeployment({ deployment: draft, publisherAuthority, evaluation: evaluation({ tenantId: 'tenant-b' }), now: at }), /tenant-bound evaluation/);
-  assert.throws(() => publishAgentDeployment({ deployment: draft, publisherAuthority, evaluation: evaluation({ score: 94 }), now: at }), /tenant-bound evaluation/);
-  assert.throws(() => publishAgentDeployment({ deployment: draft, publisherAuthority, evaluation: evaluation({ sampleCount: 19 }), now: at }), /tenant-bound evaluation/);
-  assert.throws(() => publishAgentDeployment({ deployment: draft, publisherAuthority, evaluation: evaluation({ evaluatedAt: new Date(at - 8 * 86400000).toISOString() }), now: at }), /tenant-bound evaluation/);
+  assert.throws(() => publishAgentDeployment({ deployment: draft, publisherAuthority: resolveAtlasAuthority({ actor: { id: 'guest', authenticated: true }, tenantId, ownerEmail: 'khan@example.test' }), evaluation: evaluation(), evaluationVerifier: testEvaluationVerifier, now: at }), /Tenant membership/);
+  assert.throws(() => publishAgentDeployment({ deployment: draft, publisherAuthority, evaluation: evaluation({ tenantId: 'tenant-b' }), evaluationVerifier: testEvaluationVerifier, now: at }), /tenant-bound evaluation/);
+  assert.throws(() => publishAgentDeployment({ deployment: draft, publisherAuthority, evaluation: evaluation({ score: 94 }), evaluationVerifier: testEvaluationVerifier, now: at }), /tenant-bound evaluation/);
+  assert.throws(() => publishAgentDeployment({ deployment: draft, publisherAuthority, evaluation: evaluation({ sampleCount: 19 }), evaluationVerifier: testEvaluationVerifier, now: at }), /tenant-bound evaluation/);
+  assert.throws(() => publishAgentDeployment({ deployment: draft, publisherAuthority, evaluation: evaluation({ evaluatedAt: new Date(at - 8 * 86400000).toISOString() }), evaluationVerifier: testEvaluationVerifier, now: at }), /tenant-bound evaluation/);
   assert.equal(release().status, 'canary');
   assert.equal(release().routes[0].coveragePercent, 10);
 });
@@ -41,10 +42,10 @@ test('publishing requires tenant admin authority and fresh, tenant-bound evaluat
 test('only a verified configured owner can bypass tenant membership for cross-tenant platform work', () => {
   const ownerAuthority = resolveAtlasAuthority({ actor: { id: 'khan', authenticated: true, email: 'KHAN@example.test', emailVerified: true }, ownerEmail: 'khan@example.test' });
   const builtForOtherTenant = deployment({ tenantId: 'tenant-b' });
-  const published = publishAgentDeployment({ deployment: builtForOtherTenant, publisherAuthority: ownerAuthority, evaluation: evaluation({ tenantId: 'tenant-b' }), now: at, releaseId: 'release-b' });
+  const published = publishAgentDeployment({ deployment: builtForOtherTenant, publisherAuthority: ownerAuthority, evaluation: evaluation({ tenantId: 'tenant-b' }), evaluationVerifier: testEvaluationVerifier, now: at, releaseId: 'release-b' });
   assert.equal(published.tenantId, 'tenant-b');
   const forged = resolveAtlasAuthority({ actor: { id: 'fake', authenticated: true, email: 'fake@example.test', emailVerified: true, platformOwner: true }, ownerEmail: 'khan@example.test' });
-  assert.throws(() => publishAgentDeployment({ deployment: builtForOtherTenant, publisherAuthority: forged, evaluation: evaluation({ tenantId: 'tenant-b' }), now: at }), /Tenant membership/);
+  assert.throws(() => publishAgentDeployment({ deployment: builtForOtherTenant, publisherAuthority: forged, evaluation: evaluation({ tenantId: 'tenant-b' }), evaluationVerifier: testEvaluationVerifier, now: at }), /Tenant membership/);
 });
 
 test('channel, destination, segments, and stable coverage select one tenant deployment', () => {
@@ -65,7 +66,7 @@ test('outside hours and traffic canary misses route to a human without calling t
   const outside = selectCustomerAgent({ tenantId, conversationId: 'night', channel: 'webchat', deployments: [live], now: afterHours });
   assert.equal(outside.route, 'human');
   assert.equal(outside.reason, 'outside_working_hours_or_segment');
-  const zeroCoverage = publishAgentDeployment({ deployment: deployment({ routes: [{ id: 'webchat', channel: 'webchat', coveragePercent: 0, workingHours: { mode: 'during', timezone: 'America/Los_Angeles', windows: [{ days: [1], start: '08:00', end: '17:00' }] } }] }), publisherAuthority, evaluation: evaluation(), now: at, releaseId: 'zero-coverage' });
+  const zeroCoverage = publishAgentDeployment({ deployment: deployment({ routes: [{ id: 'webchat', channel: 'webchat', coveragePercent: 0, workingHours: { mode: 'during', timezone: 'America/Los_Angeles', windows: [{ days: [1], start: '08:00', end: '17:00' }] } }] }), publisherAuthority, evaluation: evaluation(), evaluationVerifier: testEvaluationVerifier, now: at, releaseId: 'zero-coverage' });
   const canaryMiss = selectCustomerAgent({ tenantId, conversationId: 'day', channel: 'webchat', deployments: [zeroCoverage], now: at });
   assert.equal(canaryMiss.route, 'human');
   assert.equal(canaryMiss.reason, 'outside_canary_coverage');
@@ -91,7 +92,7 @@ test('direct customer-to-agent assignment wins over inclusion tags but respects 
 test('ambiguous deployments fail closed to human routing instead of selecting randomly', () => {
   const first = release();
   const secondDraft = deployment({ id: 'deploy-b', routes: [{ id: 'webchat-b', channel: 'webchat', coveragePercent: 100, workingHours: { mode: 'during', timezone: 'America/Los_Angeles', windows: [{ days: [1], start: '08:00', end: '17:00' }] } }] });
-  const second = publishAgentDeployment({ deployment: secondDraft, publisherAuthority, evaluation: evaluation(), now: at, releaseId: 'release-b' });
+  const second = publishAgentDeployment({ deployment: secondDraft, publisherAuthority, evaluation: evaluation(), evaluationVerifier: testEvaluationVerifier, now: at, releaseId: 'release-b' });
   const conversationId = Array.from({ length: 10000 }, (_, i) => `ambiguous-${i}`).find(id => rolloutBucket(tenantId, first.id, id) < 10 && rolloutBucket(tenantId, second.id, id) < 10);
   assert.ok(conversationId);
   const result = selectCustomerAgent({ tenantId, conversationId, channel: 'webchat', deployments: [first, second], now: at });
@@ -116,16 +117,16 @@ test('human handoff fires for customer request, weak evidence, scope, frustratio
 
 test('stepwise promotion is immutable, evaluation-gated, and capped at 25 percentage points', () => {
   const first = release();
-  const second = promoteAgentDeployment({ previousRelease: first, publisherAuthority, evaluation: evaluation({ sampleCount: 50 }), targetCoveragePercent: 25, now: at + 1000, releaseId: 'release-a-v2' });
+  const second = promoteAgentDeployment({ previousRelease: first, publisherAuthority, evaluation: evaluation({ sampleCount: 50 }), evaluationVerifier: testEvaluationVerifier, targetCoveragePercent: 25, now: at + 1000, releaseId: 'release-a-v2' });
   assert.equal(first.routes[0].coveragePercent, 10);
   assert.equal(second.routes[0].coveragePercent, 25);
   assert.equal(second.version, 2);
   assert.equal(second.supersedesReleaseId, first.releaseId);
-  assert.throws(() => promoteAgentDeployment({ previousRelease: second, publisherAuthority, evaluation: evaluation({ sampleCount: 49 }), targetCoveragePercent: 50, now: at + 1000 }), /evaluation evidence/);
-  assert.throws(() => promoteAgentDeployment({ previousRelease: second, publisherAuthority, evaluation: evaluation({ sampleCount: 50 }), targetCoveragePercent: 51, now: at + 1000 }), /1-25 percentage points/);
+  assert.throws(() => promoteAgentDeployment({ previousRelease: second, publisherAuthority, evaluation: evaluation({ sampleCount: 49 }), evaluationVerifier: testEvaluationVerifier, targetCoveragePercent: 50, now: at + 1000 }), /evaluation evidence/);
+  assert.throws(() => promoteAgentDeployment({ previousRelease: second, publisherAuthority, evaluation: evaluation({ sampleCount: 50 }), evaluationVerifier: testEvaluationVerifier, targetCoveragePercent: 51, now: at + 1000 }), /1-25 percentage points/);
   const paused = pauseAgentDeployment({ release: second, publisherAuthority, now: at + 2000 });
   assert.equal(paused.existingConversationPolicy, 'continue_until_handoff_or_resolution');
-  const third = promoteAgentDeployment({ previousRelease: second, publisherAuthority, evaluation: evaluation({ sampleCount: 50, evaluatedAt: new Date(at + 3000).toISOString() }), targetCoveragePercent: 50, now: at + 3000, releaseId: 'release-a-v3' });
+  const third = promoteAgentDeployment({ previousRelease: second, publisherAuthority, evaluation: evaluation({ sampleCount: 50, evaluatedAt: new Date(at + 3000).toISOString() }), evaluationVerifier: testEvaluationVerifier, targetCoveragePercent: 50, now: at + 3000, releaseId: 'release-a-v3' });
   assert.equal(third.supersedesReleaseId, second.releaseId);
   assert.equal(verifyAgentDeploymentRelease(third), true);
   assert.equal(verifyAgentDeploymentRelease({ ...third, publishedBy: 'attacker' }), false);
@@ -159,7 +160,7 @@ function customerAgentFixture({ channels = ['webchat'], allowedTools = [], memor
     id: 'runtime-deployment', tenantId, agentId: 'support-agent', version: 1, allowedTools, memoryPolicy,
     routes: channels.map((channel, index) => ({ id: `route-${channel}-${index}`, channel, coveragePercent: 100 }))
   });
-  const live = publishAgentDeployment({ deployment: draft, publisherAuthority, evaluation: evaluation(), now: at, releaseId: 'runtime-release' });
+  const live = publishAgentDeployment({ deployment: draft, publisherAuthority, evaluation: evaluation(), evaluationVerifier: testEvaluationVerifier, now: at, releaseId: 'runtime-release' });
   const conversationId = Array.from({ length: 1000 }, (_, i) => `runtime-${channelString(channels)}-${i}`).find(id => rolloutBucket(tenantId, live.id, id) < 10);
   const channel = channels[0];
   const selection = selectCustomerAgent({ tenantId, conversationId, channel, deployments: [live], now: at });

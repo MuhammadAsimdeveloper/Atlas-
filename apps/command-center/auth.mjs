@@ -86,6 +86,7 @@ function renderWorkspace(me) {
   $('#user-avatar').textContent = me.user.displayName.trim().slice(0, 1).toUpperCase() || 'A';
   renderOrganizationPicker();
   $('#overview-panel').hidden = false;
+  $('#growth-panel').hidden = true;
   $('#team-panel').hidden = true;
   $('#page-title').textContent = 'Overview';
   $('#breadcrumb').textContent = 'Workspace overview';
@@ -165,12 +166,14 @@ async function loadTeam() {
 
 function openPanel(panel) {
   const isTeam = panel === 'team';
-  $('#overview-panel').hidden = isTeam;
+  const isGrowth = panel === 'growth';
+  $('#overview-panel').hidden = isTeam || isGrowth;
+  $('#growth-panel').hidden = !isGrowth;
   $('#team-panel').hidden = !isTeam;
-  $('#page-title').textContent = isTeam ? 'Team & access' : 'Overview';
-  $('#breadcrumb').textContent = isTeam ? 'Workspace settings' : 'Workspace overview';
+  $('#page-title').textContent = isTeam ? 'Team & access' : isGrowth ? 'Growth Center' : 'Overview';
+  $('#breadcrumb').textContent = isTeam ? 'Workspace settings' : isGrowth ? 'Customer operations' : 'Workspace overview';
   document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.panel === panel));
-  if (isTeam) loadTeam(); else loadDashboard();
+  if (isTeam) loadTeam(); else if (isGrowth) window.AtlasGrowth?.activate(); else loadDashboard();
 }
 
 async function completeSignIn(payload) {
@@ -192,6 +195,7 @@ $('#auth-shell').addEventListener('click', event => {
   if (button) showAuth(button.dataset.view);
 });
 document.querySelectorAll('.nav-item').forEach(button => button.addEventListener('click', () => openPanel(button.dataset.panel)));
+document.querySelectorAll('[data-open-growth]').forEach(button => button.addEventListener('click', () => openPanel('growth')));
 
 $('#login-form').addEventListener('submit', async event => {
   event.preventDefault(); const form = event.currentTarget; setBusy(form, true);

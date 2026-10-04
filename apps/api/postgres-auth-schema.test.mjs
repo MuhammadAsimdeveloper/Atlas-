@@ -5,19 +5,21 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 import { PostgresAuthStore } from './postgres-auth-store.mjs';
+import { PostgresGrowthStore } from './growth-store.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const migration = await readFile(path.join(root, 'infra/postgres/FINAL-MIGRATION-V112.sql'), 'utf8');
 
-test('all PostgreSQL migrations apply in order and V112 tenant policies constrain a non-bypass runtime role', async () => {
+test('all PostgreSQL migrations apply in order and V114 tenant policies constrain a non-bypass runtime role', async () => {
   const db = new PGlite();
   try {
     const migrationDirectory = path.join(root, 'infra/postgres');
     const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
-    assert.equal(files.at(-1), 'FINAL-MIGRATION-V112.sql');
+    assert.equal(files.at(-1), 'FINAL-MIGRATION-V114.sql');
     for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
     await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V112.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V114.sql'), 'utf8'));
     await db.exec('SET ROLE atlas_app;');
 
     const makeOrg = async ({ actor, email, tenant, name, slug }) => {
@@ -58,9 +60,82 @@ test('all PostgreSQL migrations apply in order and V112 tenant policies constrai
     assert.equal(runtime.rows[0].rolcreaterole, false);
     const identityColumns = await db.query("SELECT column_name FROM information_schema.columns WHERE table_name='atlas_auth_users'");
     assert.equal(identityColumns.rows.some(row => row.column_name === 'platform_owner'), false);
+    const growthPolicy = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_growth_items'::regclass");
+    assert.equal(growthPolicy.rows[0].relrowsecurity, true);
+    assert.equal(growthPolicy.rows[0].relforcerowsecurity, true);
   } finally {
     await db.close();
   }
+});
+
+test('V114 Growth Center CRUD, revisions, Paddle webhook state and tenant isolation work under atlas_app RLS', async () => {
+  const db = new PGlite();
+  try {
+    const migrationDirectory = path.join(root, 'infra/postgres');
+    const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
+    for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
+    await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
+    await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V112.sql'),'utf8'));
+    await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V114.sql'),'utf8'));
+    await db.exec('SET ROLE atlas_app;');
+    const actorA='11111111-1111-4111-8111-111111111111', tenantA='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const actorB='22222222-2222-4222-8222-222222222222', tenantB='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const memberA='33333333-3333-4333-8333-333333333333';
+    const createOrganization = async ({ actor, tenant, email, name, slug }) => {
+      await db.exec('BEGIN');
+      await db.query("SELECT set_config('app.auth_email',$1,true)", [email]);
+      await db.query('INSERT INTO atlas_auth_users(user_id,email,display_name,password_hash,email_verified_at) VALUES ($1,$2,$3,$4,now())', [actor,email,name,'scrypt$test']);
+      await db.query("SELECT set_config('app.actor_id',$1,true)", [actor]);
+      await db.query('INSERT INTO atlas_organizations(tenant_id,name,slug,created_by) VALUES ($1,$2,$3,$4)', [tenant,name,slug,actor]);
+      await db.query("SELECT set_config('app.tenant_id',$1,true)", [tenant]);
+      await db.query("INSERT INTO atlas_organization_memberships(tenant_id,user_id,role_key,status) VALUES ($1,$2,'owner','active')", [tenant,actor]);
+      await db.exec('COMMIT');
+    };
+    await createOrganization({ actor:actorA,tenant:tenantA,email:'growth-a@example.net',name:'Growth A',slug:'growth-a' });
+    await createOrganization({ actor:actorB,tenant:tenantB,email:'growth-b@example.net',name:'Growth B',slug:'growth-b' });
+    await db.exec('BEGIN');
+    await db.query("SELECT set_config('app.auth_email',$1,true)", ['member-a@example.net']);
+    await db.query('INSERT INTO atlas_auth_users(user_id,email,display_name,password_hash,email_verified_at) VALUES ($1,$2,$3,$4,now())', [memberA,'member-a@example.net','Member A','scrypt$test']);
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [memberA]);
+    await db.query("SELECT set_config('app.tenant_id',$1,true)", [tenantA]);
+    await db.query("INSERT INTO atlas_organization_memberships(tenant_id,user_id,role_key,status) VALUES ($1,$2,'member','active')", [tenantA,memberA]);
+    await db.exec('COMMIT');
+
+    const pool = { connect: async () => ({ query: (...args) => db.query(...args), release() {} }), query: (...args) => db.query(...args) };
+    const store = new PostgresGrowthStore(pool);
+    const pipeline = await store.create({ actorId:actorA,tenantId:tenantA,module:'pipelines',payload:{ name:'Sales',stages:[{id:'new',name:'New',probability:0},{id:'qualified',name:'Qualified',probability:0.5},{id:'won',name:'Won',probability:1,isClosedWon:true }] } });
+    const contact = await store.create({ actorId:actorA,tenantId:tenantA,module:'contacts',idempotencyKey:'a'.repeat(64),payload:{ firstName:'Ari',email:'ari@example.net' } });
+    const retry = await store.create({ actorId:actorA,tenantId:tenantA,module:'contacts',idempotencyKey:'a'.repeat(64),payload:{ firstName:'ignored',email:'ignored@example.net' } });
+    assert.equal(retry.id, contact.id, 'replayed create returns the existing record');
+    const lead = await store.create({ actorId:actorA,tenantId:tenantA,module:'leads',payload:{ contactId:contact.id,pipelineId:pipeline.id,stageId:'new',status:'new' } });
+    assert.equal((await store.list({ actorId:actorA,tenantId:tenantA,module:'leads' })).items[0].id, lead.id);
+    const qualification = await store.create({ actorId:actorA,tenantId:tenantA,module:'ai-qualification',payload:{ name:'Fit rubric',instructions:'Score only supported evidence.',criteria:[{id:'fit',label:'Service fit',weight:100,evidenceRequired:true}] } });
+    const publishedQualification = await store.transition({ actorId:actorA,tenantId:tenantA,module:'ai-qualification',id:qualification.id,action:'publish',expectedVersion:1 });
+    const evaluation = await store.evaluateLead({ actorId:memberA,tenantId:tenantA,profileId:publishedQualification.id,leadId:lead.id,expectedVersion:1,ratings:{fit:85},evidenceRefs:{fit:'call:session-42'} });
+    assert.equal(evaluation.evaluation.score,85);
+    assert.equal(evaluation.item.payload.qualification.status,'needs_review','human review remains mandatory by default');
+    const movedLead = await store.moveLeadStage({ actorId:memberA,tenantId:tenantA,leadId:lead.id,expectedVersion:2,stageId:'qualified' });
+    assert.equal(movedLead.item.payload.stageId,'qualified');
+    assert.equal(movedLead.item.version,3);
+    await assert.rejects(store.moveLeadStage({ actorId:actorA,tenantId:tenantA,leadId:lead.id,expectedVersion:2,stageId:'won' }),{code:'version_conflict'});
+    await assert.rejects(store.get({ actorId:actorA,tenantId:tenantB,module:'contacts',id:contact.id }), { code:'organization_not_found' });
+    const updated = await store.update({ actorId:memberA,tenantId:tenantA,module:'contacts',id:contact.id,expectedVersion:1,payload:{ firstName:'Ari',lastName:'Member edit',email:'ari@example.net' } });
+    assert.equal(updated.version,2, 'a different tenant member can edit a record without violating creator-bound RLS');
+    await db.exec('BEGIN');
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [actorA]);
+    await db.query("SELECT set_config('app.tenant_id',$1,true)", [tenantA]);
+    const versions = await db.query('SELECT version FROM atlas_growth_item_versions WHERE tenant_id=$1 AND item_id=$2 ORDER BY version', [tenantA,contact.id]);
+    await db.exec('ROLLBACK');
+    assert.deepEqual(versions.rows.map(row => row.version),[1,2]);
+    await assert.rejects(store.update({ actorId:actorA,tenantId:tenantA,module:'contacts',id:contact.id,expectedVersion:1,payload:{ firstName:'Stale',email:'ari@example.net' } }), { code:'version_conflict' });
+
+    const occurredAt = new Date().toISOString();
+    const event = { disposition:'apply',eventId:'evt_1234567890',eventType:'subscription.created',occurredAt,tenantId:tenantA,subscriptionId:'sub_1234567890',customerId:'ctm_1234567890',priceId:'pri_1234567890',planKey:'starter',status:'active',currentPeriodEndsAt:null,cancelAtPeriodEnd:false };
+    assert.equal((await store.applyPaddleEvent(event,'f'.repeat(64))).status,'applied');
+    assert.equal((await store.applyPaddleEvent(event,'f'.repeat(64))).status,'duplicate');
+    assert.equal((await store.applyPaddleEvent({ ...event,eventId:'evt_1234567891',occurredAt:new Date(Date.parse(occurredAt)-60_000).toISOString(),status:'past_due' },'e'.repeat(64))).status,'stale');
+    assert.equal((await store.getSubscription({ actorId:actorA,tenantId:tenantA })).status,'active');
+  } finally { await db.close(); }
 });
 
 test('Postgres auth store completes tenant account, invitation, dashboard, reset and session lifecycle under RLS', async () => {

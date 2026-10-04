@@ -25,6 +25,7 @@ function voiceRelease({ tenant = tenantId, id = 'deployment-voice', agentId = 's
     deployment: draft,
     publisherAuthority: authority,
     evaluation: { tenantId: tenant, agentId, score: 98, sampleCount: 24, errorRate: 0.01, criticalFailures: 0, evaluatedAt: new Date(now).toISOString() },
+    evaluationVerifier: () => true,
     now, releaseId
   });
 }

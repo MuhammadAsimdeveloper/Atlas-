@@ -4,7 +4,34 @@ Release state
 - 114.0.0 is the single current repository release line.
 - package.json and package-lock.json are normalized to 114.0.0.
 - Historical migration and engineering documentation remains available for traceability.
-- Obsolete packaged-version archives are not part of the final source-of-truth tree.
+- Authenticated tenant Growth Center APIs and UI, Paddle checkout/webhook integration, agent evaluation evidence gates, and SEO readiness tooling are included in source.
+- Product/provider boundaries remain explicit: no live channel/model delivery, workflow workers, schedule service, production domain, managed infrastructure or capacity proof is included.
+
+ATLAS V113.0.0 — Customer-Agent Evaluation and Feature Coverage
+
+Implemented
+- Tenant/agent-bound scenario suites that require prompt-injection, sensitive-data, handoff and out-of-scope safety cases.
+- Bounded parallel evaluation with per-case timeout, deterministic expected outcomes, knowledge citation allowlists and read-only tool expectations.
+- HMAC-signed reports containing scenario IDs, issue codes, score, critical-failure count, runtime error rate, estimated cost and p95 latency; no prompts, generated answers, free-form model errors or tool arguments are retained.
+- Agent publish and traffic promotion require a trusted evaluation verifier and evidence cryptographically bound to the exact draft fingerprint or previous release/target traffic percentage.
+- Source-linked HighLevel and n8n feature inventory with truthful live/contract/preview/missing classifications.
+- Test coverage for evaluation tamper, tenant/key/release binding, tool abuse, hostile object shapes, PII-safe evidence and exact release gates.
+
+Verification (Node v24.19.0 on Windows)
+- node --test --test-concurrency=1: PASS — 165 tests, 165 passed, 0 failed.
+- scripts/check.mjs: PASS — all discovered JavaScript modules passed syntax checks.
+- scripts/doctor.mjs: PASS — 53/53 checks.
+- scripts/production-check.mjs: PASS — 15/15 checks.
+- scripts/docs-check.mjs: PASS — 50 Markdown files, 0 errors after final doc edits.
+- git diff --check: PASS — no whitespace errors after final doc edits.
+- scripts/smoke-http.mjs: PASS — 5/5; scripts/smoke-api-http.mjs: PASS — 8/8.
+- scripts/build-site.mjs: PASS — preview built with noindex/deny-all robots; scripts/seo-check.mjs: PASS — 33 assertions; scripts/launch-check.mjs: PASS — 4/4.
+- pnpm dlx npm@11 audit --audit-level=moderate: PASS — 0 vulnerabilities. npm itself is not on PATH; the equivalent npm 11 audit ran through pnpm dlx.
+
+Verification boundary
+- Evaluation engine and release gates are unit-tested domain code. No model API, test dataset database, signing-key vault, Agent Studio evaluation UI or provider-connected runtime is deployed.
+- Managed Postgres, email/channel providers, Redis workers, scheduler, object storage/CDN/WAF, OTel, domain and load/restore testing remain external configuration/deployment tasks.
+- Platform-wide owner permissions remain exclusive to the trusted verified Khan account; customer admins remain tenant-scoped.
 
 ATLAS V112.0.0 — PostgreSQL Identity and Tenant Foundation
 

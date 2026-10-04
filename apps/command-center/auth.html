@@ -9,7 +9,9 @@
   <title>Atlas workspace</title>
   <link rel="stylesheet" href="/auth.css">
   <link rel="stylesheet" href="/auth-modal.css">
+  <link rel="stylesheet" href="/growth.css">
   <script type="module" src="/auth.mjs"></script>
+  <script type="module" src="/growth.mjs"></script>
 </head>
 <body>
   <main id="auth-shell" class="auth-shell">
@@ -53,6 +55,7 @@
       <select id="workspace-picker" class="workspace-picker" aria-label="Choose workspace"></select>
       <nav class="nav" aria-label="Workspace navigation">
         <button class="nav-item active" type="button" data-panel="overview"><span aria-hidden="true">⌂</span> Overview</button>
+        <button class="nav-item" type="button" data-panel="growth"><span aria-hidden="true">✦</span> Growth Center</button>
         <button class="nav-item" type="button" data-panel="team"><span aria-hidden="true">♙</span> Team & access</button>
       </nav>
       <div class="sidebar-note"><span class="status-dot"></span><span>Workspace data is live</span></div>
@@ -71,15 +74,27 @@
           <article class="metric-card"><span>Pending invitations</span><strong id="metric-invites">—</strong><small>Awaiting acceptance</small></article>
           <article class="metric-card"><span>Activity this week</span><strong id="metric-activity">—</strong><small>Recorded workspace events</small></article>
         </div>
-        <section class="content-card module-card"><div class="section-heading"><div><span class="eyebrow">Coming online as modules connect</span><h2>Customer operations</h2></div><span class="live-tag"><span class="status-dot"></span> Core account data live</span></div>
+        <section class="content-card module-card"><div class="section-heading"><div><span class="eyebrow">Customer operations</span><h2>Growth Center</h2></div><span class="live-tag"><span class="status-dot"></span> Workspace records live</span></div>
           <div class="module-grid">
-            <article class="module"><span class="module-icon">◎</span><div><strong>CRM & sales</strong><p>Contacts, pipelines and opportunities</p></div><span class="module-state">Not connected</span></article>
-            <article class="module"><span class="module-icon">✦</span><div><strong>AI agents</strong><p>Customer support and approved actions</p></div><span class="module-state">Not connected</span></article>
-            <article class="module"><span class="module-icon">↗</span><div><strong>Automations</strong><p>Workflows, messages and schedules</p></div><span class="module-state">Not connected</span></article>
-            <article class="module"><span class="module-icon">▤</span><div><strong>Billing & growth</strong><p>Plans, usage and account revenue</p></div><span class="module-state">Not connected</span></article>
+            <article class="module"><span class="module-icon">◎</span><div><strong>CRM & sales</strong><p>Contacts, leads, pipelines and tasks</p></div><span class="module-state">Available</span></article>
+            <article class="module"><span class="module-icon">✦</span><div><strong>AI operations</strong><p>Qualification and follow-up configurations</p></div><span class="module-state">Draft-ready</span></article>
+            <article class="module"><span class="module-icon">↗</span><div><strong>Campaign builders</strong><p>Workflows, email, funnels and social</p></div><span class="module-state">Draft-ready</span></article>
+            <article class="module"><span class="module-icon">▤</span><div><strong>Billing & growth</strong><p>Paddle checkout and tenant billing</p></div><span class="module-state">Configure Paddle</span></article>
           </div>
-          <p class="truth-note">These product areas appear as unavailable until their database-backed features and service connections are enabled. No sample performance is shown as real.</p>
+          <p class="truth-note">Records, immutable revisions and workspace access are database-backed. AI runs, message delivery, social publishing and public page hosting remain disabled until their service connections are configured.</p>
+          <button class="button secondary" type="button" data-open-growth>Open Growth Center</button>
         </section>
+      </section>
+      <section id="growth-panel" class="panel-section" hidden aria-labelledby="page-title">
+        <div class="growth-intro"><div><span class="eyebrow">Customer operations workspace</span><h2>One place for lead flow, campaigns and follow-up.</h2><p>Draft, version and govern the work your team runs. External actions stay paused until their providers are connected.</p></div><div class="growth-status"><span class="status-dot"></span><span>Tenant-scoped records</span></div></div>
+        <div class="content-card growth-workspace">
+          <div class="growth-toolbar"><label>Workspace area<select id="growth-module" aria-label="Choose Growth Center area"></select></label><label class="growth-search">Search records<input id="growth-search" type="search" maxlength="120" placeholder="Search names"></label><button id="growth-refresh" class="button subtle" type="button">Refresh</button><button id="growth-new" class="button primary" type="button">Create new</button></div>
+          <div id="growth-feedback" class="growth-feedback" role="status" aria-live="polite" hidden></div>
+          <div id="growth-kpis" class="growth-kpis"></div>
+          <section class="growth-billing" aria-label="Paddle subscription"><div><span class="eyebrow">Workspace plan</span><strong id="billing-current">Loading billing…</strong><small id="billing-status">Plans become available after Paddle is configured.</small></div><label>Change plan<select id="billing-plan"></select></label><button id="billing-checkout" class="button secondary" type="button">Continue to secure checkout</button></section>
+          <div class="growth-columns"><section class="growth-list-panel" aria-labelledby="growth-list-title"><div class="section-heading"><div><span class="eyebrow">Workspace records</span><h2 id="growth-list-title">Contacts</h2></div><span id="growth-count" class="live-tag">0 records</span></div><div id="growth-list" class="growth-list"></div><div id="growth-empty" class="empty-state">Nothing here yet. Create a first record to get started.</div></section>
+            <section class="growth-detail-panel" aria-labelledby="growth-detail-title"><div class="section-heading"><div><span class="eyebrow">Versioned record</span><h2 id="growth-detail-title">Choose a record</h2></div><span id="growth-version" class="live-tag" hidden></span></div><p id="growth-detail-empty" class="empty-state">Select a record to inspect its version, update its content or move it through an approved lifecycle action.</p><form id="growth-detail-form" class="growth-form" hidden><label>Record content <span class="field-help">Validated against this module’s contract. Save creates an immutable revision.</span><textarea id="growth-payload" name="payload" rows="18" spellcheck="false" required></textarea></label><div id="growth-special-controls" class="growth-special-controls"></div><div class="growth-actions"><button id="growth-save" class="button primary" type="submit">Save revision</button><button id="growth-lifecycle" class="button subtle" type="button" hidden></button></div><p id="growth-provider-note" class="field-help"></p></form></section></div>
+        </div>
       </section>
       <section id="team-panel" class="panel-section" hidden aria-labelledby="page-title">
         <div class="content-card"><div class="section-heading"><div><span class="eyebrow">People in this workspace</span><h2>Team members</h2></div><span id="team-count" class="live-tag"></span></div><div class="table-scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Access</th><th>Status</th></tr></thead><tbody id="member-rows"></tbody></table></div></div>

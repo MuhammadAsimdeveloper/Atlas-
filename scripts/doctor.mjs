@@ -32,7 +32,7 @@ try {
   check('V112 actual readiness and authenticated API', apiServer.includes('authStore.ping()') && apiServer.includes('authenticatedApi: Boolean(authApi)') && apiServer.includes("'/health/ready'"), 'Readiness checks a connected PostgreSQL identity schema and tenant endpoints fail closed without it');
   const ui = await read('apps/command-center/auth.html');
   const uiScript = await read('apps/command-center/auth.mjs');
-  check('V112 live account workspace UI', ui.includes('id="workspace"') && ui.includes('id="invite-form"') && uiScript.includes("request('/dashboard/summary')") && uiScript.includes("result.delivery === 'sent'") && ui.includes('Not connected'), 'Signup, team/role controls, actual account metrics and disconnected product areas are represented without sample values');
+  check('V112 live account workspace UI', ui.includes('id="workspace"') && ui.includes('id="invite-form"') && uiScript.includes("request('/dashboard/summary')") && uiScript.includes("result.delivery === 'sent'") && ui.includes('data-panel="growth"'), 'Signup, team/role controls, live account metrics and Growth Center navigation are connected without fabricated counts');
   const migrationRunner = await read('scripts/migrate.mjs');
   check('V112 checksum-tracked migrations', migrationRunner.includes('pg_advisory_lock') && migrationRunner.includes('sha256') && migrationRunner.includes('changed after it was applied') && migrationRunner.includes('ATLAS_MIGRATION_DATABASE_URL'), 'Migration process serializes schema changes, checks immutable checksums and requires a separate production migration connection');
 
@@ -119,8 +119,32 @@ try {
   check('V111 trusted workflow approvals', workflowTarget.includes('copyWorkflowApprovalEvidence') && workflowTarget.includes('approvalVerifier') && workflowTarget.includes('expiresAt - approvedAt <= 15 * 60_000') && workflowTarget.includes('approvedByActorId !== requestedByActorId') && workflowTests.includes('workflow approval is verified'), 'High-risk actions require exact, fresh approval evidence checked by a trusted verifier and reject known self-approval');
   check('V111 hostile AI tool objects', customerAgent.includes('Tool arguments cannot contain accessors') && customerAgent.includes('Tool result cannot contain accessors') && customerAgentTests.includes('without executing getters'), 'Agent argument and connector-result sanitizers fail closed without executing accessors');
 
+  const agentEvaluation = await read('packages/customer-operations/agent-evaluation.mjs');
+  const agentEvaluationTests = await read('packages/customer-operations/agent-evaluation.test.mjs');
+  check('V113 agent evaluation evidence', agentEvaluation.includes('REQUIRED_SAFETY_TAGS') && agentEvaluation.includes('sideEffectsAllowed: false') && agentEvaluation.includes('createAgentEvaluationVerifier') && agentEvaluation.includes('timingSafeEqual') && agentEvaluationTests.includes('exact tenant draft'), 'Agent releases require signed, candidate-bound scenario evidence with required safety coverage and no retained answer text');
+
   const engagement = await read('packages/customer-operations/engagement.mjs');
   check('tenant-bound message renderer', engagement.includes('export function renderMessageTemplateVersion') && engagement.includes('Message template tenant does not match') && engagement.includes('Email HTML contains a tag or attribute outside the safe formatting allowlist') && engagement.includes('needs_data'), 'Template renderer is tenant-bound, context-escapes HTML, restricts markup and fails closed on missing fields');
+
+  const growthDomain = await read('packages/growth-suite/index.mjs');
+  const growthDomainTest = await read('packages/growth-suite/index.test.mjs');
+  const growthStore = await read('apps/api/growth-store.mjs');
+  const growthRoutes = await read('apps/api/growth-routes.mjs');
+  const growthSql = await read('infra/postgres/FINAL-MIGRATION-V114.sql');
+  const growthGrants = await read('infra/postgres/API-ROLE-GRANTS-V114.sql');
+  const growthApiTest = await read('apps/api/growth-routes.test.mjs');
+  const growthSchemaTest = await read('apps/api/postgres-auth-schema.test.mjs');
+  check('V114 Growth Center domain coverage', ['contacts','leads','pipelines','tasks','ai-qualification','ai-follow-up','workflows','email-templates','funnels','websites','social-planner','affiliate-system','reputation-management'].every(module => growthDomain.includes(`'${module}'`)) && growthDomainTest.includes('every requested module'), 'All 13 requested records have bounded validators, checksums and lifecycle-focused tests');
+  check('V114 tenant API and authority boundary', growthRoutes.includes('authStore.getSession') && growthRoutes.includes('verifyCsrf') && growthRoutes.includes('resolveAtlasAuthority') && growthStore.includes('atlas_organization_memberships') && growthStore.includes('FOR UPDATE') && growthApiTest.includes('reject request-supplied authority'), 'Growth routes resolve tenant from authenticated session, recheck active membership, require CSRF for mutations and enforce optimistic versions');
+  check('V114 Postgres persistence and isolation', growthSql.includes('atlas_growth_item_versions') && growthSql.includes('atlas_growth_item_events') && growthSql.includes('FORCE ROW LEVEL SECURITY') && growthSql.includes('last_event_occurred_at') && growthGrants.includes('rolbypassrls') && growthGrants.includes('pg_auth_members') && growthSchemaTest.includes('V114 Growth Center CRUD'), 'Tenant item data, immutable revisions/audit events and subscription state use forced RLS with a restricted runtime role');
+  const paddle = await read('apps/api/paddle-billing.mjs');
+  const paddleTest = await read('apps/api/paddle-billing.test.mjs');
+  check('V114 Paddle checkout and webhook', paddle.includes('timingSafeEqual') && paddle.includes('toleranceSeconds = 5') && paddle.includes('rawBody') && paddle.includes('sandbox-checkout.paddle.com') && paddleTest.includes('exact raw bytes'), 'Checkout is server-side; subscription webhooks require raw-body HMAC, short replay tolerance, price/tenant validation and event deduplication');
+  const growthUi = await read('apps/command-center/growth.mjs');
+  check('V114 CRM stage and qualification operations', growthDomain.includes('export function scoreLeadQualification') && growthDomain.includes('export function planLeadStageMove') && growthStore.includes('async moveLeadStage') && growthStore.includes('async evaluateLead') && growthRoutes.includes('move-stage') && growthRoutes.includes("searchParams.get('publishedOnly') === 'true'") && growthApiTest.includes('CRM stage moves and qualification evaluations') && growthSchemaTest.includes('human review remains mandatory by default'), 'Pipeline movement is versioned/policy-checked and published weighted rubrics save evidence-backed human-review outcomes');
+  check('V114 Growth Center desktop UI', ui.includes('growth-panel') && growthUi.includes('immutable revision') && growthUi.includes('Load module example') && growthUi.includes('/billing/checkout') && growthUi.includes('Move lead') && growthUi.includes('Evaluate lead'), 'Laptop-first UI supports all module collections, searchable versioned records, lead operations, lifecycle actions and Paddle checkout controls');
+  const featureMatrix = await read('docs/COMPETITOR-FEATURE-MATRIX-2026-10.md');
+  check('V114 competitor coverage is explicit', featureMatrix.includes('V114') && featureMatrix.includes('13 requested') && featureMatrix.includes('External email, AI, social and page providers are not connected'), 'HighLevel and n8n coverage states distinguish authenticated database features from provider-dependent execution');
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
 }
