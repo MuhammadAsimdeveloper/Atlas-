@@ -33,6 +33,7 @@ GRANT SELECT ON atlas_integration_mappings,atlas_integration_webhook_events TO a
 GRANT SELECT,UPDATE ON atlas_integration_connections TO atlas_worker;
 GRANT SELECT,UPDATE ON atlas_integration_tasks TO atlas_worker;
 GRANT SELECT,UPDATE ON atlas_integration_webhook_events TO atlas_worker;
+GRANT SELECT,INSERT,UPDATE ON atlas_integration_deliveries TO atlas_worker;
 GRANT SELECT,INSERT,UPDATE ON atlas_integration_mappings TO atlas_worker;
 
 GRANT EXECUTE ON FUNCTION atlas_v118_consume_oauth_state(CHAR) TO atlas_app;
