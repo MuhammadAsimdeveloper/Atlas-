@@ -134,11 +134,35 @@ export function authorizeFreelancerAction({ workspace, memberId, action, spend=0
   return {allowed:true,code:'ALLOWED'};
 }
 
-export function generateSeoMetadata({ title, description, canonicalUrl, siteName, imageUrl, locale='en_US', type='website', robots='index,follow', keywords=[] } = {}) {
+export function generateSeoMetadata({
+  title, description, canonicalUrl, siteName, imageUrl=null, imageAlt='',
+  locale='en_US', type='website', robots='index,follow,max-image-preview:large',
+  twitterCard=imageUrl ? 'summary_large_image' : 'summary', keywords=[], verification={}
+} = {}) {
   title=text(title,'title',120); description=text(description,'description',320);
-  if (!/^https?:\/\//.test(canonicalUrl)) throw new Error('canonicalUrl invalid');
-  if (imageUrl && !/^https?:\/\//.test(imageUrl)) throw new Error('imageUrl invalid');
-  const body={title,description,canonicalUrl,siteName:text(siteName,'siteName',120),imageUrl:imageUrl||null,locale,type,robots,keywords:[...new Set(keywords)].slice(0,30)};
+  const parsed=new URL(text(canonicalUrl,'canonicalUrl',2048));
+  if (!['https:','http:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error('canonicalUrl invalid');
+  canonicalUrl=parsed.toString().replace(/\/$/,'') || parsed.origin;
+  if (imageUrl) {
+    const image=new URL(text(imageUrl,'imageUrl',2048));
+    if (!['https:','http:'].includes(image.protocol)) throw new Error('imageUrl invalid');
+    imageUrl=image.toString();
+  }
+  imageAlt=imageAlt ? text(imageAlt,'imageAlt',240) : '';
+  if (!['website','article','profile'].includes(type)) throw new Error('SEO type invalid');
+  if (!['summary','summary_large_image'].includes(twitterCard)) throw new Error('Twitter card invalid');
+  const robotTokens=String(robots).split(',').map(v=>v.trim().toLowerCase()).filter(Boolean);
+  if (!robotTokens.length || robotTokens.some(token=>!['index','noindex','follow','nofollow','max-image-preview:large','max-image-preview:standard','max-image-preview:none','max-snippet:-1'].includes(token))) throw new Error('robots policy invalid');
+  if (!verification || typeof verification!=='object' || Array.isArray(verification)) throw new Error('verification invalid');
+  const body={
+    title,description,canonicalUrl,siteName:text(siteName,'siteName',120),imageUrl,imageAlt,locale,type,
+    robots:robotTokens.join(','),twitterCard,
+    keywords:[...new Set(keywords.map(value=>text(value,'keyword',80)))].slice(0,30),
+    verification:{
+      google:verification.google ? text(verification.google,'google verification',300) : null,
+      bing:verification.bing ? text(verification.bing,'bing verification',300) : null
+    }
+  };
   return freeze({...body,checksum:hash(body)});
 }
 
