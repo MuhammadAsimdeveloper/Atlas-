@@ -160,7 +160,7 @@ export function renderPublicIndex(html, origin, {
   ].filter(Boolean).join('\n    ');
   let output = replaceTitle(html, SITE_TITLE);
   output = replaceMeta(output, 'description', SITE_DESCRIPTION);
-  output = output.replace(/<meta\\s+name=["']robots["'][^>]*>/i, '<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">');
+  output = output.replace(/<meta\s+name=["']robots["'][^>]*>/i, '<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">');
   return output.replace('    <!-- Public canonical, social metadata and JSON-LD are injected by scripts/build-site.mjs. -->', '    ' + additions);
 }
 
@@ -181,13 +181,13 @@ export function renderPublicSitemap(origin, entries=[{path:'/',lastmod:PUBLIC_LA
     if (!path.startsWith('/') || /[?#<>&"'\s]/.test(path)) throw new TypeError('Sitemap path invalid.');
     const lastmod = typeof entry.lastmod === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(entry.lastmod) ? entry.lastmod : null;
     return '  <url><loc>' + canonical + path + '</loc>' + (lastmod ? '<lastmod>' + lastmod + '</lastmod>' : '') + '</url>';
-  }).join('\\n');
+  }).join('\n');
   return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + '\n</urlset>\n';
 }
 
 export function makeNoindex(html) {
-  const noindex = /<meta\\s+name=["']robots["']/i.test(html)
-    ? html.replace(/<meta\\s+name=["']robots["'][^>]*>/i, '<meta name="robots" content="noindex,nofollow">')
-    : html.replace('</head>', '    <meta name="robots" content="noindex,nofollow">\\n  </head>');
+  const noindex = /<meta\s+name=["']robots["']/i.test(html)
+    ? html.replace(/<meta\s+name=["']robots["'][^>]*>/i, '<meta name="robots" content="noindex,nofollow">')
+    : html.replace('</head>', '    <meta name="robots" content="noindex,nofollow">\n  </head>');
   return noindex.replace('    <!-- Public canonical, social metadata and JSON-LD are injected by scripts/build-site.mjs. -->', '');
 }
