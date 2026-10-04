@@ -84,7 +84,7 @@ export class PostgresIntegrationStore {
         SELECT * FROM atlas_integration_connections WHERE tenant_id=$1 AND connection_id=$2 LIMIT 1`, [tenantId, connectionId]);
       if (!rows[0]) throw createAuthError(404, 'integration_connection_not_found');
       return rows[0];
-    });
+    }, { manage });
   }
 
   async createJobberOAuthStart({ actorId, tenantId }) {
