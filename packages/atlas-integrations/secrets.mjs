@@ -5,6 +5,7 @@ const AAD = Buffer.from('atlas-integration-secret-v1', 'utf8');
 
 function keyFromEnv(value) {
   if (Buffer.isBuffer(value) && value.length === 32) return Buffer.from(value);
+  if (Buffer.isBuffer(value)) throw new Error('ATLAS_INTEGRATION_ENCRYPTION_KEY must be exactly 32 bytes.');
   if (typeof value !== 'string' || !value.trim()) throw new Error('ATLAS_INTEGRATION_ENCRYPTION_KEY is required.');
   const raw = value.trim();
   if (/^[a-f0-9]{64}$/i.test(raw)) return Buffer.from(raw, 'hex');
