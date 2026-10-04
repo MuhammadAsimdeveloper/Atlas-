@@ -1,6 +1,6 @@
-# HighLevel and n8n feature inventory vs Atlas V114 — 3 October 2026
+# HighLevel and n8n feature inventory vs Atlas V115 — 3 October 2026
 
-This is a current, source-linked inventory of the products' major user-facing and platform capability families, compared with the actual Atlas V114 repository, including the V114 authenticated Growth Center, Paddle billing routes and workspace UI. It is not an exhaustive list of every vendor integration, UI control, plan limit or newly released feature. HighLevel's permission catalog covers 80+ controllable features and its workflow catalogs change; n8n's integration catalog is a changing set of hundreds of first-party/community integrations. Those catalogs are dynamic, so Atlas records the stable product areas and representative operations rather than pretending a static feature list proves connector parity.
+This is a current, source-linked inventory of the products' major user-facing and platform capability families, compared with the actual Atlas V115 repository, including authenticated Growth Center, Paddle billing routes, workspace UI and durable queue/scheduler foundation. It is not an exhaustive list of every vendor integration, UI control, plan limit or newly released feature. HighLevel's permission catalog covers 80+ controllable features and its workflow catalogs change; n8n's integration catalog is a changing set of hundreds of first-party/community integrations. Those catalogs are dynamic, so Atlas records the stable product areas and representative operations rather than pretending a static feature list proves connector parity.
 
 ## How to read Atlas coverage
 
@@ -14,6 +14,10 @@ This is a current, source-linked inventory of the products' major user-facing an
 V114 implements the 13 requested areas as tenant-authenticated, database-backed records: Contacts, Leads, Pipelines, Tasks, AI Lead Qualification, AI Follow-up, Workflow Builder, Paddle Billing, Email Builder, Funnel Builder, Website Builder, Social Planner, Affiliate System and Reputation Management. It adds a desktop workspace UI, immutable revisions, activity events, scoped search, same-tenant relationship checks and Paddle subscription checkout/webhook reconciliation. Leads can move through policy-checked pipeline stages, and published qualification rubrics can score operator-entered ratings with evidence references. That score is deterministic and human-reviewable; it is not an LLM inference.
 
 External email, AI, social and page providers are not connected. In particular, saved follow-up/workflow definitions do not send messages or execute automatically, and page drafts cannot be published before domain verification and hosting are configured.
+
+## V115 delivered scope
+
+V115 adds PostgreSQL-backed durable jobs, tenant-scoped transactional Growth Center outbox records, interval schedules, worker-specific claims, lease heartbeat/recovery, bounded retry and dead-letter state. The generic worker only calls explicitly registered handler types; no workflow graph executor or real channel/provider handler is bundled. The workflow UI remains a JSON definition editor.
 
 ## HighLevel product inventory
 

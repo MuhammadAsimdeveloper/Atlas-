@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/auth.css">
   <link rel="stylesheet" href="/auth-modal.css">
   <link rel="stylesheet" href="/growth.css">
+  <link rel="stylesheet" href="/workspace.css">
   <script type="module" src="/auth.mjs"></script>
   <script type="module" src="/growth.mjs"></script>
 </head>
@@ -50,21 +51,44 @@
 
   <div id="workspace" class="workspace" hidden>
     <aside class="sidebar">
-      <a class="brand" href="/" aria-label="Atlas workspace home"><span class="brand-mark">A</span><span>Atlas<small>Business OS</small></span></a>
-      <label class="switcher-label" for="workspace-picker">Workspace</label>
-      <select id="workspace-picker" class="workspace-picker" aria-label="Choose workspace"></select>
-      <nav class="nav" aria-label="Workspace navigation">
-        <button class="nav-item active" type="button" data-panel="overview"><span aria-hidden="true">⌂</span> Overview</button>
-        <button class="nav-item" type="button" data-panel="growth"><span aria-hidden="true">✦</span> Growth Center</button>
-        <button class="nav-item" type="button" data-panel="team"><span aria-hidden="true">♙</span> Team & access</button>
+      <div class="sidebar-brand-row">
+        <a class="brand" href="/" aria-label="Atlas workspace home"><span class="brand-mark">A</span><span>Atlas<small>Business OS</small></span></a>
+        <button id="mobile-nav-toggle" class="mobile-nav-toggle" type="button" aria-expanded="false" aria-controls="workspace-nav" aria-label="Toggle workspace navigation">☰</button>
+      </div>
+      <div class="location-picker-wrap"><label class="switcher-label" for="workspace-picker">Your location</label><select id="workspace-picker" class="workspace-picker" aria-label="Choose workspace"></select></div>
+      <nav id="workspace-nav" class="nav" aria-label="Workspace navigation">
+        <span class="nav-label">Workspace</span>
+        <button class="nav-item active" type="button" data-nav-page="overview" data-nav-key="overview"><span aria-hidden="true">⌂</span><span>Dashboard</span></button>
+        <span class="nav-label">Manage</span>
+        <button class="nav-item" type="button" data-nav-page="unavailable" data-page-title="Conversations" data-nav-key="conversations"><span aria-hidden="true">☷</span><span>Conversations</span></button>
+        <button class="nav-item" type="button" data-nav-page="unavailable" data-page-title="Calendars" data-nav-key="calendars"><span aria-hidden="true">▦</span><span>Calendars</span></button>
+        <button class="nav-item" type="button" data-nav-page="growth" data-module="contacts" data-page-title="Contacts" data-nav-key="contacts"><span aria-hidden="true">◎</span><span>Contacts</span></button>
+        <button class="nav-item" type="button" data-nav-page="growth" data-module="leads" data-page-title="Opportunities" data-nav-key="leads"><span aria-hidden="true">◇</span><span>Opportunities</span></button>
+        <button class="nav-item" type="button" data-nav-page="growth" data-module="tasks" data-page-title="Tasks" data-nav-key="tasks"><span aria-hidden="true">✓</span><span>Tasks</span></button>
+        <button class="nav-item" type="button" data-nav-page="growth" data-module="workflows" data-page-title="Automation" data-nav-key="workflows"><span aria-hidden="true">⇢</span><span>Automation</span></button>
+        <button class="nav-item" type="button" data-nav-page="growth" data-module="ai-follow-up" data-page-title="AI agents" data-nav-key="ai"><span aria-hidden="true">✦</span><span>AI agents</span></button>
+        <button class="nav-item" type="button" data-nav-page="unavailable" data-page-title="Service Desk" data-nav-key="service-desk"><span aria-hidden="true">▣</span><span>Service Desk</span></button>
+        <span class="nav-label">Grow</span>
+        <button class="nav-item" type="button" data-nav-page="growth" data-module="email-templates" data-page-title="Marketing" data-nav-key="marketing"><span aria-hidden="true">↗</span><span>Marketing</span></button>
+        <button class="nav-item" type="button" data-nav-page="growth" data-module="websites" data-page-title="Websites" data-nav-key="websites"><span aria-hidden="true">▤</span><span>Websites</span></button>
+        <button class="nav-item" type="button" data-nav-page="growth" data-module="social-planner" data-page-title="Social" data-nav-key="social"><span aria-hidden="true">◉</span><span>Social</span></button>
+        <button class="nav-item" type="button" data-nav-page="growth" data-module="affiliate-system" data-page-title="Affiliates" data-nav-key="affiliates"><span aria-hidden="true">♧</span><span>Affiliates</span></button>
+        <button class="nav-item" type="button" data-nav-page="payments" data-nav-key="payments"><span aria-hidden="true">$</span><span>Payments</span></button>
+        <button class="nav-item" type="button" data-nav-page="growth" data-module="reputation-management" data-page-title="Reputation" data-nav-key="reputation"><span aria-hidden="true">☆</span><span>Reputation</span></button>
+        <button class="nav-item" type="button" data-nav-page="unavailable" data-page-title="Reporting" data-nav-key="reporting"><span aria-hidden="true">▥</span><span>Reporting</span></button>
+        <button class="nav-item" type="button" data-nav-page="unavailable" data-page-title="Integrations" data-nav-key="integrations"><span aria-hidden="true">⌘</span><span>Integrations</span></button>
+        <span class="nav-label">Administration</span>
+        <button class="nav-item" type="button" data-nav-page="team" data-nav-key="team"><span aria-hidden="true">♙</span><span>Team & access</span></button>
+        <button class="nav-item" type="button" data-nav-page="unavailable" data-page-title="Agency" data-nav-key="agency"><span aria-hidden="true">▥</span><span>Agency</span></button>
+        <button class="nav-item" type="button" data-nav-page="settings" data-nav-key="settings"><span aria-hidden="true">⚙</span><span>Settings</span></button>
       </nav>
-      <div class="sidebar-note"><span class="status-dot"></span><span>Workspace data is live</span></div>
-      <div class="side-owner"><span id="user-avatar" class="avatar">A</span><span id="sidebar-user"></span></div>
+      <div class="sidebar-note"><span class="status-dot"></span><span>Secure workspace</span></div>
+      <button class="side-owner" type="button" data-nav-page="settings" data-nav-key="settings"><span id="user-avatar" class="avatar">A</span><span id="sidebar-user"></span><span class="profile-chevron" aria-hidden="true">⌄</span></button>
     </aside>
     <main class="main-content">
       <header class="topbar">
-        <div><div class="eyebrow" id="breadcrumb">Workspace overview</div><h1 id="page-title">Overview</h1></div>
-        <div class="account-tools"><span id="active-role" class="role-pill"></span><button id="logout-button" class="button subtle" type="button">Sign out</button></div>
+        <div class="topbar-heading"><div class="eyebrow" id="breadcrumb">Workspace overview</div><h1 id="page-title">Dashboard</h1><p id="page-description">Your workspace at a glance.</p></div>
+        <div class="account-tools"><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" maxlength="120" placeholder="Search contacts" aria-label="Search contacts"></label><span id="active-role" class="role-pill"></span><button id="settings-shortcut" class="button subtle" type="button" data-nav-page="settings" data-nav-key="settings">Settings</button><button id="logout-button" class="button subtle" type="button">Sign out</button></div>
       </header>
       <div id="workspace-notice" class="notice" role="status" aria-live="polite" hidden></div>
       <section id="overview-panel" class="panel-section" aria-labelledby="page-title">
@@ -76,13 +100,13 @@
         </div>
         <section class="content-card module-card"><div class="section-heading"><div><span class="eyebrow">Customer operations</span><h2>Growth Center</h2></div><span class="live-tag"><span class="status-dot"></span> Workspace records live</span></div>
           <div class="module-grid">
-            <article class="module"><span class="module-icon">◎</span><div><strong>CRM & sales</strong><p>Contacts, leads, pipelines and tasks</p></div><span class="module-state">Available</span></article>
-            <article class="module"><span class="module-icon">✦</span><div><strong>AI operations</strong><p>Qualification and follow-up configurations</p></div><span class="module-state">Draft-ready</span></article>
-            <article class="module"><span class="module-icon">↗</span><div><strong>Campaign builders</strong><p>Workflows, email, funnels and social</p></div><span class="module-state">Draft-ready</span></article>
-            <article class="module"><span class="module-icon">▤</span><div><strong>Billing & growth</strong><p>Paddle checkout and tenant billing</p></div><span class="module-state">Configure Paddle</span></article>
+            <button class="module module-link" type="button" data-nav-page="growth" data-module="contacts" data-page-title="Contacts" data-nav-key="contacts"><span class="module-icon">◎</span><span><strong>CRM & sales</strong><p>Contacts, leads, pipelines and tasks</p></span><span class="module-state">Open</span></button>
+            <button class="module module-link" type="button" data-nav-page="growth" data-module="ai-follow-up" data-page-title="AI operations" data-nav-key="ai"><span class="module-icon">✦</span><span><strong>AI operations</strong><p>Qualification and follow-up configurations</p></span><span class="module-state">Open</span></button>
+            <button class="module module-link" type="button" data-nav-page="growth" data-module="workflows" data-page-title="Automation" data-nav-key="workflows"><span class="module-icon">↗</span><span><strong>Automation</strong><p>Workflow definitions and approved lifecycle</p></span><span class="module-state">Open</span></button>
+            <button class="module module-link" type="button" data-nav-page="growth" data-module="funnels" data-page-title="Marketing" data-nav-key="marketing"><span class="module-icon">▤</span><span><strong>Marketing</strong><p>Funnels, email templates and social drafts</p></span><span class="module-state">Open</span></button>
+            <button class="module module-link" type="button" data-nav-page="payments" data-nav-key="payments"><span class="module-icon">$</span><span><strong>Payments</strong><p>Paddle checkout and tenant billing</p></span><span class="module-state">Open</span></button>
           </div>
           <p class="truth-note">Records, immutable revisions and workspace access are database-backed. AI runs, message delivery, social publishing and public page hosting remain disabled until their service connections are configured.</p>
-          <button class="button secondary" type="button" data-open-growth>Open Growth Center</button>
         </section>
       </section>
       <section id="growth-panel" class="panel-section" hidden aria-labelledby="page-title">
@@ -91,10 +115,13 @@
           <div class="growth-toolbar"><label>Workspace area<select id="growth-module" aria-label="Choose Growth Center area"></select></label><label class="growth-search">Search records<input id="growth-search" type="search" maxlength="120" placeholder="Search names"></label><button id="growth-refresh" class="button subtle" type="button">Refresh</button><button id="growth-new" class="button primary" type="button">Create new</button></div>
           <div id="growth-feedback" class="growth-feedback" role="status" aria-live="polite" hidden></div>
           <div id="growth-kpis" class="growth-kpis"></div>
-          <section class="growth-billing" aria-label="Paddle subscription"><div><span class="eyebrow">Workspace plan</span><strong id="billing-current">Loading billing…</strong><small id="billing-status">Plans become available after Paddle is configured.</small></div><label>Change plan<select id="billing-plan"></select></label><button id="billing-checkout" class="button secondary" type="button">Continue to secure checkout</button></section>
           <div class="growth-columns"><section class="growth-list-panel" aria-labelledby="growth-list-title"><div class="section-heading"><div><span class="eyebrow">Workspace records</span><h2 id="growth-list-title">Contacts</h2></div><span id="growth-count" class="live-tag">0 records</span></div><div id="growth-list" class="growth-list"></div><div id="growth-empty" class="empty-state">Nothing here yet. Create a first record to get started.</div></section>
             <section class="growth-detail-panel" aria-labelledby="growth-detail-title"><div class="section-heading"><div><span class="eyebrow">Versioned record</span><h2 id="growth-detail-title">Choose a record</h2></div><span id="growth-version" class="live-tag" hidden></span></div><p id="growth-detail-empty" class="empty-state">Select a record to inspect its version, update its content or move it through an approved lifecycle action.</p><form id="growth-detail-form" class="growth-form" hidden><label>Record content <span class="field-help">Validated against this module’s contract. Save creates an immutable revision.</span><textarea id="growth-payload" name="payload" rows="18" spellcheck="false" required></textarea></label><div id="growth-special-controls" class="growth-special-controls"></div><div class="growth-actions"><button id="growth-save" class="button primary" type="submit">Save revision</button><button id="growth-lifecycle" class="button subtle" type="button" hidden></button></div><p id="growth-provider-note" class="field-help"></p></form></section></div>
         </div>
+      </section>
+      <section id="payments-panel" class="panel-section" hidden aria-labelledby="page-title">
+        <div class="growth-intro"><div><span class="eyebrow">Workspace billing</span><h2>Plan and subscription</h2><p>Subscription state comes from Paddle checkout and signed webhooks. Payment operations remain unavailable until provider setup is complete.</p></div><div class="growth-status"><span class="status-dot"></span><span>Tenant-scoped billing</span></div></div>
+        <div class="content-card"><section class="growth-billing" aria-label="Paddle subscription"><div><span class="eyebrow">Workspace plan</span><strong id="billing-current">Loading billing…</strong><small id="billing-status">Trial offers are verified against Paddle before checkout.</small></div><label>Choose plan<select id="billing-plan"></select></label><button id="billing-checkout" class="button secondary" type="button" disabled>Start 14-day free trial</button><button id="billing-manage" class="button subtle" type="button" hidden>Manage or cancel plan</button></section><p id="billing-trial-note" class="truth-note">The free trial is only offered for an active Paddle price verified as free for 14 days. Paddle Checkout displays the price and billing cadence before subscription. Cancel and payment-method controls open the authenticated Paddle customer portal.</p></div>
       </section>
       <section id="team-panel" class="panel-section" hidden aria-labelledby="page-title">
         <div class="content-card"><div class="section-heading"><div><span class="eyebrow">People in this workspace</span><h2>Team members</h2></div><span id="team-count" class="live-tag"></span></div><div class="table-scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Access</th><th>Status</th></tr></thead><tbody id="member-rows"></tbody></table></div></div>
@@ -103,6 +130,17 @@
           <div class="content-card"><span class="eyebrow">Open invitations</span><h2>Invitations</h2><div id="invitation-list" class="simple-list"></div><div id="invitation-empty" class="empty-state">No pending invitations.</div></div>
         </div>
         <div class="content-card" id="role-card"><div class="section-heading"><div><span class="eyebrow">Fine-grained workspace access</span><h2>Custom roles</h2></div></div><form id="role-form" class="role-form"><label>Role name<input name="name" maxlength="64" required></label><label>Role key<input name="key" pattern="[a-z0-9][a-z0-9-]{0,48}" maxlength="49" placeholder="support-agent" required><span class="field-help">Use lowercase letters, numbers and hyphens.</span></label><fieldset><legend>Permissions</legend><div id="permission-options" class="permission-grid"></div></fieldset><button class="button secondary" type="submit">Create custom role</button></form><div id="role-list" class="role-list"></div></div>
+      </section>
+      <section id="settings-panel" class="panel-section" hidden aria-labelledby="page-title">
+        <div class="settings-layout">
+          <section class="content-card settings-card"><div class="section-heading"><div><span class="eyebrow">Your account</span><h2>Profile</h2></div><span id="profile-verified" class="live-tag"></span></div><p class="settings-copy">Manage the name shown to teammates. Authentication and email verification stay attached to your account.</p><form id="profile-form" class="form-stack compact"><label>Display name<input id="profile-name" name="displayName" maxlength="120" autocomplete="name" required></label><label>Email address<input id="profile-email" type="email" readonly aria-readonly="true"></label><button class="button primary" type="submit">Save profile</button></form><div id="settings-feedback" class="notice" role="status" aria-live="polite" hidden></div><button id="resend-verification" class="text-button settings-resend" type="button" hidden>Resend verification email</button></section>
+          <section class="content-card settings-card"><div class="section-heading"><div><span class="eyebrow">Company workspace</span><h2 id="settings-workspace-name">Workspace</h2></div><span id="settings-role" class="role-pill"></span></div><p class="settings-copy">This location has its own team and customer records. Company administrators stay tenant-scoped and cannot access Atlas platform-owner controls.</p><div class="settings-summary"><span>Workspace ID</span><code id="settings-workspace-id"></code><span>Your access</span><strong id="settings-workspace-role"></strong></div><button class="button secondary" type="button" data-nav-page="team" data-nav-key="team">Manage team and roles</button></section>
+          <section class="content-card settings-card"><div class="section-heading"><div><span class="eyebrow">Connections</span><h2>Services and providers</h2></div><span class="module-state">Not connected</span></div><p class="settings-copy">Email, messaging, calendars, social publishing, AI models and payment-side effects need provider setup and verified credentials.</p><div class="settings-connection-list"><div><span>Customer communication</span><span class="connection-state">Unavailable</span></div><div><span>Workflow execution</span><span class="connection-state">Handler required</span></div><div><span>AI model runtime</span><span class="connection-state">Unavailable</span></div><div><span>Website hosting</span><span class="connection-state">Unavailable</span></div></div><p class="field-help">Saved drafts and connection settings are not presented as live integrations.</p></section>
+          <section class="content-card settings-card"><div class="section-heading"><div><span class="eyebrow">Sign-in security</span><h2>Account access</h2></div><span class="live-tag">Protected session</span></div><p class="settings-copy">Sessions use secure, same-site cookies and CSRF checks. Multi-factor authentication, SSO and API keys are not available in this release.</p><button class="button subtle" type="button" data-nav-page="unavailable" data-page-title="Security settings" data-nav-key="security">Review security options</button></section>
+        </div>
+      </section>
+      <section id="unavailable-panel" class="panel-section" hidden aria-labelledby="page-title">
+        <div class="content-card unavailable-card"><span class="module-icon" aria-hidden="true">◇</span><span id="unavailable-state" class="live-tag">Not available yet</span><h2 id="unavailable-title">Module unavailable</h2><p id="unavailable-copy">This module does not have a live workspace service connected.</p><div class="unavailable-details" id="unavailable-details"></div><button class="button secondary" type="button" data-nav-page="settings" data-nav-key="settings">Open settings</button></div>
       </section>
       <footer class="workspace-footer"><span>Atlas · Secure business workspace</span><span id="footer-status">Ready</span></footer>
     </main>

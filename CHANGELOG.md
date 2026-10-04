@@ -1,3 +1,13 @@
+## 115.0.0 — Durable runtime foundation
+- Added tenant-bound PostgreSQL job, transactional event outbox and interval scheduler tables with forced RLS and reference-only payload validation.
+- Added separate non-bypass/non-inheriting `atlas_worker` grants and database role checks. The API can enqueue only for the active tenant and cannot claim or mutate jobs.
+- Added atomic Growth Center outbox records, `SKIP LOCKED` claims, lease heartbeat/completion, bounded exponential retry, dead-letter state, stale-lease recovery and schedule coalescing.
+- Added a graceful handler loop with explicit handler type filters, abortable leases, a deployment-local reviewed handler module contract and an opt-in Compose worker profile.
+- Added migration/role integration tests and worker behavior tests. No default workflow or provider handlers ship; workflow graph execution and provider delivery remain unavailable until reviewed handlers and services are connected.
+- Integrated a tenant-aware workspace shell with a CRM/automation-style navigation hierarchy, responsive mobile menu, account/workspace/provider settings, and page-title/active-navigation synchronization when the selected customer-operations module changes. Modules without live services identify their exact unavailable dependencies.
+- Restricted the optional worker container to an explicit runtime environment so reviewed handlers do not inherit unrelated API credentials from the shared environment file.
+- Added Paddle-verified 14-day free trials, a sticky tenant trial-use marker, duplicate-subscription/trial guards and authenticated Paddle customer-portal links for subscription management and cancellation. Prices that lack the exact free trial remain unavailable for checkout.
+
 ## 114.0.0 — Consolidated Growth Center and SEO release
 - Consolidated repository and package metadata on release 114.0.0 while preserving historical engineering and migration records.
 - Connected tenant-scoped Growth Center records and builders for contacts, leads, pipelines, tasks, qualification profiles, follow-up sequences, workflow definitions, email templates, funnels, websites, social posts, affiliate campaigns and reputation policies.

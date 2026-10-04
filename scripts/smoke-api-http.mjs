@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const port = 43000 + Math.floor(Math.random() * 14000);
 const server = spawn(process.execPath, [path.join(root, 'apps', 'api', 'server.mjs')], {
   cwd: root,
-  env: { ...process.env, NODE_ENV: 'test', PORT: String(port), ATLAS_RELEASE: 'V112', ATLAS_DATABASE_URL: '', ATLAS_PUBLIC_ORIGIN: '', ATLAS_PLATFORM_OWNER_EMAIL: '' },
+  env: { ...process.env, NODE_ENV: 'test', PORT: String(port), ATLAS_RELEASE: 'V115', ATLAS_DATABASE_URL: '', ATLAS_PUBLIC_ORIGIN: '', ATLAS_PLATFORM_OWNER_EMAIL: '' },
   stdio: 'ignore', windowsHide: true
 });
 const base = `http://127.0.0.1:${port}`;
@@ -24,7 +24,7 @@ try {
   assert.equal(ready, true, 'Atlas API starts');
 
   const live = await get('/health/live');
-  assert.equal((await live.json()).release, 'V112');
+  assert.equal((await live.json()).release, 'V115');
   const homepage = await get('/');
   const html = await homepage.text();
   assert.equal(homepage.status, 200);
@@ -42,6 +42,15 @@ try {
   const modalStyles = await get('/auth-modal.css');
   assert.equal(modalStyles.status, 200);
   assert.match(await modalStyles.text(), /workspace-dialog/);
+  const workspaceStyles = await get('/workspace.css');
+  assert.equal(workspaceStyles.status, 200);
+  const workspaceCss = await workspaceStyles.text();
+  assert.match(workspaceCss, /\.sidebar \.nav-item\.active/);
+  assert.match(workspaceCss, /max-width:740px/);
+  assert.match(html, /data-page-title="Service Desk"/);
+  assert.match(html, /data-page-title="Agency"/);
+  assert.match(html, /Start 14-day free trial/);
+  assert.match(html, /Manage or cancel plan/);
 
   const status = await get('/api/v1/status');
   assert.equal((await status.json()).authenticatedApi, false);
@@ -51,7 +60,7 @@ try {
   const me = await get('/api/v1/me');
   assert.equal(me.status, 503);
   assert.equal((await me.json()).error, 'database_required');
-  console.log('Atlas API HTTP smoke: 8/8 checks passed (auth UI, assets, status, readiness and fail-closed tenant routes).');
+  console.log('Atlas API HTTP smoke: 10/10 checks passed (auth UI, assets, trial disclosure, status, readiness and fail-closed tenant routes).');
 } finally {
   server.kill();
 }

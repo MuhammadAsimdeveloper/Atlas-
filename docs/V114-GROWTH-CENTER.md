@@ -79,11 +79,13 @@ V114 adds authenticated persistence and first-party UI for the 13 requested modu
 
 V114 adopts n8n patterns that fit Atlas: typed definitions, draft/publish/pause lifecycle, optimistic versions, idempotent create, append-only history, relationship validation, explicit approval state, webhook signature verification and runtime capability reporting. Visual node-canvas editing, sub-workflow execution, durable wait/retry/replay, schedule execution, OAuth/credential management, worker fleet, template marketplace and full execution inspector remain deployment/product work.
 
+V115 adds a PostgreSQL queue, transactional outbox, interval scheduler, worker role and generic worker loop. It still does not execute workflow graphs or ship real event/provider handlers. See [V115 Execution Engine](EXECUTION-ENGINE.md) for exact role and delivery semantics.
+
 The larger family-by-family inventory and current official source links are in [the V114 competitor feature matrix](COMPETITOR-FEATURE-MATRIX-2026-10.md), [the n8n architecture review](N8N-ARCHITECTURE-REVIEW-2026-10.md), and [the HighLevel benchmark](COMPETITOR-BENCHMARK-2026-10.md).
 
 ## Scale and production boundary
 
-The local JSON/state adapter remains development-only. Use managed PostgreSQL for authoritative records, managed Redis for queue distribution, separate horizontally scalable API/webhook/worker services, managed object storage for media, a CDN and WAF at the public edge, and an OpenTelemetry collector for redacted traces. Apply per-tenant quotas/fair scheduling, provider rate limits and graceful queue draining before turning on volume features. V114 includes queue/job table foundations, not a running Redis worker, object store, CDN, WAF, autoscaler or millions-of-users benchmark.
+The local JSON/state adapter remains development-only. Use managed PostgreSQL for authoritative records and durable queue state, optional managed Redis for ephemeral acceleration, separate horizontally scalable API/webhook/worker services, managed object storage for media, a CDN and WAF at the public edge, and an OpenTelemetry collector for redacted traces. Apply per-tenant quotas/fair scheduling, provider rate limits and graceful queue draining before turning on volume features. V115 includes queue and scheduler mechanics, not object storage, CDN, WAF, autoscaler or millions-of-users benchmark.
 
 The checked-in Docker Compose file is a deployment template: provide the PostgreSQL bootstrap password out of band, complete the documented migrations/runtime-role setup, configure the HTTPS edge and provider secrets, and run a Docker image build in the deployment pipeline. Docker is not installed in the current build environment, so the container build has not been verified here.
 

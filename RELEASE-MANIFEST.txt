@@ -1,3 +1,38 @@
+ATLAS V115.0.0 — Durable runtime, integrated workspace and verified trial release
+
+Implemented
+- Added a tenant-scoped PostgreSQL job queue, transactional Growth Center outbox, interval scheduler, idempotency, bounded retry/dead-letter handling, lease renewal/recovery and a graceful worker loop.
+- Added a distinct `atlas_worker` role that can process queue metadata but has no access to customer business tables. The optional worker profile requires an externally reviewed handler module and receives a minimal explicit environment without the API `.env` secrets.
+- Integrated account and workspace settings, responsive CRM/automation-style navigation, synchronized module headings, real tenant-backed Growth Center routes and explicit unavailable states for not-yet-connected services.
+- Added a Paddle-verified 14-day free trial, server-side recurring-price validation, sticky tenant trial-use tracking, duplicate subscription/trial guards and authenticated customer-portal links for payment management and cancellation.
+- Preserved the configured verified Khan-only platform-owner boundary and tenant-scoped company administrators.
+- Added migration/RLS integration coverage, Paddle fixture tests, worker runtime tests, release checks, production deployment notes and an implementation status roadmap.
+- No default workflow graph or provider handlers ship; this release does not execute workflows or send email/SMS/social messages and does not claim capacity for millions of users.
+
+Verification (Node v24.19.0 on Windows)
+- `node --test --test-concurrency=1`: PASS — 190 tests, 190 passed, 0 failed.
+- `node scripts/check.mjs`: PASS — all discovered JavaScript modules passed syntax checks.
+- `node scripts/doctor.mjs`: PASS — 67/67 invariants.
+- `node scripts/production-check.mjs`: PASS — 27/27 checks.
+- `node scripts/docs-check.mjs`: PASS — 56 Markdown files, 0 errors.
+- `node scripts/smoke-http.mjs`: PASS — 5/5 static preview checks.
+- `node scripts/smoke-api-http.mjs`: PASS — 10/10 authenticated API fail-closed, workspace and billing disclosure checks.
+- `node scripts/seo-check.mjs`: PASS — 38 assertions; `node scripts/launch-check.mjs`: PASS — 6/6 checks.
+- `node scripts/build-site.mjs`: PASS — preview built with indexing disabled.
+- `pnpm dlx npm@11 audit --audit-level=moderate`: PASS — 0 vulnerabilities.
+- `git diff --check`: PASS — no whitespace errors.
+- Docker image build: NOT RUN — Docker CLI is unavailable in this environment.
+
+Not verified / external work
+- SQL migrations and role grants were exercised against ephemeral PGlite only; no managed production PostgreSQL has been configured or migrated.
+- The trial integration was tested with deterministic Paddle API fixtures, not a real Paddle sandbox/live account; no trial price, API key, webhook secret or subscription event delivery is configured.
+- No production domain, transactional-email credentials, live messaging/social/calendar/AI provider, reviewed business handler, Redis-backed queue, KMS/object storage, OTel export, backup restore drill, failover drill, external penetration test or load/capacity result is present.
+- The workspace navigation includes real records where services exist and clear unavailable explanations where they do not. Full n8n/HighLevel product parity, active graph execution, execution/replay UI, full inbox and agency administration remain incomplete.
+
+Artifact
+- `atlas-v115.0.0-final.zip` contains the source release without `.git`, `node_modules`, local state, build output or environment secrets.
+- `atlas-v115.0.0-final.zip.sha256` contains its SHA-256 digest.
+
 ATLAS V114.0.0 — Consolidated final repository release
 
 Release state

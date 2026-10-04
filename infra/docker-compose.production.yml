@@ -8,6 +8,8 @@ services:
       - ../.env
     environment:
       ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
+      ATLAS_WORKER_DATABASE_URL: null
+      ATLAS_WORKER_HANDLERS_MODULE: null
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -38,6 +40,28 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - atlas-redis:/data
+  worker:
+    profiles: ["workers"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: ["node", "apps/worker/main.mjs"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      ATLAS_DATABASE_URL: "${ATLAS_WORKER_DATABASE_URL:?Set a restricted atlas_worker database URL}"
+      ATLAS_WORKER_DATABASE_URL: "${ATLAS_WORKER_DATABASE_URL:?Set a restricted atlas_worker database URL}"
+      ATLAS_DATABASE_SSL_CA_FILE: "${ATLAS_DATABASE_SSL_CA_FILE:-}"
+      ATLAS_WORKER_HANDLERS_MODULE: production.mjs
+      ATLAS_WORKER_CONCURRENCY: "${ATLAS_WORKER_CONCURRENCY:-4}"
+      ATLAS_WORKER_LEASE_SECONDS: "${ATLAS_WORKER_LEASE_SECONDS:-60}"
+      ATLAS_WORKER_POLL_MS: "${ATLAS_WORKER_POLL_MS:-1000}"
+      ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
+    volumes:
+      - "${ATLAS_WORKER_HANDLERS_PATH:?Mount a reviewed local worker handler module}:/app/apps/worker/handlers/production.mjs:ro"
+    depends_on:
+      postgres:
+        condition: service_healthy
 volumes:
   atlas-postgres:
   atlas-redis:

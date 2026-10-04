@@ -4,7 +4,7 @@ const PERMISSIONS = [
   ['inbox.read', 'View conversations'], ['inbox.respond', 'Respond to customers'], ['billing.read', 'View billing'],
   ['billing.manage', 'Manage billing'], ['reports.read', 'View reports'], ['integrations.read', 'View integrations'], ['integrations.manage', 'Manage integrations']
 ];
-const state = { csrf: null, me: null, dashboard: null, organizations: [], members: [], invitations: [], roles: [], inviteToken: null };
+const state = { csrf: null, me: null, dashboard: null, organizations: [], members: [], invitations: [], roles: [], inviteToken: null, activePanel: null };
 const $ = selector => document.querySelector(selector);
 const element = (tag, text, className = '') => { const node = document.createElement(tag); node.textContent = text; if (className) node.className = className; return node; };
 
@@ -85,12 +85,8 @@ function renderWorkspace(me) {
   $('#sidebar-user').textContent = me.user.displayName;
   $('#user-avatar').textContent = me.user.displayName.trim().slice(0, 1).toUpperCase() || 'A';
   renderOrganizationPicker();
-  $('#overview-panel').hidden = false;
-  $('#growth-panel').hidden = true;
-  $('#team-panel').hidden = true;
-  $('#page-title').textContent = 'Overview';
-  $('#breadcrumb').textContent = 'Workspace overview';
-  loadDashboard();
+  renderSettings();
+  openPanel('overview');
 }
 
 async function loadDashboard() {
@@ -164,16 +160,74 @@ async function loadTeam() {
   }
 }
 
-function openPanel(panel) {
-  const isTeam = panel === 'team';
-  const isGrowth = panel === 'growth';
-  $('#overview-panel').hidden = isTeam || isGrowth;
-  $('#growth-panel').hidden = !isGrowth;
-  $('#team-panel').hidden = !isTeam;
-  $('#page-title').textContent = isTeam ? 'Team & access' : isGrowth ? 'Growth Center' : 'Overview';
-  $('#breadcrumb').textContent = isTeam ? 'Workspace settings' : isGrowth ? 'Customer operations' : 'Workspace overview';
-  document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.panel === panel));
-  if (isTeam) loadTeam(); else if (isGrowth) window.AtlasGrowth?.activate(); else loadDashboard();
+function renderSettings() {
+  if (!state.me) return;
+  $('#profile-name').value = state.me.user.displayName || '';
+  $('#profile-email').value = state.me.user.email || '';
+  const verified = state.me.user.emailVerified === true;
+  $('#profile-verified').textContent = verified ? 'Email verified' : 'Verification required';
+  $('#profile-verified').dataset.kind = verified ? 'success' : 'warning';
+  $('#resend-verification').hidden = verified;
+  const organization = state.me.activeOrganization;
+  $('#settings-workspace-name').textContent = organization?.name || 'No workspace selected';
+  $('#settings-workspace-id').textContent = organization?.id || '—';
+  $('#settings-workspace-role').textContent = organization?.role?.replaceAll('_',' ') || 'No access';
+  $('#settings-role').textContent = organization?.role?.replaceAll('_',' ') || 'Select workspace';
+}
+
+const unavailableReasons = {
+  Conversations: ['The tenant inbox and live channel adapters are not connected.', 'Message policy and template contracts exist, but there is no operational customer inbox or email/SMS/WhatsApp/social delivery service.'],
+  Calendars: ['Live calendar booking is not available.', 'Booking and availability contracts exist, but calendar-provider sync, appointment UI and reminder delivery are not connected.'],
+  Reporting: ['Only account and workspace core metrics are currently available.', 'Campaign attribution, workflow executions, agent outcomes, revenue analytics and custom report building are not connected.'],
+  'Security settings': ['Advanced sign-in controls are not available yet.', 'Multi-factor authentication, SSO and API keys are not implemented. Current sessions use secure cookies, same-origin checks and CSRF protection.'],
+  'Service Desk': ['Case management is not available yet.', 'Atlas has service-desk contracts, but this workspace does not yet have a live case API, SLA queue or agent handoff screen.'],
+  Integrations: ['Provider connections are not available yet.', 'OAuth installation, scoped credential storage, connection health checks and provider event receipts are not configured.'],
+  Agency: ['Agency administration is not available yet.', 'Cross-workspace provisioning, reseller billing, snapshots and white-label controls are not connected.']
+};
+
+function openPanel(panel, module = null, title = null, navKey = null, search = null) {
+  state.activePanel = panel;
+  if (!navKey) navKey = ({overview:'overview',team:'team',settings:'settings',payments:'payments'})[panel] || null;
+  const views = ['overview','growth','team','settings','unavailable','payments'];
+  for (const view of views) $(`#${view}-panel`).hidden = view !== panel;
+  const defaults = {
+    overview: ['Dashboard','Workspace overview','Your workspace at a glance.'],
+    growth: [title || 'Customer operations','Manage · workspace records','Versioned customer and growth records for this location.'],
+    team: ['Team & access','Settings · workspace access','Invite teammates and manage tenant-scoped roles.'],
+    settings: ['Settings','Settings · account and location','Manage your account and review what is connected.'],
+    unavailable: [title || 'Unavailable','Workspace · service status','This module is not connected to a live workspace service.'],
+    payments: ['Payments','Grow · workspace billing','Review your workspace plan and Paddle subscription setup.']
+  };
+  const [pageTitle, crumb, description] = defaults[panel] || defaults.unavailable;
+  $('#page-title').textContent = pageTitle;
+  $('#breadcrumb').textContent = crumb;
+  $('#page-description').textContent = description;
+  document.querySelectorAll('.nav-item[data-nav-key]').forEach(item => item.classList.toggle('active', item.dataset.navKey === navKey));
+  document.querySelectorAll('[data-nav-page]').forEach(item => { if (item.classList.contains('side-owner')) item.classList.toggle('side-owner-active', panel === 'settings'); });
+  $('#workspace-nav').classList.remove('nav-expanded');
+  $('#mobile-nav-toggle').setAttribute('aria-expanded','false');
+  if (panel === 'team') loadTeam();
+  else if (panel === 'growth') {
+    if (search !== null) $('#growth-search').value = search;
+    window.AtlasGrowth?.activate(module);
+  } else if (panel === 'payments') window.AtlasGrowth?.activatePayments();
+  else if (panel === 'overview') loadDashboard();
+  else if (panel === 'settings') renderSettings();
+  else if (panel === 'unavailable') {
+    const [summary, detail] = unavailableReasons[title] || ['This workspace area is not available yet.','Atlas shows a module here only after its real API, data and required services are implemented.'];
+    $('#unavailable-title').textContent = title || 'Module unavailable';
+    $('#unavailable-copy').textContent = summary;
+    const details = $('#unavailable-details'); details.replaceChildren(element('p',detail,'field-help'));
+  }
+}
+
+function openNavButton(button) {
+  const page = button.dataset.navPage;
+  const title = button.dataset.pageTitle || null;
+  const key = button.dataset.navKey || null;
+  if (page === 'growth') openPanel('growth',button.dataset.module || 'contacts',title,key);
+  else if (page === 'payments') openPanel('payments',null,'Payments',key);
+  else openPanel(page || 'overview',null,title,key);
 }
 
 async function completeSignIn(payload) {
@@ -194,8 +248,51 @@ $('#auth-shell').addEventListener('click', event => {
   const button = event.target.closest('[data-view]');
   if (button) showAuth(button.dataset.view);
 });
-document.querySelectorAll('.nav-item').forEach(button => button.addEventListener('click', () => openPanel(button.dataset.panel)));
-document.querySelectorAll('[data-open-growth]').forEach(button => button.addEventListener('click', () => openPanel('growth')));
+document.querySelectorAll('[data-nav-page]').forEach(button => button.addEventListener('click', () => openNavButton(button)));
+const growthNavigation = {
+  contacts: ['Contacts', 'contacts'], leads: ['Opportunities', 'leads'], pipelines: ['Pipelines', 'leads'], tasks: ['Tasks', 'tasks'],
+  'ai-qualification': ['AI agents', 'ai'], 'ai-follow-up': ['AI agents', 'ai'], workflows: ['Automation', 'workflows'],
+  'email-templates': ['Marketing', 'marketing'], funnels: ['Marketing', 'marketing'], websites: ['Websites', 'websites'],
+  'social-planner': ['Social', 'social'], 'affiliate-system': ['Affiliates', 'affiliates'], 'reputation-management': ['Reputation', 'reputation']
+};
+window.addEventListener('atlas:growth-module-changed', event => {
+  if (state.activePanel !== 'growth') return;
+  const [title, navKey] = growthNavigation[event.detail?.module] || ['Customer operations', null];
+  $('#page-title').textContent = title;
+  $('#breadcrumb').textContent = 'Manage · workspace records';
+  $('#page-description').textContent = `Versioned ${title.toLowerCase()} records for this workspace.`;
+  document.querySelectorAll('.nav-item[data-nav-key]').forEach(item => item.classList.toggle('active', item.dataset.navKey === navKey));
+});
+$('#mobile-nav-toggle').addEventListener('click', event => {
+  const expanded = event.currentTarget.getAttribute('aria-expanded') === 'true';
+  event.currentTarget.setAttribute('aria-expanded',String(!expanded));
+  $('#workspace-nav').classList.toggle('nav-expanded',!expanded);
+});
+$('#global-search').addEventListener('keydown', event => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  const query = event.currentTarget.value.trim();
+  openPanel('growth','contacts','Contacts','contacts',query);
+});
+
+$('#profile-form').addEventListener('submit', async event => {
+  event.preventDefault(); const form=event.currentTarget; setBusy(form,true);
+  try {
+    const result=await request('/me',{method:'PATCH',body:{displayName:formData(form).displayName},csrf:true});
+    state.me.user={...state.me.user,...result.user};
+    $('#sidebar-user').textContent=state.me.user.displayName;
+    $('#user-avatar').textContent=state.me.user.displayName.trim().slice(0,1).toUpperCase()||'A';
+    const notice=$('#settings-feedback'); notice.hidden=false; notice.dataset.kind='success'; notice.textContent='Profile saved.';
+  } catch(error) { const notice=$('#settings-feedback'); notice.hidden=false; notice.dataset.kind='error'; notice.textContent=error.message; }
+  finally { setBusy(form,false); }
+});
+
+$('#resend-verification').addEventListener('click',async event=>{
+  event.currentTarget.disabled=true;
+  try { await request('/auth/verification/resend',{method:'POST',body:{email:state.me.user.email},csrf:true}); const notice=$('#settings-feedback'); notice.hidden=false; notice.dataset.kind='success'; notice.textContent='If this account needs verification, an email will be sent.'; }
+  catch(error) { const notice=$('#settings-feedback'); notice.hidden=false; notice.dataset.kind='error'; notice.textContent=error.message; }
+  finally { event.currentTarget.disabled=false; }
+});
 
 $('#login-form').addEventListener('submit', async event => {
   event.preventDefault(); const form = event.currentTarget; setBusy(form, true);

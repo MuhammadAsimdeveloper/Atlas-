@@ -220,11 +220,22 @@ async function loadBilling() {
   try {
     const [plans, subscription] = await Promise.all([api('/billing/plans'), api('/billing/subscription')]);
     const select = $('#billing-plan');
-    select.replaceChildren(...plans.plans.map(plan => { const option = document.createElement('option'); option.value = plan.key; option.textContent = `${plan.name}${plan.checkoutAvailable ? '' : ' · setup required'}`; option.disabled = !plan.checkoutAvailable; return option; }));
     const current = subscription.subscription;
-    $('#billing-current').textContent = current ? `${moduleLabel(current.planKey)} plan` : 'No paid plan yet';
-    $('#billing-status').textContent = current ? `${current.status.replaceAll('_',' ')}${current.currentPeriodEndsAt ? ` · renews ${new Date(current.currentPeriodEndsAt).toLocaleDateString()}` : ''}` : 'Secure Paddle checkout is available after plan IDs and provider credentials are configured.';
-    const button = $('#billing-checkout'); button.disabled = !plans.plans.some(plan => plan.checkoutAvailable);
+    const trialUsed = Boolean(current?.trialStartedAt);
+    select.replaceChildren(...plans.plans.map(plan => {
+      const option = document.createElement('option'); option.value = plan.key;
+      option.textContent = `${plan.name}${plan.trialAvailable ? ` · free for ${plan.trialDays} days, then billed by Paddle` : ' · trial setup required'}${trialUsed ? ' · trial already used' : ''}`;
+      option.disabled = !plan.checkoutAvailable || trialUsed || Boolean(current && current.status !== 'canceled');
+      return option;
+    }));
+    $('#billing-current').textContent = current ? `${moduleLabel(current.planKey)} plan` : 'No subscription yet';
+    const endDate = current?.currentPeriodEndsAt ? new Date(current.currentPeriodEndsAt).toLocaleDateString() : null;
+    if (current?.status === 'trialing') $('#billing-status').textContent = `Free trial · ends ${endDate || 'as shown in Paddle'}. Manage or cancel before it converts to the shown recurring plan.`;
+    else if (current) $('#billing-status').textContent = `${current.status.replaceAll('_',' ')}${endDate ? ` · ${current.cancelAtPeriodEnd ? 'ends' : 'renews'} ${endDate}` : ''}${trialUsed ? ' · free trial already used' : ''}`;
+    else $('#billing-status').textContent = plans.plans.some(plan => plan.trialAvailable) ? 'A verified 14-day free trial is available. Paddle shows the renewal price before checkout.' : 'Paddle prices are not confirmed for the 14-day free trial yet. Configure active trial prices and the required Paddle API permissions.';
+    const canStartTrial = !trialUsed && (!current || current.status === 'canceled') && plans.plans.some(plan => plan.checkoutAvailable);
+    $('#billing-checkout').disabled = !canStartTrial;
+    $('#billing-manage').hidden = !current?.customerId;
   } catch (error) { $('#billing-current').textContent = 'Billing unavailable'; $('#billing-status').textContent = error.message; $('#billing-checkout').disabled = true; }
 }
 
@@ -272,12 +283,21 @@ async function transition(action) {
   } catch (error) { notice(error.message, 'error'); }
 }
 
-function activate() {
-  setupCreatePanel(); renderModules(); state.activated = true; refresh();
+function activate(module = null) {
+  setupCreatePanel(); renderModules(); state.activated = true;
+  if (module && MODULES.some(([key]) => key === module)) {
+    state.module = module; state.current = null; $('#growth-module').value = module;
+    $('#growth-list-title').textContent = moduleLabel(module); $('#growth-detail-form').hidden = true; $('#growth-detail-empty').hidden = false;
+    $('#growth-detail-title').textContent = 'Choose a record'; $('#growth-version').hidden = true; $('#growth-create').hidden = true;
+    window.dispatchEvent(new CustomEvent('atlas:growth-module-changed',{detail:{module}}));
+  }
+  return refresh();
 }
 
+function activatePayments() { return loadBilling(); }
+
 $('#growth-module').addEventListener('change', async event => {
-  state.module = event.target.value; state.current = null; $('#growth-list-title').textContent = moduleLabel(state.module); $('#growth-detail-form').hidden = true; $('#growth-detail-empty').hidden = false; $('#growth-detail-title').textContent = 'Choose a record'; $('#growth-version').hidden = true; $('#growth-create').hidden = true; await loadRecords();
+  state.module = event.target.value; state.current = null; $('#growth-list-title').textContent = moduleLabel(state.module); $('#growth-detail-form').hidden = true; $('#growth-detail-empty').hidden = false; $('#growth-detail-title').textContent = 'Choose a record'; $('#growth-version').hidden = true; $('#growth-create').hidden = true; window.dispatchEvent(new CustomEvent('atlas:growth-module-changed',{detail:{module:state.module}})); await loadRecords();
 });
 $('#growth-refresh').addEventListener('click', refresh);
 $('#growth-new').addEventListener('click', () => {
@@ -290,5 +310,11 @@ $('#billing-checkout').addEventListener('click', async () => {
   try { const result = await api('/billing/checkout', { method: 'POST', body: { planKey: $('#billing-plan').value } }); location.assign(result.checkout.checkoutUrl); }
   catch (error) { notice(error.message, 'error'); }
 });
+$('#billing-manage').addEventListener('click', async event => {
+  const button = event.currentTarget; button.disabled = true;
+  try { const result = await api('/billing/portal', { method: 'POST' }); location.assign(result.portal.manageUrl); }
+  catch (error) { notice(error.message, 'error'); }
+  finally { button.disabled = false; }
+});
 
-window.AtlasGrowth = Object.freeze({ activate });
+window.AtlasGrowth = Object.freeze({ activate, activatePayments });

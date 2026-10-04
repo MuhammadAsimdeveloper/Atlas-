@@ -67,6 +67,10 @@ V114 addresses one of the highest-priority n8n/GHL gaps by connecting 13 CRM, AI
 
 The Paddle Billing path uses a backend-created checkout transaction, allowlisted checkout origin, configured price mapping, raw-body HMAC webhook validation and duplicate/stale subscription event protection. It implements subscription state ingestion and checkout handoff, not the broader n8n credential vault or HighLevel SaaS commerce/entitlement stack. Managed provider services, runtime credentials, subscription feature enforcement and actual message/social providers remain external deployment and implementation work. See [V114 Growth Center](V114-GROWTH-CENTER.md) for route, migration and role details.
 
+## V115 execution-foundation follow-through
+
+V115 adds a durable Postgres queue, transactional outbox and interval scheduler with tenant-aware RLS, a separately restricted worker role, lease renewal/recovery, bounded exponential retries and registered-type worker loops. Growth Center changes append reference-only outbox events in their existing database transaction. This is execution infrastructure, not workflow execution parity: no default business handler, graph interpreter, durable wait/approval resume, execution replay UI, Redis queue adapter or live provider action is included. See [Execution Engine](EXECUTION-ENGINE.md) and the [master roadmap](ATLAS-MASTER-ROADMAP.md).
+
 ## Review limits
 
-Vendor docs change frequently. The source pages were checked on 3 October 2026; plan availability and preview notices may change. This analysis does not reproduce n8n or HighLevel UI/branding. Atlas code-level coverage should be read with [the V114 feature matrix](COMPETITOR-FEATURE-MATRIX-2026-10.md); migrations are tested against ephemeral PGlite but have not been applied to managed production, and no provider delivery or scale benchmark is verified.
+Vendor docs change frequently. The source pages were checked on 3 October 2026; plan availability and preview notices may change. This analysis does not reproduce n8n or HighLevel UI/branding. Atlas code-level coverage should be read with [the V115 feature matrix](COMPETITOR-FEATURE-MATRIX-2026-10.md); migrations are tested against ephemeral PGlite but have not been applied to managed production, and no provider delivery or scale benchmark is verified.

@@ -6,20 +6,24 @@ import test from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 import { PostgresAuthStore } from './postgres-auth-store.mjs';
 import { PostgresGrowthStore } from './growth-store.mjs';
+import { PostgresRuntimeStore } from './runtime-store.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const migration = await readFile(path.join(root, 'infra/postgres/FINAL-MIGRATION-V112.sql'), 'utf8');
 
-test('all PostgreSQL migrations apply in order and V114 tenant policies constrain a non-bypass runtime role', async () => {
+test('all PostgreSQL migrations apply in order and V115 keeps tenant data and worker queue roles scoped', async () => {
   const db = new PGlite();
   try {
     const migrationDirectory = path.join(root, 'infra/postgres');
     const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
-    assert.equal(files.at(-1), 'FINAL-MIGRATION-V114.sql');
+    assert.equal(files.at(-1), 'FINAL-MIGRATION-V115.sql');
     for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
+    const trialMarker = await db.query("SELECT column_name FROM information_schema.columns WHERE table_name='atlas_paddle_subscriptions' AND column_name='trial_started_at'");
+    assert.equal(trialMarker.rowCount,1,'V115 permanently records whether a workspace has used its free trial');
     await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V112.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V114.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V115.sql'), 'utf8'));
     await db.exec('SET ROLE atlas_app;');
     assert.equal(await new PostgresAuthStore(db).assertSafeRuntimeRole(), true, 'restricted atlas_app passes the production startup check');
 
@@ -64,6 +68,17 @@ test('all PostgreSQL migrations apply in order and V114 tenant policies constrai
     const growthPolicy = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_growth_items'::regclass");
     assert.equal(growthPolicy.rows[0].relrowsecurity, true);
     assert.equal(growthPolicy.rows[0].relforcerowsecurity, true);
+    const jobPolicy = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_runtime_jobs'::regclass");
+    assert.equal(jobPolicy.rows[0].relrowsecurity, true);
+    assert.equal(jobPolicy.rows[0].relforcerowsecurity, true);
+    const apiWorkerGrants = await db.query("SELECT has_function_privilege('atlas_app','atlas_v115_claim_jobs(text,integer,integer,text[])','EXECUTE') AS can_claim,has_table_privilege('atlas_app','atlas_runtime_jobs','UPDATE') AS can_update");
+    assert.equal(apiWorkerGrants.rows[0].can_claim, false);
+    assert.equal(apiWorkerGrants.rows[0].can_update, false);
+    const workerGrants = await db.query("SELECT has_table_privilege('atlas_worker','atlas_runtime_jobs','SELECT,UPDATE') AS can_process,has_table_privilege('atlas_worker','atlas_growth_items','SELECT') AS can_read_customer_data");
+    assert.equal(workerGrants.rows[0].can_process, true);
+    assert.equal(workerGrants.rows[0].can_read_customer_data, false);
+    await db.exec('RESET ROLE; SET ROLE atlas_worker;');
+    assert.equal(await new PostgresRuntimeStore(db).assertSafeWorkerRole(), true);
   } finally {
     await db.close();
   }
@@ -78,6 +93,7 @@ test('V114 Growth Center CRUD, revisions, Paddle webhook state and tenant isolat
     await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
     await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V112.sql'),'utf8'));
     await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V114.sql'),'utf8'));
+    await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V115.sql'),'utf8'));
     await db.exec('SET ROLE atlas_app;');
     const actorA='11111111-1111-4111-8111-111111111111', tenantA='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     const actorB='22222222-2222-4222-8222-222222222222', tenantB='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -131,11 +147,28 @@ test('V114 Growth Center CRUD, revisions, Paddle webhook state and tenant isolat
     await assert.rejects(store.update({ actorId:actorA,tenantId:tenantA,module:'contacts',id:contact.id,expectedVersion:1,payload:{ firstName:'Stale',email:'ari@example.net' } }), { code:'version_conflict' });
 
     const occurredAt = new Date().toISOString();
-    const event = { disposition:'apply',eventId:'evt_1234567890',eventType:'subscription.created',occurredAt,tenantId:tenantA,subscriptionId:'sub_1234567890',customerId:'ctm_1234567890',priceId:'pri_1234567890',planKey:'starter',status:'active',currentPeriodEndsAt:null,cancelAtPeriodEnd:false };
+    const event = { disposition:'apply',eventId:'evt_1234567890',eventType:'subscription.created',occurredAt,tenantId:tenantA,subscriptionId:'sub_1234567890',customerId:'ctm_1234567890',priceId:'pri_1234567890',planKey:'starter',status:'active',currentPeriodEndsAt:null,cancelAtPeriodEnd:false,trialStartedAt:null };
     assert.equal((await store.applyPaddleEvent(event,'f'.repeat(64))).status,'applied');
     assert.equal((await store.applyPaddleEvent(event,'f'.repeat(64))).status,'duplicate');
     assert.equal((await store.applyPaddleEvent({ ...event,eventId:'evt_1234567891',occurredAt:new Date(Date.parse(occurredAt)-60_000).toISOString(),status:'past_due' },'e'.repeat(64))).status,'stale');
     assert.equal((await store.getSubscription({ actorId:actorA,tenantId:tenantA })).status,'active');
+    const trialStartedAt=new Date(Date.parse(occurredAt)+10_000).toISOString();
+    const trialEvent={...event,eventId:'evt_1234567892',eventType:'subscription.trialing',status:'trialing',occurredAt:trialStartedAt,trialStartedAt,currentPeriodEndsAt:new Date(Date.parse(trialStartedAt)+14*86400_000).toISOString()};
+    assert.equal((await store.applyPaddleEvent(trialEvent,'d'.repeat(64))).status,'applied');
+    const canceledEvent={...trialEvent,eventId:'evt_1234567893',eventType:'subscription.canceled',status:'canceled',occurredAt:new Date(Date.parse(trialStartedAt)+20_000).toISOString(),trialStartedAt:null};
+    assert.equal((await store.applyPaddleEvent(canceledEvent,'c'.repeat(64))).status,'applied');
+    const canceledSubscription=await store.getSubscription({ actorId:actorA,tenantId:tenantA });
+    assert.equal(canceledSubscription.status,'canceled');
+    assert.equal(new Date(canceledSubscription.trialStartedAt).toISOString(),trialStartedAt,'trial use remains recorded after cancellation');
+    await db.exec('RESET ROLE; SET ROLE atlas_worker;');
+    const runtime = new PostgresRuntimeStore(pool);
+    assert.equal(await runtime.assertSafeWorkerRole(), true);
+    const outboxEvents = await runtime.claimOutbox('integration-worker',100,60);
+    assert.ok(outboxEvents.some(row => row.event_type === 'contacts.created'), 'Growth Center writes a contact event to the transactional outbox');
+    const createdContactEvent = outboxEvents.find(row => row.event_type === 'contacts.created');
+    assert.deepEqual(Object.keys(createdContactEvent.payload_ref).sort(), ['id','kind','version']);
+    assert.equal(await runtime.ackOutbox(createdContactEvent,'wrong-worker'), false, 'another worker cannot acknowledge a lease');
+    assert.equal(await runtime.ackOutbox(createdContactEvent,'integration-worker'), true);
   } finally { await db.close(); }
 });
 

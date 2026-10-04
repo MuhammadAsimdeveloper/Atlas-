@@ -9,7 +9,7 @@ import { hashOpaqueToken, sessionCookieName } from './auth-contracts.mjs';
 const tenantA='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', tenantB='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const actor='11111111-1111-4111-8111-111111111111', ownerEmail='khan@example.net';
 
-async function createTestApi({ tenantId = tenantA, email = ownerEmail, memberships = [{tenant_id:tenantA,role_key:'owner',status:'active'}], envExtra = {} } = {}) {
+async function createTestApi({ tenantId = tenantA, email = ownerEmail, memberships = [{tenant_id:tenantA,role_key:'owner',status:'active'}], envExtra = {}, subscriptionState = null, paddleFetch = fetch } = {}) {
   const sessionToken='session-token-for-growth-api-test'; const csrf='csrf-token-for-growth-api-test'; const seen=[];
   const session={tokenHash:hashOpaqueToken(sessionToken),csrfHash:hashOpaqueToken(csrf),expiresAt:new Date(Date.now()+60_000),tenantId,user:{id:actor,email,displayName:'Khan',emailVerified:true,status:'active'},memberships};
   const authStore={async getSession({sessionHash}) { return sessionHash===session.tokenHash ? session : null; }};
@@ -23,12 +23,12 @@ async function createTestApi({ tenantId = tenantA, email = ownerEmail, membershi
     async transition(data) { seen.push(['transition',data]); return {id:data.id,tenantId:data.tenantId,state:'published'}; },
     async moveLeadStage(data) { seen.push(['move_stage',data]); return {item:{id:data.leadId,tenantId:data.tenantId,payload:{stageId:data.stageId}},move:{stageId:data.stageId,stageName:'Qualified',direction:'forward'}}; },
     async evaluateLead(data) { seen.push(['evaluate_lead',data]); return {item:{id:data.leadId,tenantId:data.tenantId},evaluation:{score:82,status:'needs_review'}}; },
-    async getSubscription(data) { seen.push(['subscription',data]); return null; },
+    async getSubscription(data) { seen.push(['subscription',data]); return subscriptionState; },
     async applyPaddleEvent(event, hash) { seen.push(['webhook',event,hash]); return {status:'applied'}; },
     async requireBillingManager(data) { seen.push(['billing_manager',data]); }
   };
   const env={NODE_ENV:'development',ATLAS_PLATFORM_OWNER_EMAIL:ownerEmail,ATLAS_PADDLE_WEBHOOK_SECRET:'webhook-secret-for-test-long-enough',ATLAS_PADDLE_PRICE_STARTER:'pri_1234567890',...envExtra};
-  const api=createGrowthApi({store,authStore,env});
+  const api=createGrowthApi({store,authStore,env,fetchImpl:paddleFetch});
   const server=createServer(async(req,res)=>{if(!(await api.handle(req,res))){res.writeHead(404);res.end();}});
   server.listen(0,'127.0.0.1'); await once(server,'listening');
   const base=`http://127.0.0.1:${server.address().port}`;
@@ -105,4 +105,42 @@ test('Paddle webhook verification covers exact raw bytes, event normalization an
     response=await fetch(`${api.base}/api/v1/webhooks/paddle`,{method:'POST',headers:{'content-type':'application/json','paddle-signature':`ts=${timestamp};h1=${'0'.repeat(64)}`},body:rawBody});
     assert.equal(response.status,401);
   } finally {await api.close();}
+});
+
+test('billing offers only Paddle-verified 14-day trials, blocks repeat trials, and creates an authenticated cancel/manage portal', async () => {
+  const price={id:'pri_1234567890',status:'active',billing_cycle:{interval:'month',frequency:1},unit_price:{amount:'2900',currency_code:'USD'},trial_period:{interval:'day',frequency:14,requires_payment_method:true,unit_price:null,unit_price_overrides:[]}};
+  const envExtra={ATLAS_PADDLE_ENVIRONMENT:'sandbox',ATLAS_PADDLE_API_ORIGIN:'https://sandbox-api.paddle.com',ATLAS_PADDLE_API_KEY:'sandbox-api-key-contains-more-than-20-characters'};
+  let transactions=0;
+  const paddleFetch=async(url,init)=>{
+    if(url.endsWith('/prices/pri_1234567890')) return {ok:true,async json(){return {data:price};}};
+    if(url.endsWith('/transactions')) { transactions++; return {ok:true,async json(){return {data:{id:'txn_1234567890',checkout:{url:'https://sandbox-checkout.paddle.com/checkout/txn_1234567890'}}};}}; }
+    if(url.endsWith('/portal-sessions')) return {ok:true,async json(){return {data:{customer_id:'ctm_1234567890',urls:{subscriptions:[{id:'sub_1234567890',view_subscription:'https://customer-portal.paddle.com/session?action=view&token=temporary',cancel_subscription:'https://customer-portal.paddle.com/session?action=cancel&token=temporary'}]}}};}};
+    throw new Error(`Unexpected Paddle request: ${url}`);
+  };
+  const api=await createTestApi({envExtra,paddleFetch});
+  try {
+    let response=await fetch(`${api.base}/api/v1/billing/plans`,{headers:api.headers});
+    const plans=await response.json();
+    assert.equal(response.status,200); assert.equal(plans.plans.find(plan=>plan.key==='starter').trialDays,14);
+    assert.equal(plans.plans.find(plan=>plan.key==='starter').checkoutAvailable,true);
+    response=await fetch(`${api.base}/api/v1/billing/checkout`,{method:'POST',headers:api.headers,body:JSON.stringify({planKey:'starter'})});
+    const checkout=await response.json();
+    assert.equal(response.status,201); assert.equal(checkout.checkout.trialDays,14); assert.equal(transactions,1);
+    assert.equal(api.seen.find(([kind])=>kind==='billing_manager')[1].tenantId,tenantA);
+  } finally { await api.close(); }
+
+  const priorTrial=await createTestApi({envExtra,subscriptionState:{subscriptionId:'sub_1234567890',customerId:'ctm_1234567890',status:'canceled',trialStartedAt:new Date().toISOString()},paddleFetch});
+  try {
+    const response=await fetch(`${priorTrial.base}/api/v1/billing/checkout`,{method:'POST',headers:priorTrial.headers,body:JSON.stringify({planKey:'starter'})});
+    assert.equal(response.status,409); assert.equal((await response.json()).error,'billing_trial_already_used');
+    assert.equal(transactions,1,'the route enforces trial eligibility before calling Paddle');
+  } finally { await priorTrial.close(); }
+
+  const active=await createTestApi({envExtra,subscriptionState:{subscriptionId:'sub_1234567890',customerId:'ctm_1234567890',status:'trialing',trialStartedAt:new Date().toISOString()},paddleFetch});
+  try {
+    const response=await fetch(`${active.base}/api/v1/billing/portal`,{method:'POST',headers:active.headers});
+    const result=await response.json();
+    assert.equal(response.status,201); assert.equal(result.portal.manageUrl,'https://customer-portal.paddle.com/session?action=view&token=temporary');
+    assert.equal(result.portal.cancelUrl,'https://customer-portal.paddle.com/session?action=cancel&token=temporary');
+  } finally { await active.close(); }
 });

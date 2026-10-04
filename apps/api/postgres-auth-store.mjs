@@ -375,8 +375,12 @@ export class PostgresAuthStore {
       to_regclass('public.atlas_auth_users') AS auth_schema,
       to_regclass('public.atlas_growth_items') AS growth_schema,
       to_regclass('public.atlas_growth_item_versions') AS versions_schema,
-      to_regclass('public.atlas_paddle_subscriptions') AS billing_schema`);
-    return Boolean(rows[0]?.auth_schema && rows[0]?.growth_schema && rows[0]?.versions_schema && rows[0]?.billing_schema);
+      to_regclass('public.atlas_paddle_subscriptions') AS billing_schema,
+      EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='atlas_paddle_subscriptions' AND column_name='trial_started_at') AS trial_schema,
+      to_regclass('public.atlas_runtime_jobs') AS runtime_jobs,
+      to_regclass('public.atlas_event_outbox') AS event_outbox,
+      to_regclass('public.atlas_runtime_schedules') AS runtime_schedules`);
+    return Boolean(rows[0]?.auth_schema && rows[0]?.growth_schema && rows[0]?.versions_schema && rows[0]?.billing_schema && rows[0]?.trial_schema && rows[0]?.runtime_jobs && rows[0]?.event_outbox && rows[0]?.runtime_schedules);
   }
 
   async assertSafeRuntimeRole() {

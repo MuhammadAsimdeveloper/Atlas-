@@ -237,7 +237,9 @@ export class PostgresGrowthStore {
   }
 
   async #event(client, { actorId, tenantId, id, module, action, version }) {
-    await client.query('INSERT INTO atlas_growth_item_events(tenant_id,event_id,item_id,actor_id,module_key,action,version) VALUES ($1,$2,$3,$4,$5,$6,$7)', [tenantId, randomUUID(), id, actorId, module, action, version]);
+    const eventId = randomUUID();
+    await client.query('INSERT INTO atlas_growth_item_events(tenant_id,event_id,item_id,actor_id,module_key,action,version) VALUES ($1,$2,$3,$4,$5,$6,$7)', [tenantId, eventId, id, actorId, module, action, version]);
+    await client.query('SELECT atlas_v115_append_outbox_event($1,$2,$3,$4::jsonb)', [tenantId, eventId, `${module}.${action}`, JSON.stringify({ kind: module, id, version })]);
   }
 
   async overview({ actorId, tenantId }) {
@@ -261,8 +263,8 @@ export class PostgresGrowthStore {
     return this.#transaction(async client => {
       const { role, permissions } = await this.#scope(client, { actorId, tenantId });
       if (!['owner', 'admin', 'billing_admin'].includes(role) && !permissions.includes('billing.read') && !permissions.includes('billing.manage')) throw createAuthError(403, 'billing_read_forbidden');
-      const { rows } = await client.query('SELECT paddle_subscription_id,paddle_customer_id,paddle_price_id,plan_key,status,current_period_ends_at,cancel_at_period_end,updated_at FROM atlas_paddle_subscriptions WHERE tenant_id=$1', [tenantId]);
-      return rows[0] ? { subscriptionId: rows[0].paddle_subscription_id, customerId: rows[0].paddle_customer_id, priceId: rows[0].paddle_price_id, planKey: rows[0].plan_key, status: rows[0].status, currentPeriodEndsAt: rows[0].current_period_ends_at, cancelAtPeriodEnd: rows[0].cancel_at_period_end, updatedAt: rows[0].updated_at } : null;
+      const { rows } = await client.query('SELECT paddle_subscription_id,paddle_customer_id,paddle_price_id,plan_key,status,current_period_ends_at,cancel_at_period_end,trial_started_at,updated_at FROM atlas_paddle_subscriptions WHERE tenant_id=$1', [tenantId]);
+      return rows[0] ? { subscriptionId: rows[0].paddle_subscription_id, customerId: rows[0].paddle_customer_id, priceId: rows[0].paddle_price_id, planKey: rows[0].plan_key, status: rows[0].status, currentPeriodEndsAt: rows[0].current_period_ends_at, cancelAtPeriodEnd: rows[0].cancel_at_period_end, trialStartedAt: rows[0].trial_started_at, updatedAt: rows[0].updated_at } : null;
     });
   }
 
@@ -288,12 +290,13 @@ export class PostgresGrowthStore {
         VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (tenant_id,paddle_event_id) DO NOTHING RETURNING paddle_event_id`, [event.tenantId, event.eventId, event.eventType, event.occurredAt, bodySha256, stale ? 'ignored' : 'applied']);
       if (!inserted.rowCount) return { status: 'duplicate' };
       if (stale) return { status: 'stale' };
-      await client.query(`INSERT INTO atlas_paddle_subscriptions(tenant_id,paddle_subscription_id,paddle_customer_id,paddle_price_id,plan_key,status,current_period_ends_at,cancel_at_period_end,last_event_id,last_event_occurred_at,updated_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      await client.query(`INSERT INTO atlas_paddle_subscriptions(tenant_id,paddle_subscription_id,paddle_customer_id,paddle_price_id,plan_key,status,current_period_ends_at,cancel_at_period_end,last_event_id,last_event_occurred_at,trial_started_at,updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         ON CONFLICT (tenant_id) DO UPDATE SET paddle_subscription_id=EXCLUDED.paddle_subscription_id,paddle_customer_id=EXCLUDED.paddle_customer_id,paddle_price_id=EXCLUDED.paddle_price_id,
         plan_key=EXCLUDED.plan_key,status=EXCLUDED.status,current_period_ends_at=EXCLUDED.current_period_ends_at,cancel_at_period_end=EXCLUDED.cancel_at_period_end,
+        trial_started_at=coalesce(atlas_paddle_subscriptions.trial_started_at,EXCLUDED.trial_started_at),
         last_event_id=EXCLUDED.last_event_id,last_event_occurred_at=EXCLUDED.last_event_occurred_at,updated_at=EXCLUDED.updated_at
-        WHERE atlas_paddle_subscriptions.last_event_occurred_at <= EXCLUDED.last_event_occurred_at`, [event.tenantId, event.subscriptionId, event.customerId, event.priceId, event.planKey, event.status, event.currentPeriodEndsAt, event.cancelAtPeriodEnd, event.eventId, event.occurredAt, this.clock()]);
+        WHERE atlas_paddle_subscriptions.last_event_occurred_at <= EXCLUDED.last_event_occurred_at`, [event.tenantId, event.subscriptionId, event.customerId, event.priceId, event.planKey, event.status, event.currentPeriodEndsAt, event.cancelAtPeriodEnd, event.eventId, event.occurredAt, event.trialStartedAt, this.clock()]);
       return { status: 'applied' };
     });
   }

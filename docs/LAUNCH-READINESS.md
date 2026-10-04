@@ -1,10 +1,14 @@
-# Atlas V100 Launch Readiness
+# Atlas V115 Launch Readiness
+
+## V115 repository status
+
+The current source release is V115. The authenticated tenant API, Growth Center records, Paddle subscription webhook path, PostgreSQL durable queue/outbox/scheduler mechanics, and generic worker loop are covered by local automated checks. No default workflow or provider handlers ship, and the worker refuses to start without an operator-reviewed module. Migrations have only been exercised against ephemeral PGlite in this workspace. See [the V115 master roadmap](ATLAS-MASTER-ROADMAP.md) for DONE/PARTIAL/BLOCKED status by phase.
 
 ## What is launchable now
 
-Atlas V100 has a reproducible static marketing/preview build with automated syntax, SEO, HTTP smoke, documentation, security-invariant and unit-test checks. The latest main commit has passed the repository CI matrix on Node 20 and Node 22.
+Atlas V115 has a reproducible static marketing/demo preview and an authenticated workspace UI/API when PostgreSQL is configured. The static preview (`scripts/preview.mjs`) contains illustrative data; the API-served workspace (`apps/api/server.mjs`) uses authenticated tenant routes and does not fabricate CRM metrics. Local checks cover syntax, SEO, HTTP smoke, documentation, tenant boundaries, queue state transitions and the worker-loop contract. GitHub CI is configured for Node 20 and Node 22; verify the V115 commit's workflow result before release.
 
-The launch artifact is deliberately preview-safe by default: the marketing page is noindex, robots denies crawling, and the command-center remains a sample-data preview. Public indexing requires a real HTTPS origin supplied at build time.
+The marketing/demo preview is deliberately noindex by default and robots denies crawling. Public indexing requires a real HTTPS origin supplied at build time.
 
 ## Verified in CI
 
@@ -21,12 +25,12 @@ The launch artifact is deliberately preview-safe by default: the marketing page 
 
 These are product/infrastructure dependencies, not bugs hidden by the source build:
 
-1. Deploy an authenticated API and tenant/session middleware.
-2. Apply and validate PostgreSQL migrations with forced RLS in a managed environment.
-3. Deploy durable Redis/queue workers and a scheduler.
+1. Configure a production HTTPS domain/edge, managed PostgreSQL, transactional email and Paddle settings, including active recurring plan prices with verified 14-day free trials and the required API permissions.
+2. Apply V115 migrations and grants with separate migration, API and worker roles; validate forced RLS in the target environment.
+3. Supply reviewed workflow/provider handler modules before enabling queue workers; Redis is not part of V115 queue runtime.
 4. Connect and verify real email/SMS/WhatsApp/social/voice/calendar/payment providers as needed.
 5. Configure secret management/KMS, object storage, WAF/CDN and OpenTelemetry export.
-6. Add signup/login, tenant administration, live inbox and production operator surfaces.
+6. Add live inbox, graph execution, execution/replay UI, worker operations and complete tenant lifecycle controls.
 7. Configure a real HTTPS domain, then build with ATLAS_PUBLIC_ORIGIN=https://... and run npm run seo:check.
 8. Execute backup/restore, load, failover, retention/deletion and provider-replay drills.
 9. Perform an external mobile/laptop accessibility and security review.

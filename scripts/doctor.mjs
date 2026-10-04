@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '114.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '115.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   const authority = await read('packages/atlas-core/authority.mjs');
@@ -32,7 +32,7 @@ try {
   check('V112 actual readiness and authenticated API', apiServer.includes('authStore.ping()') && apiServer.includes('authenticatedApi: Boolean(authApi)') && apiServer.includes("'/health/ready'"), 'Readiness checks a connected PostgreSQL identity schema and tenant endpoints fail closed without it');
   const ui = await read('apps/command-center/auth.html');
   const uiScript = await read('apps/command-center/auth.mjs');
-  check('V112 live account workspace UI', ui.includes('id="workspace"') && ui.includes('id="invite-form"') && uiScript.includes("request('/dashboard/summary')") && uiScript.includes("result.delivery === 'sent'") && ui.includes('data-panel="growth"'), 'Signup, team/role controls, live account metrics and Growth Center navigation are connected without fabricated counts');
+  check('V112 live account workspace UI', ui.includes('id="workspace"') && ui.includes('id="invite-form"') && uiScript.includes("request('/dashboard/summary')") && uiScript.includes("result.delivery === 'sent'") && ui.includes('data-nav-page="growth"') && ui.includes('id="profile-form"') && uiScript.includes('atlas:growth-module-changed'), 'Signup, team/role controls, live account metrics, integrated settings and synchronized Growth Center navigation use real endpoints');
   const migrationRunner = await read('scripts/migrate.mjs');
   check('V112 checksum-tracked migrations', migrationRunner.includes('pg_advisory_lock') && migrationRunner.includes('sha256') && migrationRunner.includes('changed after it was applied') && migrationRunner.includes('ATLAS_MIGRATION_DATABASE_URL'), 'Migration process serializes schema changes, checks immutable checksums and requires a separate production migration connection');
 
@@ -140,11 +140,28 @@ try {
   const paddle = await read('apps/api/paddle-billing.mjs');
   const paddleTest = await read('apps/api/paddle-billing.test.mjs');
   check('V114 Paddle checkout and webhook', paddle.includes('timingSafeEqual') && paddle.includes('toleranceSeconds = 5') && paddle.includes('rawBody') && paddle.includes('sandbox-checkout.paddle.com') && paddleTest.includes('exact raw bytes'), 'Checkout is server-side; subscription webhooks require raw-body HMAC, short replay tolerance, price/tenant validation and event deduplication');
+  const billingRoutes = await read('apps/api/growth-routes.mjs');
+  const billingStore = await read('apps/api/growth-store.mjs');
+  const billingSchemaTest = await read('apps/api/postgres-auth-schema.test.mjs');
+  check('V115 verified 14-day trial and cancellation path', paddle.includes('ATLAS_FREE_TRIAL_DAYS = 14') && paddle.includes('verifyPaddleFreeTrialPrice') && paddle.includes('unit_price_overrides') && paddle.includes('createPaddlePortalSession') && paddleTest.includes('14-day free trial') && paddleTest.includes('customer portal returns') && billingRoutes.includes("path === '/api/v1/billing/portal'") && billingRoutes.includes('trialStartedAt') && billingStore.includes('trial_started_at') && billingSchemaTest.includes('permanently records whether a workspace has used its free trial') && billingSchemaTest.includes('trial use remains recorded after cancellation'), 'Paddle recurring prices are checked before checkout, repeat trials are tenant-blocked after cancellation, and authenticated portal links are available for cancellation');
   const growthUi = await read('apps/command-center/growth.mjs');
   check('V114 CRM stage and qualification operations', growthDomain.includes('export function scoreLeadQualification') && growthDomain.includes('export function planLeadStageMove') && growthStore.includes('async moveLeadStage') && growthStore.includes('async evaluateLead') && growthRoutes.includes('move-stage') && growthRoutes.includes("searchParams.get('publishedOnly') === 'true'") && growthApiTest.includes('CRM stage moves and qualification evaluations') && growthSchemaTest.includes('human review remains mandatory by default'), 'Pipeline movement is versioned/policy-checked and published weighted rubrics save evidence-backed human-review outcomes');
   check('V114 Growth Center desktop UI', ui.includes('growth-panel') && growthUi.includes('immutable revision') && growthUi.includes('Load module example') && growthUi.includes('/billing/checkout') && growthUi.includes('Move lead') && growthUi.includes('Evaluate lead'), 'Laptop-first UI supports all module collections, searchable versioned records, lead operations, lifecycle actions and Paddle checkout controls');
+  check('V115 billing UI explains trial and plan management', ui.includes('Start 14-day free trial') && ui.includes('id="billing-manage"') && ui.includes('Paddle Checkout displays the price and billing cadence'), 'Payments UI discloses the verified trial and gives workspace billing users an authenticated manage/cancel entry point');
   const featureMatrix = await read('docs/COMPETITOR-FEATURE-MATRIX-2026-10.md');
   check('V114 competitor coverage is explicit', featureMatrix.includes('V114') && featureMatrix.includes('13 requested') && featureMatrix.includes('External email, AI, social and page providers are not connected'), 'HighLevel and n8n coverage states distinguish authenticated database features from provider-dependent execution');
+
+  const runtimeSql = await read('infra/postgres/FINAL-MIGRATION-V115.sql');
+  const runtimeGrants = await read('infra/postgres/API-ROLE-GRANTS-V115.sql');
+  const runtimeStore = await read('apps/api/runtime-store.mjs');
+  const runtimeTests = await read('apps/api/runtime-store.test.mjs');
+  const workerRuntime = await read('apps/worker/runtime.mjs');
+  const workerTests = await read('apps/worker/runtime.test.mjs');
+  const handlerContract = await read('apps/worker/handlers/README.md');
+  check('V115 tenant-safe durable job/outbox/scheduler schema', runtimeSql.includes('FORCE ROW LEVEL SECURITY') && runtimeSql.includes('atlas_v115_enqueue_job') && runtimeSql.includes('atlas_v115_append_outbox_event') && runtimeSql.includes('atlas_v115_tick_schedules') && runtimeSql.includes('payload_ref') && runtimeTests.includes('tenant B cannot see tenant A jobs'), 'Queue and schedule rows use forced RLS, reference-only payloads and tenant-bound API functions');
+  check('V115 isolated worker role and leases', runtimeGrants.includes('atlas_worker LOGIN NOSUPERUSER') && runtimeGrants.includes('atlas_v115_claim_jobs') && runtimeGrants.includes('atlas_v115_reap_jobs') && runtimeStore.includes("role.rolname !== 'atlas_worker'") && runtimeTests.includes('previous worker cannot complete after lease loss'), 'A distinct non-bypass worker role can claim/recover leases but cannot read customer tables');
+  check('V115 registered worker and honest external handler boundary', workerRuntime.includes('claimJobs(this.workerId') && workerRuntime.includes('controller.abort()') && workerRuntime.includes('worker refuses to claim work') && handlerContract.includes('no default business handlers'), 'Worker loop filters registered types, renews leases, drains safely and refuses to imply unimplemented workflow/provider handlers');
+  check('V115 workflow/event groundwork is explicitly documented', await read('docs/EXECUTION-ENGINE.md').then(text => text.includes('No default event or job handlers ship') && text.includes('at-least-once')) && await read('docs/ATLAS-MASTER-ROADMAP.md').then(text => text.includes('0. Foundation') && text.includes('BLOCKED BY EXTERNAL DEPENDENCY')) && workerTests.includes('worker shutdown'), 'Execution semantics and remaining external/provider blockers are documented and tested');
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
 }

@@ -2,7 +2,7 @@ import {
   sessionCookieName, createAuthError, hashOpaqueToken, isAllowedOrigin, parseCookies, verifyCsrf
 } from './auth-contracts.mjs';
 import { resolveAtlasAuthority } from '../../packages/atlas-core/authority.mjs';
-import { paddlePlanCatalog, createPaddleCheckout, normalizePaddleBillingEvent, paddleBodySha256, verifyPaddleSignature } from './paddle-billing.mjs';
+import { paddlePlanCatalog, verifyPaddleFreeTrialPrice, createPaddleCheckout, createPaddlePortalSession, normalizePaddleBillingEvent, paddleBodySha256, verifyPaddleSignature } from './paddle-billing.mjs';
 
 const MAX_BODY_BYTES = 110_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -98,17 +98,37 @@ export function createGrowthApi({ store, authStore, env = process.env, fetchImpl
       const who = await identity(req);
       if (path === '/api/v1/growth/overview' && req.method === 'GET') return send(res, 200, await store.overview(who), env);
       if (path === '/api/v1/billing/plans' && req.method === 'GET') {
-        const configured = new Set(paddlePlanCatalog(env).map(plan => plan.key));
+        const configured = new Map(paddlePlanCatalog(env).map(plan => [plan.key, plan]));
         const environmentConfigured = ['sandbox', 'live'].includes(env.ATLAS_PADDLE_ENVIRONMENT);
-        return send(res, 200, { plans: Object.entries(PLAN_DETAILS).map(([key, plan]) => ({ key, ...plan, checkoutAvailable: environmentConfigured && configured.has(key) && Boolean(env.ATLAS_PADDLE_API_KEY) })) }, env);
+        const plans = await Promise.all(Object.entries(PLAN_DETAILS).map(async ([key, plan]) => {
+          const selected = configured.get(key);
+          let trial = null;
+          if (environmentConfigured && selected && env.ATLAS_PADDLE_API_KEY) {
+            try { trial = await verifyPaddleFreeTrialPrice({ priceId: selected.priceId, env, fetchImpl }); }
+            catch { /* A plan is not offered until Paddle confirms its exact trial and recurring price. */ }
+          }
+          return { key, ...plan, checkoutAvailable: Boolean(trial), trialAvailable: Boolean(trial), trialDays: trial?.trialDays || null, billingCycle: trial?.billingCycle || null, renewal: trial?.renewal || null };
+        }));
+        return send(res, 200, { plans }, env);
       }
       if (path === '/api/v1/billing/subscription' && req.method === 'GET') return send(res, 200, { subscription: await store.getSubscription(who) }, env);
       if (path === '/api/v1/billing/checkout' && req.method === 'POST') {
         await requireMutation(req, who.session);
         await store.requireBillingManager(who);
+        const current = await store.getSubscription(who);
+        if (current && current.status !== 'canceled') throw createAuthError(409, 'billing_subscription_already_exists', 'Manage the current subscription before starting another checkout.');
+        if (current?.trialStartedAt) throw createAuthError(409, 'billing_trial_already_used', 'This workspace has already used its free trial.');
         const body = await readJson(req); exact(body, ['planKey']);
         const checkout = await createPaddleCheckout({ tenantId: who.tenantId, email: who.session.user.email, planKey: body.planKey, env, fetchImpl });
         return send(res, 201, { checkout }, env);
+      }
+      if (path === '/api/v1/billing/portal' && req.method === 'POST') {
+        await requireMutation(req, who.session);
+        await store.requireBillingManager(who);
+        const current = await store.getSubscription(who);
+        if (!current?.customerId || !current?.subscriptionId) throw createAuthError(409, 'billing_subscription_required', 'A Paddle subscription is not available for this workspace yet.');
+        const portal = await createPaddlePortalSession({ customerId: current.customerId, subscriptionId: current.subscriptionId, env, fetchImpl });
+        return send(res, 201, { portal }, env);
       }
       const match = path.match(/^\/api\/v1\/growth\/([a-z-]+)(?:\/([0-9a-f-]+)(?:\/([a-z-]+))?)?$/i);
       if (!match) return send(res, 404, { error: 'not_found' }, env);

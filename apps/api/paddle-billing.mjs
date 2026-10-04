@@ -2,6 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 const TENANT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PLAN_KEYS = Object.freeze(['starter', 'growth', 'scale']);
+export const ATLAS_FREE_TRIAL_DAYS = 14;
 const BILLING_EVENTS = new Set(['subscription.created', 'subscription.updated', 'subscription.trialing', 'subscription.activated', 'subscription.past_due', 'subscription.canceled', 'subscription.paused', 'subscription.resumed']);
 const STATUS_MAP = Object.freeze({ trialing: 'trialing', active: 'active', past_due: 'past_due', paused: 'paused', canceled: 'canceled' });
 
@@ -46,6 +47,40 @@ function apiOrigin(env) {
   return sandbox ? 'https://sandbox-api.paddle.com' : 'https://api.paddle.com';
 }
 
+function hasAtlasFreeTrial(price, priceId) {
+  const trial = price?.trial_period;
+  const cycle = price?.billing_cycle;
+  const amount = price?.unit_price?.amount;
+  const overrides = trial?.unit_price_overrides;
+  return price?.id === priceId && price?.status === 'active'
+    && ['day', 'week', 'month', 'year'].includes(cycle?.interval)
+    && Number.isInteger(cycle?.frequency) && cycle.frequency >= 1 && cycle.frequency <= 999
+    && typeof amount === 'string' && /^\d{1,12}$/.test(amount) && Number(amount) > 0
+    && /^[A-Z]{3}$/.test(price?.unit_price?.currency_code || '')
+    && trial?.interval === 'day' && trial?.frequency === ATLAS_FREE_TRIAL_DAYS
+    && trial?.requires_payment_method === true && trial?.unit_price === null
+    && (overrides == null || (Array.isArray(overrides) && overrides.length === 0));
+}
+
+export async function verifyPaddleFreeTrialPrice({ priceId, env = process.env, fetchImpl = fetch } = {}) {
+  if (typeof priceId !== 'string' || !/^pri_[A-Za-z0-9]{8,120}$/.test(priceId)) throw Object.assign(new Error('Paddle price is not configured'), { code: 'billing_trial_not_configured', status: 503 });
+  if (typeof env.ATLAS_PADDLE_API_KEY !== 'string' || env.ATLAS_PADDLE_API_KEY.length < 20) throw Object.assign(new Error('Paddle billing is not configured'), { code: 'billing_not_configured', status: 503 });
+  const response = await fetchImpl(`${apiOrigin(env)}/prices/${encodeURIComponent(priceId)}`, {
+    method: 'GET',
+    headers: { authorization: `Bearer ${env.ATLAS_PADDLE_API_KEY}`, accept: 'application/json', 'paddle-version': '1' },
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!response.ok) throw Object.assign(new Error('Paddle could not verify the trial price configuration.'), { code: 'paddle_trial_price_unavailable', status: 503 });
+  const price = (await response.json().catch(() => null))?.data;
+  if (!hasAtlasFreeTrial(price, priceId)) throw Object.assign(new Error('This plan is unavailable until Paddle confirms an active recurring price with a 14-day free trial.'), { code: 'billing_trial_not_configured', status: 503 });
+  return {
+    priceId,
+    trialDays: ATLAS_FREE_TRIAL_DAYS,
+    billingCycle: { interval: price.billing_cycle.interval, frequency: price.billing_cycle.frequency },
+    renewal: { amount: price.unit_price.amount, currencyCode: price.unit_price.currency_code }
+  };
+}
+
 export async function createPaddleCheckout({ tenantId, email, planKey, env = process.env, fetchImpl = fetch } = {}) {
   if (typeof tenantId !== 'string' || !TENANT_ID.test(tenantId)) throw new Error('A verified workspace is required');
   if (typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('A valid billing email is required');
@@ -54,6 +89,7 @@ export async function createPaddleCheckout({ tenantId, email, planKey, env = pro
   const plan = paddlePlanCatalog(env).find(item => item.key === planKey);
   if (!plan) throw Object.assign(new Error('Paddle is not configured for this plan'), { code: 'billing_not_configured', status: 503 });
   if (typeof env.ATLAS_PADDLE_API_KEY !== 'string' || env.ATLAS_PADDLE_API_KEY.length < 20) throw Object.assign(new Error('Paddle billing is not configured'), { code: 'billing_not_configured', status: 503 });
+  const trial = await verifyPaddleFreeTrialPrice({ priceId: plan.priceId, env, fetchImpl });
   const response = await fetchImpl(`${apiOrigin(env)}/transactions`, {
     method: 'POST',
     headers: { authorization: `Bearer ${env.ATLAS_PADDLE_API_KEY}`, 'content-type': 'application/json', accept: 'application/json', 'paddle-version': '1' },
@@ -68,7 +104,32 @@ export async function createPaddleCheckout({ tenantId, email, planKey, env = pro
   try { parsed = new URL(checkoutUrl); } catch { throw Object.assign(new Error('Paddle returned an invalid checkout link'), { code: 'paddle_checkout_unavailable', status: 502 }); }
   const allowedHost = env.ATLAS_PADDLE_ENVIRONMENT === 'sandbox' ? 'sandbox-checkout.paddle.com' : 'checkout.paddle.com';
   if (parsed.protocol !== 'https:' || parsed.hostname !== allowedHost || parsed.origin !== `https://${allowedHost}` || parsed.username || parsed.password || !/^txn_[A-Za-z0-9]{8,120}$/.test(String(transaction?.id || ''))) throw Object.assign(new Error('Paddle returned an unexpected checkout link'), { code: 'paddle_checkout_unavailable', status: 502 });
-  return { transactionId: transaction.id, checkoutUrl: parsed.toString(), planKey: plan.key, priceId: plan.priceId };
+  return { transactionId: transaction.id, checkoutUrl: parsed.toString(), planKey: plan.key, priceId: plan.priceId, trialDays: trial.trialDays, billingCycle: trial.billingCycle, renewal: trial.renewal };
+}
+
+export async function createPaddlePortalSession({ customerId, subscriptionId, env = process.env, fetchImpl = fetch } = {}) {
+  if (typeof customerId !== 'string' || !/^ctm_[A-Za-z0-9]{8,120}$/.test(customerId) || typeof subscriptionId !== 'string' || !/^sub_[A-Za-z0-9]{8,120}$/.test(subscriptionId)) {
+    throw Object.assign(new Error('A verified workspace subscription is required.'), { code: 'billing_subscription_required', status: 409 });
+  }
+  if (typeof env.ATLAS_PADDLE_API_KEY !== 'string' || env.ATLAS_PADDLE_API_KEY.length < 20) throw Object.assign(new Error('Paddle billing is not configured'), { code: 'billing_not_configured', status: 503 });
+  const response = await fetchImpl(`${apiOrigin(env)}/customers/${encodeURIComponent(customerId)}/portal-sessions`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${env.ATLAS_PADDLE_API_KEY}`, 'content-type': 'application/json', accept: 'application/json', 'paddle-version': '1' },
+    body: JSON.stringify({ subscription_ids: [subscriptionId] }),
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!response.ok) throw Object.assign(new Error('Paddle could not open secure billing management. Try again later.'), { code: 'paddle_portal_unavailable', status: 502 });
+  const data = (await response.json().catch(() => null))?.data;
+  const links = data?.urls?.subscriptions?.find(item => item.id === subscriptionId);
+  const checkedUrl = value => {
+    let parsed;
+    try { parsed = new URL(value); } catch { return null; }
+    return parsed.protocol === 'https:' && parsed.hostname === 'customer-portal.paddle.com' && parsed.origin === 'https://customer-portal.paddle.com' && !parsed.username && !parsed.password && parsed.searchParams.has('token') ? parsed.toString() : null;
+  };
+  const manageUrl = checkedUrl(links?.view_subscription);
+  const cancelUrl = checkedUrl(links?.cancel_subscription);
+  if (data?.customer_id !== customerId || !manageUrl || !cancelUrl) throw Object.assign(new Error('Paddle returned an invalid customer portal session.'), { code: 'paddle_portal_unavailable', status: 502 });
+  return { manageUrl, cancelUrl };
 }
 
 export function normalizePaddleBillingEvent(event, { env = process.env } = {}) {
@@ -85,6 +146,8 @@ export function normalizePaddleBillingEvent(event, { env = process.env } = {}) {
   if (typeof subscriptionId !== 'string' || !/^sub_[A-Za-z0-9]{8,120}$/.test(subscriptionId) || typeof priceId !== 'string') throw new Error('Paddle subscription identifiers are invalid');
   const status = STATUS_MAP[data.status];
   if (!status) throw new Error('Paddle subscription status is unsupported');
+  const subscriptionPrice = data.items?.[0]?.price;
+  if (status === 'trialing' && !hasAtlasFreeTrial(subscriptionPrice, priceId)) throw new Error('Paddle trial subscription does not match the configured 14-day free trial');
   const plans = paddlePlanCatalog(env);
   const pricePlan = plans.find(item => item.priceId === priceId);
   if (!pricePlan || pricePlan.key !== planKey) throw new Error('Paddle subscription does not match a configured Atlas plan');
@@ -92,11 +155,13 @@ export function normalizePaddleBillingEvent(event, { env = process.env } = {}) {
   if (periodEnd && !Number.isFinite(periodEnd.getTime())) throw new Error('Paddle billing period is invalid');
   const customerId = data.customer_id;
   if (customerId != null && (typeof customerId !== 'string' || !/^ctm_[A-Za-z0-9]{8,120}$/.test(customerId))) throw new Error('Paddle customer reference is invalid');
+  const normalizedStatus = event.event_type === 'subscription.canceled' ? 'canceled' : status;
   return {
     disposition: 'apply', eventId: event.event_id, eventType: event.event_type,
     occurredAt: new Date(occurredAt).toISOString(), tenantId: tenantId.toLowerCase(),
     subscriptionId, customerId: customerId || null, priceId, planKey,
-    status: event.event_type === 'subscription.canceled' ? 'canceled' : status,
+    status: normalizedStatus,
+    trialStartedAt: normalizedStatus === 'trialing' ? new Date(occurredAt).toISOString() : null,
     currentPeriodEndsAt: periodEnd?.toISOString() || null,
     cancelAtPeriodEnd: data.scheduled_change?.action === 'cancel'
   };
