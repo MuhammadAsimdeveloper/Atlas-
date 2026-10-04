@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { WORKFLOW_NODE_CATALOG, WORKFLOW_NODE_TYPES, WORKFLOW_TRIGGER_CATALOG } from './workflow-catalog.mjs';
 
 const sha = value => crypto.createHash('sha256').update(JSON.stringify(canon(value))).digest('hex');
 const canon = value => Array.isArray(value) ? value.map(canon) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canon(value[key])])) : value;
@@ -128,15 +129,110 @@ export function searchCrm({ records, tenantId, type, query = '', filters = {}, l
   return { items: page, nextCursor: page.length === limit ? page[page.length - 1].id : null };
 }
 
-export const WORKFLOW_NODE_CATALOG = Object.freeze({
-  trigger:{risk:'read',guard:null}, condition:{risk:'read',guard:null}, switch:{risk:'read',guard:null}, delay:{risk:'read',guard:null}, wait_until:{risk:'read',guard:null},
-  transform:{risk:'read',guard:null}, set_field:{risk:'write',guard:'tenant_record_and_version'}, tag:{risk:'write',guard:'tenant_record_and_idempotency'}, associate:{risk:'write',guard:'tenant_scope'},
-  create_task:{risk:'write',guard:'tenant_task_and_idempotency'}, send_message:{risk:'network',guard:'fresh_message_policy'}, find_availability:{risk:'network',guard:'fresh_calendar_read'},
-  book_appointment:{risk:'write',guard:'fresh_availability_and_idempotency'}, reschedule_appointment:{risk:'write',guard:'calendar_availability_and_version'}, cancel_appointment:{risk:'destructive',guard:'tenant_and_version',requiresApproval:true},
-  invoke_agent:{risk:'ai',guard:'agent_release_and_capability_gate'}, sub_workflow:{risk:'write',guard:'pinned_child_release'}, approval:{risk:'write',guard:'explicit_approval',requiresApproval:true},
-  webhook:{risk:'network',guard:'allowlisted_https_endpoint'}, stop:{risk:'read',guard:null}
+export { WORKFLOW_NODE_CATALOG, WORKFLOW_NODE_TYPES, WORKFLOW_TRIGGER_CATALOG, WORKFLOW_TRIGGER_TYPES } from './workflow-catalog.mjs';
+
+const PRIVATE_CONFIG_FIELD = /password|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|credential|authorization|cookie|private[_-]?key|raw[_-]?body|message[_-]?body|transcript|recording/i;
+const DIRECT_DESTINATION_FIELD = /^(?:email|phone|phone_number|recipient|recipient_email|recipient_phone|to|to_email|to_phone)$/i;
+const NETWORK_LOCATION_FIELD = /^(?:url|uri|host|hostname|endpoint_url|callback_url)$/i;
+const CONFIG_REFERENCE_PHONE = /[+()\s]/;
+
+function opaqueWorkflowReference(value, label) {
+  const result = reference(value, label);
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result);
+  const numericAddress = /^[+\d(). -]+$/.test(result) && (result.match(/\d/g) || []).length >= 7;
+  const phoneLike = CONFIG_REFERENCE_PHONE.test(result) && (result.match(/\d/g) || []).length >= 7;
+  if (/@/.test(result) || /^https?:\/\//i.test(result) || !uuid && (numericAddress || phoneLike)) throw new Error(label + ' must be an opaque reference, not a direct address or URL');
+  return result;
+}
+
+function copyWorkflowConfig(value, path = 'config', depth = 0, state = { bytes:0 }, seen = new WeakSet()) {
+  if (depth > 8) throw new Error('Workflow config nesting exceeds limit');
+  if (value === null || typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value.length > 8192 || /\u0000/.test(value)) throw new Error(path + ' string is invalid or too large');
+    state.bytes += Buffer.byteLength(value, 'utf8');
+    if (state.bytes > 32768) throw new Error('Workflow node config exceeds 32 KB');
+    return value;
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(path + ' must be finite');
+    return value;
+  }
+  if (!value || typeof value !== 'object' || seen.has(value)) throw new Error(path + ' must be acyclic JSON data');
+  seen.add(value);
+  let result;
+  if (Array.isArray(value)) {
+    if (value.length > 100) throw new Error(path + ' list exceeds 100 items');
+    result = value.map((item, index) => copyWorkflowConfig(item, path + '[' + index + ']', depth + 1, state, seen));
+  } else {
+    if (Object.getPrototypeOf(value) !== Object.prototype) throw new Error(path + ' must be a plain object');
+    const symbols = Object.getOwnPropertySymbols(value);
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const keys = Object.keys(descriptors).filter(key => descriptors[key].enumerable);
+    if (symbols.length || keys.length > 100) throw new Error(path + ' object is invalid or too large');
+    result = {};
+    for (const key of keys) {
+      const descriptor = descriptors[key];
+      if (!Object.hasOwn(descriptor, 'value')) throw new Error(path + ' cannot contain accessors');
+      if (['__proto__','prototype','constructor'].includes(key)) throw new Error('Unsafe workflow config key');
+      if (PRIVATE_CONFIG_FIELD.test(key)) throw new Error('Workflow config cannot contain credential or private-content fields');
+      if (DIRECT_DESTINATION_FIELD.test(key)) throw new Error('Workflow config must use contact references, not direct recipient data');
+      if (NETWORK_LOCATION_FIELD.test(key)) throw new Error('Workflow config must use an approved connection reference, not a network location');
+      if (key.length > 100) throw new Error(path + ' key is too large');
+      state.bytes += Buffer.byteLength(key, 'utf8');
+      if (state.bytes > 32768) throw new Error('Workflow node config exceeds 32 KB');
+      result[key] = copyWorkflowConfig(descriptor.value, path + '.' + key, depth + 1, state, seen);
+    }
+  }
+  seen.delete(value);
+  return result;
+}
+
+const NODE_REFERENCE_FIELDS = Object.freeze({
+  find_contact:['queryRef'], create_contact:['sourceRef'], copy_contact:['contactRef','targetWorkspaceRef'], delete_contact:['contactRef'], assign_contact:['contactRef','assigneeRef'], remove_contact_assignment:['contactRef'], manage_contact_followers:['contactRef'], update_engagement_score:['contactRef','scoreRef'],
+  set_contact_dnd:['contactRef'], add_note:['contactRef','noteTemplateRef'], edit_conversation:['conversationRef'],
+  create_opportunity:['contactRef','pipelineRef'], update_opportunity:['opportunityRef'], remove_opportunity:['opportunityRef','pipelineRef'],
+  create_task:['taskTemplateRef'], set_custom_value:['valueRef'], generate_booking_link:['calendarRef','contactRef'],
+  update_appointment_status:['appointmentRef'], call_contact:['contactRef','connectionRef'], manual_action:['taskTemplateRef'],
+  reply_social_comment:['commentRef','contentRef','connectionRef'], send_document_contract:['documentTemplateRef','contactRef','connectionRef'],
+  ai_generate:['promptRef'], send_analytics_event:['conversionRef','connectionRef'],
+  send_message:['templateRef','connectionRef'], reply_in_conversation:['conversationRef','templateRef','connectionRef'], notify_internal:['recipientRef'],
+  webhook:['connectionRef','operationRef'], http_request:['connectionRef','operationRef'], spreadsheet_upsert:['connectionRef','resourceRef'],
+  send_review_request:['contactRef','templateRef','connectionRef'], create_payment_link:['customerRef','priceRef','connectionRef'],
+  send_invoice:['invoiceRef','connectionRef'], issue_refund:['paymentRef','connectionRef'], publish_social_post:['contentRef','connectionRef'],
+  charge_payment:['customerRef','amountPolicyRef','connectionRef'], add_to_audience:['audienceRef','contactRef','connectionRef'], remove_from_audience:['audienceRef','contactRef','connectionRef'],
+  add_google_ads_audience:['audienceRef','contactRef','connectionRef'], remove_google_ads_audience:['audienceRef','contactRef','connectionRef'], facebook_conversion_event:['conversionRef','connectionRef'],
+  record_conversion:['conversionRef','connectionRef'], affiliate_action:['affiliateRef','connectionRef'], update_affiliate:['affiliateRef','connectionRef'], manage_affiliate_campaign:['affiliateRef','campaignRef','connectionRef'], grant_course_access:['memberRef','offerRef'],
+  revoke_course_access:['memberRef','offerRef'], set_community_access:['memberRef','groupRef'], ivr_transfer_call:['callSessionRef','routeRef'],
+  ivr_gather_input:['callSessionRef'], ivr_play_message:['callSessionRef','contentRef'], ivr_transfer_call:['callSessionRef','routeRef'], ivr_connect_call:['callSessionRef','routeRef'], ivr_end_call:['callSessionRef'], record_voicemail:['callSessionRef'],
+  sub_workflow:['workflowReleaseRef']
 });
-export const WORKFLOW_NODE_TYPES = Object.freeze(Object.keys(WORKFLOW_NODE_CATALOG));
+
+function validateWorkflowNodeConfig(type, config) {
+  if (type === 'trigger') {
+    if (typeof config.eventType !== 'string' || !Object.hasOwn(WORKFLOW_TRIGGER_CATALOG, config.eventType)) throw new Error('trigger requires a supported eventType');
+  }
+  if (type === 'send_message') {
+    if (!['email','sms','whatsapp','facebook','instagram','google_business','webchat','voice'].includes(config.channel)) throw new Error('send_message channel unsupported');
+    if (typeof config.templateRef !== 'string' || typeof config.connectionRef !== 'string') throw new Error('send_message requires templateRef and connectionRef');
+    opaqueWorkflowReference(config.templateRef, 'send_message templateRef');
+    opaqueWorkflowReference(config.connectionRef, 'send_message connectionRef');
+  }
+  if (type === 'notify_internal') {
+    if (!['email','slack','in_app','web_push'].includes(config.channel)) throw new Error('notify_internal channel unsupported');
+    if (typeof config.recipientRef !== 'string' || !config.recipientRef.trim()) throw new Error('notify_internal requires recipientRef');
+    if (['email','slack'].includes(config.channel)) opaqueWorkflowReference(config.connectionRef, 'notify_internal connectionRef');
+  }
+  if (['find_availability','book_appointment','reschedule_appointment','cancel_appointment'].includes(type) && typeof config.calendarRef !== 'string') throw new Error(type + ' requires calendarRef');
+  if (type === 'invoke_agent' && typeof config.agentReleaseRef !== 'string') throw new Error('invoke_agent requires agentReleaseRef');
+  for (const field of NODE_REFERENCE_FIELDS[type] || []) {
+    opaqueWorkflowReference(config[field], type + ' ' + field);
+  }
+  if (['delay','wait_until'].includes(type) && (!Number.isSafeInteger(config.delayMs ?? config.offsetMs) || Math.abs(config.delayMs ?? config.offsetMs) > 365 * 86400000)) throw new Error(type + ' duration is invalid');
+  if (type === 'split_batches' && (!Number.isSafeInteger(config.batchSize) || config.batchSize < 1 || config.batchSize > 1000)) throw new Error('split_batches batchSize must be 1-1000');
+  if (type === 'rate_limit_batch' && (!Number.isSafeInteger(config.batchSize) || config.batchSize < 1 || config.batchSize > 1000 || !Number.isSafeInteger(config.intervalMs) || config.intervalMs < 100 || config.intervalMs > 86400000)) throw new Error('rate_limit_batch bounds are invalid');
+  if (['condition','switch','random_split'].includes(type) && (!Array.isArray(config.cases) || config.cases.length < 1 || config.cases.length > 32)) throw new Error(type + ' requires 1-32 cases');
+}
 
 function normalizeNode(node, index) {
   if (!node || typeof node !== 'object' || Array.isArray(node)) throw new Error('Node ' + (index + 1) + ' is invalid');
@@ -144,14 +240,17 @@ function normalizeNode(node, index) {
   const type = text(node.type, 'node type', 48);
   const definition = WORKFLOW_NODE_CATALOG[type];
   if (!definition) throw new Error('Unsupported node type: ' + type);
-  const config = node.config && typeof node.config === 'object' && !Array.isArray(node.config) ? node.config : {};
-  if (type === 'trigger' && typeof config.eventType !== 'string') throw new Error('trigger requires eventType');
-  if (type === 'send_message' && !['email','sms','whatsapp','facebook','instagram','webchat','voice'].includes(config.channel)) throw new Error('send_message channel unsupported');
-  if (['find_availability','book_appointment','reschedule_appointment','cancel_appointment'].includes(type) && typeof config.calendarRef !== 'string') throw new Error(type + ' requires calendarRef');
-  if (type === 'invoke_agent' && typeof config.agentReleaseRef !== 'string') throw new Error('invoke_agent requires agentReleaseRef');
-  if (['delay','wait_until'].includes(type) && (!Number.isSafeInteger(config.delayMs ?? config.offsetMs) || Math.abs(config.delayMs ?? config.offsetMs) > 365 * 86400000)) throw new Error(type + ' duration is invalid');
-  if (['condition','switch'].includes(type) && (!Array.isArray(config.cases) || config.cases.length < 1 || config.cases.length > 32)) throw new Error(type + ' requires 1-32 cases');
-  return { id, type, name: text(node.name || id, 'node name', 120), config, risk: definition.risk, guard: definition.guard || null, requiresApproval: Boolean(definition.requiresApproval), retry: { maxAttempts: Number.isSafeInteger(node.retry?.maxAttempts) ? node.retry.maxAttempts : 3, backoffMs: Number.isSafeInteger(node.retry?.backoffMs) ? node.retry.backoffMs : 500 }, timeoutMs: Number.isSafeInteger(node.timeoutMs) ? node.timeoutMs : 30000 };
+  if (node.config != null && (!node.config || typeof node.config !== 'object' || Array.isArray(node.config))) throw new Error('Node config must be a plain object');
+  const config = copyWorkflowConfig(node.config || {});
+  validateWorkflowNodeConfig(type, config);
+  const retry = node.retry == null ? {} : copyWorkflowConfig(node.retry, 'retry');
+  if (!retry || typeof retry !== 'object' || Array.isArray(retry)) throw new Error('Node retry policy must be an object');
+  const maxAttempts = retry.maxAttempts === undefined ? 3 : retry.maxAttempts;
+  const backoffMs = retry.backoffMs === undefined ? 500 : retry.backoffMs;
+  if (!Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 10 || !Number.isSafeInteger(backoffMs) || backoffMs < 100 || backoffMs > 60000) throw new Error('Node retry policy is outside safe limits');
+  const timeoutMs = node.timeoutMs === undefined ? 30000 : node.timeoutMs;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 600000) throw new Error('Node timeout must be 1000-600000 ms');
+  return { id, type, name: text(node.name || id, 'node name', 120), config, category:definition.category, risk: definition.risk, guard: definition.guard || null, execution:definition.execution, retrySafe:definition.retrySafe, requiresAdapter:definition.requiresAdapter, requiresApproval: Boolean(definition.requiresApproval), retry: { maxAttempts, backoffMs }, timeoutMs };
 }
 
 function cycle(nodes, edges) {
@@ -193,15 +292,49 @@ export function verifyWorkflowGraph(graph) {
   return /^[a-f0-9]{64}$/.test(checksum) && sha(body) === checksum;
 }
 
-export function planWorkflowNode({ graph, nodeId, tenantId, executionId, attempt = 1, approvalEvidence = null } = {}) {
+function copyWorkflowApprovalEvidence(evidence) {
+  const allowed = new Set(['status','approvalId','tenantId','graphChecksum','executionId','nodeId','idempotencyKey','requestedByActorId','approvedByActorId','approvedAt','expiresAt','signature','signatureRef']);
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence) || Object.getPrototypeOf(evidence) !== Object.prototype || Object.getOwnPropertySymbols(evidence).length) return null;
+  const descriptors = Object.getOwnPropertyDescriptors(evidence);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length > allowed.size || keys.some(key => typeof key !== 'string' || !allowed.has(key) || !descriptors[key].enumerable || !Object.hasOwn(descriptors[key], 'value'))) return null;
+  return Object.fromEntries(keys.map(key => [key, descriptors[key].value]));
+}
+
+export function planWorkflowNode({ graph, nodeId, tenantId, executionId, attempt = 1, approvalEvidence = null, approvalVerifier = null, requestedByActorId = null, now = Date.now() } = {}) {
   if (!verifyWorkflowGraph(graph) || graph.tenantId !== tenantId) throw new Error('Workflow graph tenant or checksum invalid');
   const node = graph.nodes.find(item => item.id === nodeId);
   if (!node) throw new Error('Workflow node not found');
   if (!Number.isSafeInteger(attempt) || attempt < 1 || attempt > 10) throw new Error('Attempt must be 1-10');
-  const idempotencyKey = sha({ tenantId, graphChecksum: graph.checksum, executionId, nodeId, attempt });
-  const approved = approvalEvidence?.status === 'approved' && approvalEvidence.tenantId === tenantId && approvalEvidence.nodeId === nodeId && approvalEvidence.idempotencyKey === idempotencyKey;
-  if (node.requiresApproval && !approved) return { status:'needs_approval', nodeId, idempotencyKey, risk:node.risk, guard:node.guard };
-  return { status:'planned', nodeId, idempotencyKey, risk:node.risk, guard:node.guard, requiresApproval:node.requiresApproval, timeoutMs:node.timeoutMs, retry:node.retry };
+  const stableExecutionId = reference(executionId, 'executionId');
+  const currentTime = Number(now);
+  if (!Number.isFinite(currentTime) || !Number.isFinite(new Date(currentTime).getTime())) throw new Error('now must be a valid timestamp');
+  if (attempt > node.retry.maxAttempts) throw new Error('Attempt exceeds this node retry limit');
+  // The key identifies the logical side effect. Including attempt here would
+  // turn every retry into a second provider command and can double-send.
+  const idempotencyKey = sha({ tenantId, graphChecksum: graph.checksum, executionId:stableExecutionId, nodeId });
+  if (attempt > 1 && !node.retrySafe) return { status:'retry_blocked', reason:'node_not_idempotent', nodeId, idempotencyKey, attempt, risk:node.risk, guard:node.guard, retrySafe:false };
+  const safeApproval = copyWorkflowApprovalEvidence(approvalEvidence);
+  const approvedAt = Date.parse(safeApproval?.approvedAt);
+  const expiresAt = Date.parse(safeApproval?.expiresAt);
+  const evidenceScopeMatches = safeApproval?.status === 'approved' &&
+    typeof safeApproval.approvalId === 'string' && safeApproval.approvalId.trim().length > 0 &&
+    safeApproval.tenantId === tenantId && safeApproval.graphChecksum === graph.checksum &&
+    safeApproval.executionId === stableExecutionId && safeApproval.nodeId === nodeId &&
+    safeApproval.idempotencyKey === idempotencyKey &&
+    typeof safeApproval.approvedByActorId === 'string' && safeApproval.approvedByActorId.trim().length > 0 &&
+    Number.isFinite(approvedAt) && Number.isFinite(expiresAt) && approvedAt <= currentTime + 60_000 &&
+    expiresAt > currentTime && expiresAt - approvedAt <= 15 * 60_000 &&
+    (!requestedByActorId || safeApproval.requestedByActorId === requestedByActorId) &&
+    (!requestedByActorId || safeApproval.approvedByActorId !== requestedByActorId);
+  let trustedApproval = false;
+  if (evidenceScopeMatches && typeof approvalVerifier === 'function') {
+    try { trustedApproval = approvalVerifier(safeApproval, { tenantId, graphChecksum:graph.checksum, executionId:stableExecutionId, nodeId, idempotencyKey, requestedByActorId }) === true; }
+    catch { trustedApproval = false; }
+  }
+  const metadata = { nodeId, idempotencyKey, attempt, category:node.category, risk:node.risk, guard:node.guard, execution:node.execution, requiresAdapter:node.requiresAdapter, retrySafe:node.retrySafe, timeoutMs:node.timeoutMs, retry:node.retry };
+  if (node.requiresApproval && !trustedApproval) return { status:'needs_approval', approvalReason: typeof approvalVerifier === 'function' ? 'approval_evidence_untrusted_or_invalid' : 'trusted_approval_verifier_required', ...metadata };
+  return { status:'planned', ...metadata, requiresApproval:node.requiresApproval };
 }
 
 export function summarizeWorkflowExecution({ executionId, tenantId, status = 'completed', steps = [] } = {}) {

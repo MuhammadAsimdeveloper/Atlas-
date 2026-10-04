@@ -183,11 +183,15 @@ function boundedToolInput(value, ancestors = new WeakSet(), depth = 0) {
     result = value.map(child => boundedToolInput(child, ancestors, depth + 1));
   } else {
     if (Object.getPrototypeOf(value) !== Object.prototype || Object.keys(value).length > 100) throw new Error('Tool arguments must be a bounded plain object');
+    if (Object.getOwnPropertySymbols(value).length) throw new Error('Tool arguments cannot contain symbol keys');
     result = {};
-    for (const [key, child] of Object.entries(value)) {
+    for (const key of Object.keys(value)) {
       if (['__proto__', 'constructor', 'prototype'].includes(key)) throw new Error('Tool arguments cannot use prototype keys');
       if (PRIVATE_INPUT_KEY.test(key)) throw new Error('Tool arguments cannot contain credentials or secret values');
-      result[key.slice(0, 120)] = boundedToolInput(child, ancestors, depth + 1);
+      if (key.length > 120) throw new Error('Tool argument key is too large');
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) throw new Error('Tool arguments cannot contain accessors');
+      result[key] = boundedToolInput(descriptor.value, ancestors, depth + 1);
     }
   }
   ancestors.delete(value);
@@ -206,10 +210,14 @@ function boundedToolOutput(value, ancestors = new WeakSet(), depth = 0) {
     result = value.map(child => boundedToolOutput(child, ancestors, depth + 1));
   } else {
     if (Object.getPrototypeOf(value) !== Object.prototype || Object.keys(value).length > 100) throw new Error('Tool result must be a bounded plain object');
+    if (Object.getOwnPropertySymbols(value).length) throw new Error('Tool result cannot contain symbol keys');
     result = {};
-    for (const [key, child] of Object.entries(value)) {
-      if (['__proto__', 'constructor', 'prototype'].includes(key)) continue;
-      result[key.slice(0, 120)] = PRIVATE_OUTPUT_KEY.test(key) ? '[REDACTED]' : boundedToolOutput(child, ancestors, depth + 1);
+    for (const key of Object.keys(value)) {
+      if (['__proto__', 'constructor', 'prototype'].includes(key)) throw new Error('Tool result cannot contain prototype keys');
+      if (key.length > 120) throw new Error('Tool result key is too large');
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) throw new Error('Tool result cannot contain accessors');
+      result[key] = PRIVATE_OUTPUT_KEY.test(key) ? '[REDACTED]' : boundedToolOutput(descriptor.value, ancestors, depth + 1);
     }
   }
   ancestors.delete(value);

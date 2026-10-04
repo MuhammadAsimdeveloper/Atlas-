@@ -2,10 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createCrmRecord, defineCrmProperty, updateCrmRecord, createCrmAssociation, createCrmPipeline, transitionCrmDeal, searchCrm,
-  createWorkflowGraph, verifyWorkflowGraph, planWorkflowNode, summarizeWorkflowExecution, WORKFLOW_NODE_TYPES,
+  createWorkflowGraph, verifyWorkflowGraph, planWorkflowNode, summarizeWorkflowExecution, WORKFLOW_NODE_TYPES, WORKFLOW_NODE_CATALOG, WORKFLOW_TRIGGER_TYPES, WORKFLOW_TRIGGER_CATALOG,
   createBookingCalendar, verifyBookingCalendar, listAvailableSlots, holdBooking, bookAppointment, rescheduleAppointment, cancelAppointment,
   createAgentRuntimePolicy, defineAgentTool, authorizeAgentToolCall, createAgentSession, consumeAgentBudget, completeAgentSession, validateAgentOutput, summarizeAgentExecution
 } from './index.mjs';
+
+function workflowApproval(graph, pending, { executionId, nodeId, requestedByActorId = 'u-requester', approvedByActorId = 'u-reviewer', now = Date.now(), overrides = {} } = {}) {
+  const approvedAt = new Date(now).toISOString();
+  return {
+    status:'approved', approvalId:'approval-1', tenantId:graph.tenantId, graphChecksum:graph.checksum,
+    executionId, nodeId, idempotencyKey:pending.idempotencyKey, requestedByActorId, approvedByActorId,
+    approvedAt, expiresAt:new Date(now + 5 * 60_000).toISOString(), signature:'trusted-test-signature', ...overrides
+  };
+}
 
 test('CRM target enforces typed properties, tenant scope, optimistic versions, associations and pipeline governance', () => {
   const schemas = new Map([
@@ -28,7 +37,8 @@ test('CRM target enforces typed properties, tenant scope, optimistic versions, a
 });
 
 test('workflow-node target is n8n/GHL-shaped but deterministic, bounded and approval-gated', () => {
-  for (const type of ['trigger','condition','switch','delay','wait_until','transform','set_field','tag','associate','create_task','send_message','find_availability','book_appointment','reschedule_appointment','cancel_appointment','invoke_agent','sub_workflow','approval','webhook','stop']) assert.ok(WORKFLOW_NODE_TYPES.includes(type));
+  for (const type of ['trigger','condition','switch','goal','random_split','delay','wait_until','await_event','rate_limit_batch','transform','map_array','filter_array','split_batches','merge','text_format','math','set_custom_value','find_contact','create_contact','copy_contact','delete_contact','set_field','tag','assign_contact','remove_contact_assignment','manage_contact_followers','update_engagement_score','set_contact_dnd','add_note','create_task','edit_conversation','create_opportunity','update_opportunity','remove_opportunity','associate','send_message','reply_in_conversation','reply_social_comment','notify_internal','send_review_request','send_document_contract','call_contact','manual_action','webhook','http_request','spreadsheet_upsert','find_availability','book_appointment','generate_booking_link','reschedule_appointment','cancel_appointment','update_appointment_status','invoke_agent','ai_generate','ai_classify','ai_summarize','ai_intent_detect','knowledge_search','create_payment_link','charge_payment','send_invoice','issue_refund','publish_social_post','add_to_audience','remove_from_audience','record_conversion','send_analytics_event','affiliate_action','update_affiliate','manage_affiliate_campaign','grant_course_access','revoke_course_access','set_community_access','ivr_gather_input','ivr_play_message','ivr_transfer_call','ivr_connect_call','ivr_end_call','record_voicemail','sub_workflow','approval','remove_from_workflow','stop']) assert.ok(WORKFLOW_NODE_TYPES.includes(type));
+  assert.equal(Object.isFrozen(WORKFLOW_NODE_CATALOG.issue_refund), true);
   const graph = createWorkflowGraph({
     tenantId:'t1', id:'wf1', name:'Lead to booking',
     nodes:[
@@ -40,7 +50,7 @@ test('workflow-node target is n8n/GHL-shaped but deterministic, bounded and appr
     edges:[{from:'start',to:'availability'},{from:'availability',to:'book',port:'available'},{from:'book',to:'done',port:'booked'}]
   });
   assert.equal(verifyWorkflowGraph(graph), true);
-  assert.throws(() => createWorkflowGraph({...graph,nodes:[{id:'start',type:'trigger',config:{eventType:'x'}},{id:'done',type:'stop'}],edges:[{from:'start',to:'done'},{from:'done',to:'start'}],checksum:undefined}), /cycle/);
+  assert.throws(() => createWorkflowGraph({...graph,nodes:[{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'done',type:'stop'}],edges:[{from:'start',to:'done'},{from:'done',to:'start'}],checksum:undefined}), /cycle/);
   const destructive = createWorkflowGraph({
     tenantId:'t1', id:'wf2', name:'Cancel',
     nodes:[{id:'start',type:'trigger',config:{eventType:'appointment.canceled'}},{id:'cancel',type:'cancel_appointment',config:{calendarRef:'cal1'}},{id:'done',type:'stop'}],
@@ -48,9 +58,126 @@ test('workflow-node target is n8n/GHL-shaped but deterministic, bounded and appr
   });
   const pending = planWorkflowNode({ graph:destructive, nodeId:'cancel', tenantId:'t1', executionId:'e1' });
   assert.equal(pending.status, 'needs_approval');
-  assert.equal(planWorkflowNode({ graph:destructive, nodeId:'cancel', tenantId:'t1', executionId:'e1', approvalEvidence:{status:'approved',tenantId:'t1',nodeId:'cancel',idempotencyKey:pending.idempotencyKey} }).status, 'planned');
+  const approval = workflowApproval(destructive, pending, { executionId:'e1', nodeId:'cancel' });
+  assert.equal(planWorkflowNode({ graph:destructive, nodeId:'cancel', tenantId:'t1', executionId:'e1', approvalEvidence:approval, approvalVerifier:evidence => evidence.signature === 'trusted-test-signature' }).status, 'planned');
+  assert.equal(planWorkflowNode({ graph:destructive, nodeId:'cancel', tenantId:'t1', executionId:'e1', approvalEvidence:approval }).status, 'needs_approval');
+  assert.equal(planWorkflowNode({ graph:destructive, nodeId:'cancel', tenantId:'t1', executionId:'e1', approvalEvidence:workflowApproval(destructive, pending, { executionId:'e2', nodeId:'cancel' }), approvalVerifier:() => true }).status, 'needs_approval');
+  assert.equal(planWorkflowNode({ graph:destructive, nodeId:'cancel', tenantId:'t1', executionId:'e1', approvalEvidence:workflowApproval(destructive, pending, { executionId:'e1', nodeId:'cancel', approvedByActorId:'u-requester' }), approvalVerifier:() => true, requestedByActorId:'u-requester' }).status, 'needs_approval');
+  assert.equal(planWorkflowNode({ graph:destructive, nodeId:'cancel', tenantId:'t1', executionId:'e1', approvalEvidence:workflowApproval(destructive, pending, { executionId:'e1', nodeId:'cancel', now:Date.now() - 20 * 60_000 }), approvalVerifier:() => true }).status, 'needs_approval');
   const summary = summarizeWorkflowExecution({ executionId:'e1', tenantId:'t1', steps:[{nodeId:'cancel',status:'failed',retryCount:2}] });
   assert.equal(summary.retries, 2);
+});
+
+test('GHL 2026 trigger inventory maps documented workflow events to canonical Atlas event families', () => {
+  const documented = [
+    'contact.created','contact.updated','contact.dnd_changed','contact.tag_added','contact.tag_removed','contact.custom_date_due','contact.birthday_due','contact.note_added','contact.note_changed','contact.engagement_threshold','task.created','task.reminder_due','task.completed',
+    'webhook.received','schedule.fired','call.details_matched','email.delivered','email.opened','email.clicked','email.bounced','email.spam','email.unsubscribed','message.customer_replied','conversation.ai_triggered','custom.event','form.submitted','survey.submitted','trigger_link.clicked','lead_form.facebook_submitted','lead_form.tiktok_submitted','video.threshold_reached','contact.phone_validation_completed','message.sms_error','lead_form.linkedin_submitted','funnel.page_viewed','quiz.submitted','review.received','prospect.generated','social.click_to_whatsapp_started','tracking.external_event',
+    'appointment.booked','appointment.service_booked','rental.booked','opportunity.status_changed','opportunity.created','opportunity.updated','opportunity.stage_changed','opportunity.stale','affiliate.created','affiliate.sale','affiliate.campaign_enrolled','affiliate.lead_created',
+    'course.category_started','course.category_completed','course.lesson_started','course.lesson_completed','course.signup','course.access_granted','course.access_removed','course.product_started','course.product_completed','course.user_login',
+    'invoice.created','payment.received','order.form_submitted','order.submitted','document.sent','document.signed','document.declined','estimate.sent','estimate.accepted','estimate.declined','subscription.created','subscription.updated','subscription.paused','subscription.resumed','subscription.canceled','payment.refunded','coupon.applied','coupon.limit_reached','coupon.expired','coupon.redeemed',
+    'store.shopify_abandoned_cart','store.shopify_order_placed','store.shopify_order_fulfilled','store.order_fulfilled','store.product_review_submitted','store.checkout_abandoned','ivr.started','social.facebook_comment','social.instagram_comment','community.group_access_granted','community.group_access_revoked','community.private_channel_granted','community.private_channel_revoked','community.level_changed','certificate.issued','social.tiktok_comment','call.transcript_generated','lead_form.google_submitted'
+  ];
+  for (const type of documented) assert.ok(Object.hasOwn(WORKFLOW_TRIGGER_CATALOG, type), `missing documented trigger ${type}`);
+  assert.equal(new Set(WORKFLOW_TRIGGER_TYPES).size, WORKFLOW_TRIGGER_TYPES.length);
+  assert.equal(WORKFLOW_TRIGGER_CATALOG['webhook.received'].trust, 'verified-adapter-required');
+  assert.equal(WORKFLOW_TRIGGER_CATALOG['tracking.external_event'].family, 'marketing');
+  assert.equal(WORKFLOW_TRIGGER_CATALOG['agent.tool_approval_requested'].family, 'ai');
+});
+
+test('workflow graph rejects unknown triggers, secret material, direct destinations and arbitrary URLs', () => {
+  const graph = nodes => createWorkflowGraph({ tenantId:'t1', name:'Safe graph', nodes, edges:[{from:'start',to:'finish'}] });
+  assert.throws(() => graph([{id:'start',type:'trigger',config:{eventType:'anything.here'}},{id:'finish',type:'stop'}]), /supported eventType/);
+  assert.throws(() => graph([{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'request',type:'http_request',config:{connectionRef:'c1',operationRef:'post',apiKey:'secret'}},{id:'finish',type:'stop'}]), /credential or private-content/);
+  assert.throws(() => graph([{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'request',type:'http_request',config:{connectionRef:'c1',operationRef:'post',recipient_email:'person@example.com'}},{id:'finish',type:'stop'}]), /direct recipient data/);
+  assert.throws(() => graph([{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'request',type:'http_request',config:{connectionRef:'c1',operationRef:'post',endpoint_url:'https://attacker.invalid'}},{id:'finish',type:'stop'}]), /network location/);
+  const accessorConfig = { eventType:'contact.created' };
+  Object.defineProperty(accessorConfig, 'x', { enumerable:true, get() { assert.fail('must not execute config getters'); } });
+  assert.throws(() => graph([{id:'start',type:'trigger',config:accessorConfig},{id:'finish',type:'stop'}]), /accessors/);
+  const cyclic = {}; cyclic.loop = cyclic;
+  assert.throws(() => graph([{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'merge',type:'merge',config:cyclic},{id:'finish',type:'stop'}]), /acyclic JSON/);
+});
+
+test('workflow retry and timeout controls are bounded and high-risk nodes require approval', () => {
+  const build = (nodeOverrides = {}) => createWorkflowGraph({ tenantId:'t1', name:'Policy', nodes:[
+    {id:'start',type:'trigger',config:{eventType:'payment.failed'}},
+    {id:'action',type:nodeOverrides.type || 'issue_refund',config:nodeOverrides.config || {paymentRef:'p1',connectionRef:'c1'},retry:nodeOverrides.retry,timeoutMs:nodeOverrides.timeoutMs},
+    {id:'finish',type:'stop'}
+  ], edges:[{from:'start',to:'action'},{from:'action',to:'finish'}] });
+  assert.throws(() => build({retry:{maxAttempts:100}}), /retry policy/);
+  assert.throws(() => build({retry:{backoffMs:1}}), /retry policy/);
+  assert.throws(() => build({timeoutMs:900000}), /timeout/);
+  const graph = build();
+  const pending = planWorkflowNode({graph,nodeId:'action',tenantId:'t1',executionId:'run-1'});
+  assert.equal(pending.status,'needs_approval');
+  assert.equal(pending.execution,'connector');
+  assert.equal(pending.requiresAdapter,true);
+  const retry = planWorkflowNode({graph,nodeId:'action',tenantId:'t1',executionId:'run-1',attempt:2});
+  assert.equal(retry.idempotencyKey,pending.idempotencyKey);
+  assert.equal(retry.status,'needs_approval');
+  const approval = workflowApproval(graph, pending, { executionId:'run-1', nodeId:'action' });
+  assert.equal(planWorkflowNode({graph,nodeId:'action',tenantId:'t1',executionId:'run-1',approvalEvidence:approval,approvalVerifier:evidence => evidence.signature === 'trusted-test-signature'}).status,'planned');
+  assert.throws(() => build({config:{paymentRef:'p1',connectionRef:'c1',accessToken:'abc'}}), /credential or private-content/);
+  assert.throws(() => planWorkflowNode({graph,nodeId:'action',tenantId:'t1',executionId:'run-1',attempt:4}), /retry limit/);
+  const unsafe = createWorkflowGraph({tenantId:'t1',name:'Unsafe retry',nodes:[{id:'start',type:'trigger',config:{eventType:'schedule.fired'}},{id:'publish',type:'publish_social_post',config:{contentRef:'post-1',connectionRef:'social-1'}},{id:'finish',type:'stop'}],edges:[{from:'start',to:'publish'},{from:'publish',to:'finish'}]});
+  assert.equal(planWorkflowNode({graph:unsafe,nodeId:'publish',tenantId:'t1',executionId:'run-2',attempt:2}).status,'retry_blocked');
+});
+
+test('workflow compiler clones caller configuration instead of freezing caller-owned input', () => {
+  const config = {eventType:'contact.created', metadata:{segment:'new'} };
+  const graph = createWorkflowGraph({tenantId:'t1',name:'Copy',nodes:[{id:'start',type:'trigger',config},{id:'finish',type:'stop'}],edges:[{from:'start',to:'finish'}]});
+  assert.equal(Object.isFrozen(config),false);
+  assert.equal(Object.isFrozen(config.metadata),false);
+  assert.equal(Object.isFrozen(graph.nodes.find(node => node.id === 'start').config),true);
+  assert.equal(verifyWorkflowGraph(graph),true);
+});
+
+test('workflow approval is verified, short-lived, execution-bound and separates requester from reviewer', () => {
+  const graph = createWorkflowGraph({tenantId:'t1',name:'Sensitive payment',nodes:[
+    {id:'start',type:'trigger',config:{eventType:'payment.failed'}},
+    {id:'refund',type:'issue_refund',config:{paymentRef:'p1',connectionRef:'c1'}},
+    {id:'finish',type:'stop'}
+  ],edges:[{from:'start',to:'refund'},{from:'refund',to:'finish'}]});
+  const pending = planWorkflowNode({graph,nodeId:'refund',tenantId:'t1',executionId:'exec-1'});
+  const verifier = evidence => evidence.signature === 'verified-by-approval-service';
+  const valid = workflowApproval(graph, pending, {executionId:'exec-1',nodeId:'refund',requestedByActorId:'requester',overrides:{signature:'verified-by-approval-service'}});
+  assert.equal(planWorkflowNode({graph,nodeId:'refund',tenantId:'t1',executionId:'exec-1',approvalEvidence:valid,approvalVerifier:verifier,requestedByActorId:'requester'}).status,'planned');
+  assert.equal(planWorkflowNode({graph,nodeId:'refund',tenantId:'t1',executionId:'exec-1',approvalEvidence:valid,approvalVerifier:() => false,requestedByActorId:'requester'}).status,'needs_approval');
+  assert.equal(planWorkflowNode({graph,nodeId:'refund',tenantId:'t1',executionId:'exec-1',approvalEvidence:workflowApproval(graph,pending,{executionId:'exec-1',nodeId:'refund',requestedByActorId:'requester',approvedByActorId:'requester',overrides:{signature:'verified-by-approval-service'}}),approvalVerifier:verifier,requestedByActorId:'requester'}).status,'needs_approval');
+  let getterRan = false;
+  const accessorEvidence = { ...valid };
+  Object.defineProperty(accessorEvidence,'approvedByActorId',{enumerable:true,get() { getterRan = true; return 'u-reviewer'; }});
+  assert.equal(planWorkflowNode({graph,nodeId:'refund',tenantId:'t1',executionId:'exec-1',approvalEvidence:accessorEvidence,approvalVerifier:verifier,requestedByActorId:'requester'}).status,'needs_approval');
+  assert.equal(getterRan,false);
+});
+
+test('communication and AI nodes keep message content and connection secrets behind references', () => {
+  const graph = createWorkflowGraph({tenantId:'t1',name:'Review follow-up',nodes:[
+    {id:'start',type:'trigger',config:{eventType:'appointment.completed'}},
+    {id:'message',type:'send_message',config:{channel:'google_business',purpose:'support',templateRef:'review-template-v1',connectionRef:'business-messages'}},
+    {id:'finish',type:'stop'}
+  ],edges:[{from:'start',to:'message'},{from:'message',to:'finish'}]});
+  const plan = planWorkflowNode({graph,nodeId:'message',tenantId:'t1',executionId:'review-run'});
+  assert.equal(plan.requiresAdapter,true);
+  assert.equal(plan.guard,'fresh_message_policy_template_and_delivery_idempotency');
+  assert.throws(() => createWorkflowGraph({tenantId:'t1',name:'Unsafe message',nodes:[
+    {id:'start',type:'trigger',config:{eventType:'appointment.completed'}},
+    {id:'message',type:'send_message',config:{channel:'email',connectionRef:'mail-1',to:'person@example.test',templateRef:'t1'}},
+    {id:'finish',type:'stop'}
+  ],edges:[{from:'start',to:'message'},{from:'message',to:'finish'}]}), /direct recipient data/);
+  assert.throws(() => createWorkflowGraph({tenantId:'t1',name:'Incomplete message',nodes:[
+    {id:'start',type:'trigger',config:{eventType:'appointment.completed'}},
+    {id:'message',type:'send_message',config:{channel:'email',connectionRef:'mail-1'}},
+    {id:'finish',type:'stop'}
+  ],edges:[{from:'start',to:'message'},{from:'message',to:'finish'}]}), /templateRef/);
+  for (const config of [
+    {channel:'email',purpose:'support',templateRef:'customer@example.test',connectionRef:'mail-1'},
+    {channel:'email',purpose:'support',templateRef:'template-1',connectionRef:'https://mail.example.test/send'},
+    {channel:'email',purpose:'support',templateRef:'template-1',connectionRef:'15551234567'}
+  ]) assert.throws(() => createWorkflowGraph({tenantId:'t1',name:'Direct message reference',nodes:[
+    {id:'start',type:'trigger',config:{eventType:'contact.created'}},
+    {id:'message',type:'send_message',config},
+    {id:'finish',type:'stop'}
+  ],edges:[{from:'start',to:'message'},{from:'message',to:'finish'}]}), /opaque reference/);
 });
 
 test('booking calendar target supports availability, holds, capacity and versioned lifecycle', () => {

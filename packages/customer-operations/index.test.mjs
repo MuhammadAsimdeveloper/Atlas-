@@ -192,6 +192,35 @@ test('agent turn loop uses scoped knowledge, only effective tools and redacted t
   assert.equal(executed.tenantId, tenantId);
 });
 
+test('agent runtime rejects getter-backed model arguments and connector results without executing getters', async () => {
+  const fixture = customerAgentFixture({ allowedTools: ['crm.search'] });
+  let getterRan = false;
+  let executorCalls = 0;
+  const unsafeArgs = {};
+  Object.defineProperty(unsafeArgs, 'contactId', { enumerable:true, get() { getterRan = true; return 'contact-1'; } });
+  const common = {
+    tenantId, conversationId:fixture.conversationId, inboundMessageId:'unsafe-json', channel:'webchat', userMessage:'Find my record',
+    deployment:fixture.live, selection:fixture.selection, actor:fixture.user, agent:fixture.configuredAgent, skill:fixture.assignedSkill,
+    knowledgeProvider:knowledgeFor(tenantId), intentInScope:true, now:at
+  };
+  const badArguments = await runCustomerAgentTurn({
+    ...common,
+    modelAdapter:{ async generate() { return {type:'tool_call',name:'crm.search',arguments:unsafeArgs}; } },
+    toolExecutor:{ async run() { executorCalls++; return {}; } }
+  });
+  assert.equal(badArguments.reason,'tool_arguments_invalid');
+  assert.equal(getterRan,false);
+  assert.equal(executorCalls,0);
+
+  const badResult = await runCustomerAgentTurn({
+    ...common, inboundMessageId:'unsafe-tool-result',
+    modelAdapter:{ async generate() { return {type:'tool_call',name:'crm.search',arguments:{contactId:'contact-1'} }; } },
+    toolExecutor:{ async run() { const result={tenantId}; Object.defineProperty(result,'message',{enumerable:true,get() { getterRan=true; return 'unexpected'; }}); return result; } }
+  });
+  assert.equal(badResult.reason,'tool_result_invalid');
+  assert.equal(getterRan,false);
+});
+
 test('agent turn fails closed on weak or cross-tenant knowledge and explicit human requests', async () => {
   const fixture = customerAgentFixture();
   let modelCalls = 0;

@@ -1,36 +1,10 @@
 import crypto from 'node:crypto';
 import { requireAtlasPlatformOwner, requireTenantRole } from '../atlas-core/authority.mjs';
+import { WORKFLOW_TRIGGER_TYPES } from '../atlas-target/workflow-catalog.mjs';
 import { verifyAgentDeploymentRelease } from './index.mjs';
 
-export const AUTOMATION_TRIGGERS = Object.freeze([
-  'contact.created', 'contact.updated', 'contact.tag_added', 'contact.tag_removed', 'contact.dnd_changed',
-  'contact.note_added', 'contact.engagement_threshold', 'contact.birthday_due', 'contact.custom_date_due',
-  'lead.score_changed', 'prospect.generated', 'form.submitted', 'survey.submitted', 'quiz.submitted',
-  'trigger_link.clicked', 'funnel.page_viewed', 'tracking.external_event', 'lead_form.facebook_submitted',
-  'lead_form.instagram_submitted', 'lead_form.tiktok_submitted', 'lead_form.linkedin_submitted', 'lead_form.google_submitted',
-  'appointment.booked', 'appointment.confirmed', 'appointment.rescheduled', 'appointment.canceled', 'appointment.no_show',
-  'appointment.completed', 'appointment.reminder_due', 'appointment.service_booked', 'rental.booked',
-  'opportunity.created', 'opportunity.updated', 'opportunity.stage_changed', 'opportunity.status_changed', 'opportunity.stale',
-  'affiliate.created', 'affiliate.sale', 'affiliate.campaign_enrolled', 'affiliate.lead_created',
-  'course.signup', 'course.category_started', 'course.category_completed', 'course.lesson_started', 'course.lesson_completed',
-  'course.product_started', 'course.product_completed', 'course.access_granted', 'course.access_removed', 'course.user_login',
-  'community.group_access_granted', 'community.group_access_revoked', 'community.private_channel_granted',
-  'community.private_channel_revoked', 'community.level_changed', 'certificate.issued',
-  'invoice.created', 'invoice.sent', 'invoice.due', 'invoice.overdue', 'invoice.paid',
-  'payment.received', 'payment.failed', 'payment.refunded', 'order.form_submitted', 'order.submitted',
-  'document.sent', 'document.signed', 'document.declined', 'estimate.sent', 'estimate.accepted', 'estimate.declined',
-  'subscription.created', 'subscription.updated', 'subscription.paused', 'subscription.resumed', 'subscription.canceled',
-  'coupon.applied', 'coupon.redeemed', 'coupon.limit_reached', 'coupon.expired',
-  'store.order_placed', 'store.order_fulfilled', 'store.checkout_abandoned', 'store.product_review_submitted',
-  'ivr.started', 'social.facebook_comment', 'social.instagram_comment', 'social.tiktok_comment',
-  'message.received', 'message.delivery_failed', 'message.sms_error', 'message.customer_replied',
-  'call.started', 'call.answered', 'call.missed', 'call.ended', 'call.transcript_generated',
-  'email.delivered', 'email.opened', 'email.clicked', 'email.bounced', 'email.spam_complaint', 'email.unsubscribed',
-  'consent.granted', 'consent.revoked', 'task.created', 'task.completed', 'task.reminder_due',
-  'conversation.handed_off', 'agent.resolved', 'agent.failed', 'workflow.completed', 'workflow.failed',
-  'workflow.called', 'schedule.fired', 'webhook.received', 'custom.event'
-]);
-export const OUTBOUND_CHANNELS = Object.freeze(['email', 'sms', 'whatsapp', 'facebook', 'instagram', 'webchat', 'voice']);
+export const AUTOMATION_TRIGGERS = WORKFLOW_TRIGGER_TYPES;
+export const OUTBOUND_CHANNELS = Object.freeze(['email', 'sms', 'whatsapp', 'facebook', 'instagram', 'google_business', 'webchat', 'voice']);
 export const OUTBOUND_PURPOSES = Object.freeze(['service', 'transactional', 'marketing', 'support', 'appointment', 'billing']);
 export const MESSAGE_STATUSES = Object.freeze(['pending', 'scheduled', 'provider_accepted', 'delivered', 'opened', 'clicked', 'replied', 'bounced', 'failed', 'suppressed', 'canceled', 'needs_review']);
 export const AUTOMATION_STEP_TYPES = Object.freeze(['wait', 'wait_until', 'branch', 'send_message', 'create_task', 'update_contact_field', 'manage_contact_tag', 'await_reply', 'call_workflow', 'invoke_agent']);

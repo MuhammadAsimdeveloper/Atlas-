@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '110.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '111.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('no runtime package dependencies', Object.keys(pkg.dependencies || {}).length === 0 && Object.keys(lock.packages?.['']?.dependencies || {}).length === 0, 'No third-party runtime packages are declared');
 
   const authority = await read('packages/atlas-core/authority.mjs');
@@ -82,6 +82,17 @@ try {
   check('V108 agency work OS', next.includes('createAgencyProject') && next.includes('authorizeWorkAction') && next.includes('FINANCE_AUTHORITY_SEPARATED') && nextTest.includes('V108 freelancer'), 'Freelancer work is scoped and separated from finance authority');
   check('V109 capability parity', next.includes('GHL_CAPABILITY_CATALOG') && next.includes('createSnapshotManifest') && nextTest.includes('V109 GHL'), 'GHL benchmark capabilities and signed/integrity-protected snapshots are explicit');
   check('V110 trust and recovery gates', next.includes('createControlRegister') && next.includes('recordControlEvidence') && next.includes('evaluateRecoveryDrill') && next.includes('calculateSloStatus') && next.includes('createReleaseGate') && nextSql.includes('atlas_trust_control_evidence') && nextSql.includes('atlas_release_gates'), 'Trust evidence, DR, SLO and release gates are explicit');
+
+  const workflowCatalog = await read('packages/atlas-target/workflow-catalog.mjs');
+  const workflowTarget = await read('packages/atlas-target/index.mjs');
+  const workflowTests = await read('packages/atlas-target/index.test.mjs');
+  const customerAgent = await read('packages/customer-operations/index.mjs');
+  const customerAgentTests = await read('packages/customer-operations/index.test.mjs');
+  check('V111 workflow catalog coverage', workflowCatalog.includes("'contact.created'") && workflowCatalog.includes("'agent.tool_approval_requested'") && workflowCatalog.includes("'store.shopify_order_placed'") && workflowCatalog.includes("['rate_limit_batch'") && workflowCatalog.includes("['charge_payment'") && workflowTests.includes('GHL 2026 trigger inventory') && workflowTests.includes('workflow approval is verified'), 'GHL event families and n8n-style node categories are explicit and regression-tested');
+  check('V111 safe workflow definitions', workflowTarget.includes('copyWorkflowConfig') && workflowTarget.includes('opaqueWorkflowReference') && workflowTarget.includes('PRIVATE_CONFIG_FIELD') && workflowTarget.includes('DIRECT_DESTINATION_FIELD') && workflowTarget.includes('NETWORK_LOCATION_FIELD') && workflowTarget.includes('Node retry policy is outside safe limits'), 'Saved node config rejects secrets, direct destinations, URL/PII reference values and arbitrary network locations and bounds execution controls');
+  check('V111 retry idempotency', workflowTarget.includes('graphChecksum: graph.checksum, executionId:stableExecutionId, nodeId') && workflowTarget.includes("status:'retry_blocked'") && !workflowTarget.includes('graphChecksum: graph.checksum, executionId, nodeId, attempt'), 'Workflow retries reuse one side-effect key and stop unsafe repeat attempts');
+  check('V111 trusted workflow approvals', workflowTarget.includes('copyWorkflowApprovalEvidence') && workflowTarget.includes('approvalVerifier') && workflowTarget.includes('expiresAt - approvedAt <= 15 * 60_000') && workflowTarget.includes('approvedByActorId !== requestedByActorId') && workflowTests.includes('workflow approval is verified'), 'High-risk actions require exact, fresh approval evidence checked by a trusted verifier and reject known self-approval');
+  check('V111 hostile AI tool objects', customerAgent.includes('Tool arguments cannot contain accessors') && customerAgent.includes('Tool result cannot contain accessors') && customerAgentTests.includes('without executing getters'), 'Agent argument and connector-result sanitizers fail closed without executing accessors');
 
   const engagement = await read('packages/customer-operations/engagement.mjs');
   check('tenant-bound message renderer', engagement.includes('export function renderMessageTemplateVersion') && engagement.includes('Message template tenant does not match') && engagement.includes('Email HTML contains a tag or attribute outside the safe formatting allowlist') && engagement.includes('needs_data'), 'Template renderer is tenant-bound, context-escapes HTML, restricts markup and fails closed on missing fields');

@@ -1,3 +1,13 @@
+## 111.0.0 — GHL/n8n Workflow Capability Registry and Retry Safety
+- Added one shared, vendor-neutral 134-event workflow trigger catalog covering HighLevel's documented CRM, event, appointment, opportunity, affiliate, course, payment, commerce, IVR, social, community, certificate, communication, review, ads and AI-agent lifecycle events.
+- Expanded the graph node catalog to 86 policy-classified node types for CRM and pipeline operations, multi-channel communications, integrations, scheduling, arrays/batching, AI, payments, marketing, affiliate/course/community, IVR, approval and sub-workflow patterns.
+- Hardened graph compilation: unknown triggers fail closed; node config is deep-copied bounded JSON; accessors, cycles, prototypes, credential/private-content fields, direct destination PII, URL-like opaque refs and arbitrary network locations are rejected.
+- Bounded retries to 1–10 attempts and timeouts to 1 second–10 minutes. Side-effect idempotency keys now remain stable across retries; nodes without an idempotency guard pause for review on retry. Financial, destructive, social-publish, telephony and contract actions require approval.
+- Strengthened sensitive-action approvals: evidence is bound to tenant, graph checksum, execution, node and idempotency key; expires within 15 minutes; must be accepted by a trusted verifier; and rejects self-approval where a requester is known.
+- Hardened AI-agent tool boundaries against accessor getters, symbol/prototype keys and overlong object keys in model arguments and connector results.
+- Added regression tests for every official HighLevel trigger family, untrusted node config, retry duplication, approval expiry/scope/trust, hostile accessors, adapter requirements and reference-only message/connection data.
+- Added a capability-by-capability GHL/n8n comparison and explicit execution/infrastructure limitations. The catalog and contracts do not claim live providers, persistent workflow execution or UI parity.
+
 ## 110.0.0 — V104–V110 Production Hardening Frontier
 - Added provider adapter definitions with webhook verification, rate limits, incremental sync checkpoints and circuit-breaker health states.
 - Added tenant-bound website/domain/publish contracts with HTTPS, verified-domain and preview noindex gates.

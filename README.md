@@ -2,7 +2,13 @@
 
 Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
 
-## Current release: V110
+## Current release: V111
+
+V111 expands the workflow registry against current HighLevel workflow trigger/action documentation and n8n orchestration/agent patterns. The graph compiler validates a canonical 134-event catalog and 86 policy-classified node types, rejects credentials/private message content and direct recipient/URL values even inside reference fields, bounds retries and timeouts, and keeps stable idempotency across attempts. High-risk approvals are bound to the exact tenant, graph, execution, node and action key, expire quickly, and require trusted verification. AI tool objects reject accessors without invoking them. This remains a hardened contract layer; external actions still need authenticated APIs, durable persistence, worker execution and provider adapters.
+
+See [V111 workflow capability registry](docs/V111-WORKFLOW-CAPABILITY-REGISTRY.md) for the feature-by-feature comparison and remaining coverage gaps.
+
+## Previous release: V104–V110
 
 V104–V110 adds the provider adapter and sync fabric, production website/SEO publish gate, unified communication policy, USD financial operations, freelancer/agency work controls, explicit GHL capability coverage, integrity-protected snapshots, and trust/DR/SLO release gates. Live providers and managed production infrastructure remain deployment work.
 

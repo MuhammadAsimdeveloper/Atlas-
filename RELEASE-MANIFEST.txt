@@ -1,4 +1,20 @@
-ATLAS V110.0.0 — V104–V110 Production Hardening Frontier
+ATLAS V111.0.0 — GHL/n8n Workflow Capability Registry and Retry Safety
+
+Implemented
+- Shared canonical workflow event registry: 134 typed event names with event family, ingress trust policy, idempotency expectation and payload policy.
+- Policy-classified graph node registry: 86 CRM, messaging, data, orchestration, connector, AI, booking, finance, marketing, education, IVR and governance action types.
+- Fail-closed graph validation for event names, node configuration shape, secret/private-content fields, direct recipient fields, email/phone/URL values in opaque references, arbitrary endpoints, retry limits, timeouts and required typed references.
+- Stable per-execution/per-node idempotency across retries; retry planning stops for operations without a safe idempotency contract.
+- High-risk action approvals are bound to tenant, graph checksum, execution, node and idempotency key, expire within 15 minutes and require a trusted verifier. Self-approval is rejected when the requester is known.
+- AI-agent tool arguments and connector results reject getters, symbols, prototype keys and overlong keys without executing accessors.
+- External connector/model/runtime nodes declare adapter requirements.
+- V111 feature inventory, competitor comparison, tests, doctor checks and release documentation.
+
+Verification boundary
+- Registry and pure domain contracts are tested. They do not make a connector, workflow worker, model provider, schedule service or authenticated API live.
+- PostgreSQL migrations remain unexecuted; no connected production provider or workload/capacity profile is verified.
+
+## Previous release: V110.0.0 — V104–V110 Production Hardening Frontier
 
 Implemented
 - V104 provider adapter, webhook verification, sync checkpoint and provider-health contracts.
