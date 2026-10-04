@@ -1,3 +1,11 @@
+ATLAS V114.0.0 — Consolidated final repository release
+
+Release state
+- 114.0.0 is the single current repository release line.
+- package.json and package-lock.json are normalized to 114.0.0.
+- Historical migration and engineering documentation remains available for traceability.
+- Obsolete packaged-version archives are not part of the final source-of-truth tree.
+
 ATLAS V112.0.0 — PostgreSQL Identity and Tenant Foundation
 
 Implemented
