@@ -189,6 +189,44 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION atlas_v118_attach_integration_mapping(
+  p_tenant_id UUID,p_connection_id UUID,p_provider_object_type TEXT,p_external_id TEXT,p_atlas_module TEXT,p_atlas_item_id UUID,p_source_updated_at TIMESTAMPTZ
+)
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+BEGIN
+  IF current_user NOT IN ('atlas_worker','atlas_integration_ingress') THEN RAISE EXCEPTION 'integration_worker_required'; END IF;
+  IF p_provider_object_type !~ '^[A-Za-z][A-Za-z0-9_.-]{0,79}$'
+     OR p_external_id IS NULL OR length(p_external_id) NOT BETWEEN 1 AND 512
+     OR p_atlas_module !~ '^[a-z][a-z0-9-]{0,79}$'
+     OR p_atlas_item_id IS NULL THEN
+    RAISE EXCEPTION 'integration_mapping_invalid';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.atlas_integration_connections
+    WHERE tenant_id=p_tenant_id AND connection_id=p_connection_id AND status IN ('connected','needs_reauth','error')
+  ) THEN
+    RAISE EXCEPTION 'integration_connection_not_found';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.atlas_growth_items
+    WHERE tenant_id=p_tenant_id AND item_id=p_atlas_item_id AND module_key=p_atlas_module
+  ) THEN
+    RAISE EXCEPTION 'integration_atlas_record_not_found';
+  END IF;
+  INSERT INTO public.atlas_integration_mappings(
+    tenant_id,connection_id,provider_object_type,external_id,atlas_module,atlas_item_id,source_updated_at
+  ) VALUES(
+    p_tenant_id,p_connection_id,p_provider_object_type,p_external_id,p_atlas_module,p_atlas_item_id,p_source_updated_at
+  )
+  ON CONFLICT(tenant_id,connection_id,provider_object_type,external_id) DO UPDATE SET
+    atlas_module=EXCLUDED.atlas_module,
+    atlas_item_id=EXCLUDED.atlas_item_id,
+    source_updated_at=EXCLUDED.source_updated_at,
+    updated_at=now();
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION atlas_v118_get_integration_contact(
   p_tenant_id UUID,p_connection_id UUID,p_external_id TEXT
 )
@@ -443,6 +481,7 @@ BEGIN
     GRANT INSERT ON atlas_event_outbox TO atlas_integration_ingress;
     GRANT EXECUTE ON FUNCTION atlas_v115_append_outbox_event(UUID,UUID,TEXT,JSONB) TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_get_growth_record(UUID,UUID) OWNER TO atlas_integration_ingress;
+    ALTER FUNCTION atlas_v118_attach_integration_mapping(UUID,UUID,TEXT,TEXT,TEXT,UUID,TIMESTAMPTZ) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_consume_oauth_state(CHAR) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_get_integration_contact(UUID,UUID,TEXT) OWNER TO atlas_integration_ingress;
     ALTER FUNCTION atlas_v118_upsert_integration_contact(UUID,UUID,TEXT,TIMESTAMPTZ,JSONB) OWNER TO atlas_integration_ingress;
@@ -454,6 +493,7 @@ $$;
 
 REVOKE ALL ON atlas_integration_connections,atlas_integration_oauth_states,atlas_integration_mappings,atlas_integration_webhook_events,atlas_integration_tasks,atlas_integration_deliveries FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v118_get_growth_record(UUID,UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION atlas_v118_attach_integration_mapping(UUID,UUID,TEXT,TEXT,TEXT,UUID,TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v118_consume_oauth_state(CHAR) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v118_get_integration_contact(UUID,UUID,TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v118_upsert_integration_contact(UUID,UUID,TEXT,TIMESTAMPTZ,JSONB) FROM PUBLIC;
