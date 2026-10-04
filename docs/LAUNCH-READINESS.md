@@ -6,13 +6,13 @@ The current source release is V115. The authenticated tenant API, Growth Center 
 
 ## What is launchable now
 
-Atlas V115 has a reproducible static marketing/demo preview and an authenticated workspace UI/API when PostgreSQL is configured. The static preview (`scripts/preview.mjs`) contains illustrative data; the API-served workspace (`apps/api/server.mjs`) uses authenticated tenant routes and does not fabricate CRM metrics. Local checks cover syntax, SEO, HTTP smoke, documentation, tenant boundaries, queue state transitions and the worker-loop contract. GitHub CI is configured for Node 20 and Node 22; verify the V115 commit's workflow result before release.
+Atlas V115 has a reproducible static marketing/demo preview and an authenticated workspace UI/API when PostgreSQL is configured. The static preview (`scripts/preview.mjs`) contains illustrative data; the API-served workspace (`apps/api/server.mjs`) uses authenticated tenant routes and does not fabricate CRM metrics. Local checks cover syntax, SEO, HTTP smoke, documentation, tenant boundaries, queue state transitions and the worker-loop contract. GitHub CI installs locked runtime/test dependencies and runs the Node 20/22 matrix; require a green Actions result for the current commit before deployment.
 
 The marketing/demo preview is deliberately noindex by default and robots denies crawling. Public indexing requires a real HTTPS origin supplied at build time.
 
-## Verified in CI
+## CI verification gates
 
-- Node 20 and 22 test matrix.
+- Node 20 and 22 test matrix; `npm ci` installs the PGlite test dependency before migration integration tests.
 - Unit tests and JavaScript syntax checks.
 - Security/tenant-boundary doctor checks.
 - Markdown documentation checks.

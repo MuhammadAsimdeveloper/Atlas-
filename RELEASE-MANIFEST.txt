@@ -21,6 +21,7 @@ Verification (Node v24.19.0 on Windows)
 - `node scripts/build-site.mjs`: PASS — preview built with indexing disabled.
 - `pnpm dlx npm@11 audit --audit-level=moderate`: PASS — 0 vulnerabilities.
 - `git diff --check`: PASS — no whitespace errors.
+- GitHub Actions CI installs the locked runtime and test dependencies before running the Node 20/22 verification matrix.
 - Docker image build: NOT RUN — Docker CLI is unavailable in this environment.
 
 Not verified / external work
