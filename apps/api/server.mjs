@@ -25,6 +25,7 @@ const webAssets = new Map([
   ['/auth-modal.css', ['../command-center/auth-modal.css', 'text/css; charset=utf-8']],
   ['/growth.mjs', ['../command-center/growth.mjs', 'text/javascript; charset=utf-8']],
   ['/workflow-studio.mjs', ['../command-center/workflow-studio.mjs', 'text/javascript; charset=utf-8']],
+  ['/integrations.mjs', ['../command-center/integrations.mjs', 'text/javascript; charset=utf-8']],
   ['/growth.css', ['../command-center/growth.css', 'text/css; charset=utf-8']],
   ['/workspace.css', ['../command-center/workspace.css', 'text/css; charset=utf-8']]
 ]);
