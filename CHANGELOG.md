@@ -27,6 +27,15 @@
 
 # Changelog
 
+## 111.0.0 — Full GHL + n8n Feature Completion Foundation
+- Added an exhaustive machine-readable GHL + n8n feature catalog covering CRM, communications, marketing, websites/SEO, calendars, commerce, reputation, learning/community, affiliates, agency/SaaS/white-label, AI, workflow runtime, integrations, queues, security, DevOps and observability.
+- Replaced the ambiguous “targeted” label with explicit contract/build/deployment boundaries.
+- Added tenant-bound, checksummed product-resource contracts for websites, campaigns, ads, connectors, payments, subscriptions, courses, memberships, affiliates, agency projects, workflows, agents and related resources.
+- Added publish gates for verified domains, provider grants, ad spend, payment readiness, dependencies, step-up authentication and dual approval.
+- Added feature-bundle integrity and scoped-secret/financial permission safeguards.
+- Added a CI-ready feature coverage checker and canonical V111–V120 completion plan.
+
+
 ## 100.0.0 — Voice Quality Reviews and Agent Coaching
 - Added authenticated, tenant-pinned voice QA for completed calls with a fixed six-part rubric covering policy/privacy, disclosure, booking/intake completion, grounded answers, handoff quality and approved follow-up.
 - Added immutable checksummed reviews with bounded scores, confidence and structured evidence references; the review record never accepts or stores transcripts, audio, prompts or free-text notes.

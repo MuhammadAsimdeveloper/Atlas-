@@ -83,6 +83,28 @@ try {
   check('V109 capability parity', next.includes('GHL_CAPABILITY_CATALOG') && next.includes('createSnapshotManifest') && nextTest.includes('V109 GHL'), 'GHL benchmark capabilities and signed/integrity-protected snapshots are explicit');
   check('V110 trust and recovery gates', next.includes('createControlRegister') && next.includes('recordControlEvidence') && next.includes('evaluateRecoveryDrill') && next.includes('calculateSloStatus') && next.includes('createReleaseGate') && nextSql.includes('atlas_trust_control_evidence') && nextSql.includes('atlas_release_gates'), 'Trust evidence, DR, SLO and release gates are explicit');
 
+  const featureCatalog = await read('packages/atlas-feature-catalog/index.mjs');
+  const featureCatalogTest = await read('packages/atlas-feature-catalog/index.test.mjs');
+  check('V111 full feature catalog', featureCatalog.includes('FULL_FEATURE_CATALOG') && featureCatalog.includes('GHL_FEATURES') && featureCatalog.includes('N8N_FEATURES') && featureCatalogTest.includes('exhaustive enough'), 'GHL and n8n benchmark features are machine-mapped to stages and Atlas anchors');
+  const runtime = await read('packages/atlas-runtime/index.mjs');
+  const runtimeTest = await read('packages/atlas-runtime/index.test.mjs');
+  check('V111 durable runtime', runtime.includes('compileDurableWorkflow') && runtime.includes('checkpointExecution') && runtime.includes('createQueueJob') && runtime.includes('createConnectorSdkDefinition') && runtimeTest.includes('queue leases'), 'n8n-class workflow execution has deterministic compilation, checkpoint/resume, queue leases and connector invocation gates');
+  const product = await read('packages/atlas-product/index.mjs');
+  const productTest = await read('packages/atlas-product/index.test.mjs');
+  check('V111 product resource safety', product.includes('defineProductResource') && product.includes('planProductResourcePublish') && product.includes('createFeatureBundle') && productTest.includes('feature bundles'), 'GHL-class product resources are tenant-bound, checksummed and protected by publish/permission gates');
+
+  const business = await read('packages/atlas-business/index.mjs');
+  const businessTest = await read('packages/atlas-business/index.test.mjs');
+  check('V111 business surface', business.includes('createCampaign') && business.includes('submitForm') && business.includes('createAdCampaign') && business.includes('createCourse') && business.includes('createSaaSPlan') && businessTest.includes('marketplace packages'), 'GHL-class business resources have bounded tenant-safe contracts and publish/spend/entitlement gates');
+  const v111Sql = await read('infra/postgres/FINAL-MIGRATION-V111.sql');
+  check('V111 durable persistence', v111Sql.includes('atlas_product_resources') && v111Sql.includes('atlas_workflow_executions') && v111Sql.includes('atlas_queue_jobs') && v111Sql.includes('FORCE ROW LEVEL SECURITY') && !/BYPASSRLS/i.test(v111Sql), 'V111 product/workflow/queue persistence is tenant-isolated with forced RLS');
+
+  const ai = await read('packages/atlas-ai/index.mjs');
+  const aiTest = await read('packages/atlas-ai/index.test.mjs');
+  check('V114 governed AI workforce', ai.includes('defineAgent') && ai.includes('createKnowledgeDocument') && ai.includes('createMcpCapability') && ai.includes('createAiEvaluation') && aiTest.includes('AI evaluations'), 'AI agents are tenant-scoped with tool budgets, provenance, MCP approval, evaluation and human handoff gates');
+  const security = await read('packages/atlas-security/index.mjs');
+  const securityTest = await read('packages/atlas-security/index.test.mjs');
+  check('V117 enterprise security', security.includes('authorize') && security.includes('createSecretReference') && security.includes('evaluatePolicy') && security.includes('verifyAuditChain') && security.includes('createSsoPolicy') && securityTest.includes('audit hashes'), 'IAM, secrets, default-deny policy, SSO and tamper-evident audit controls are explicit');
   const engagement = await read('packages/customer-operations/engagement.mjs');
   check('tenant-bound message renderer', engagement.includes('export function renderMessageTemplateVersion') && engagement.includes('Message template tenant does not match') && engagement.includes('Email HTML contains a tag or attribute outside the safe formatting allowlist') && engagement.includes('needs_data'), 'Template renderer is tenant-bound, context-escapes HTML, restricts markup and fails closed on missing fields');
 } catch (error) {
