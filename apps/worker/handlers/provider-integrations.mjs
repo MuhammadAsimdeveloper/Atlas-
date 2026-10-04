@@ -109,7 +109,7 @@ async function postJson(urlValue, payload, headers = {}, { timeoutMs = 10_000 } 
   timer.unref?.();
   try {
     const raw = JSON.stringify(payload);
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       method: 'POST',
       redirect: 'error',
       headers: {
