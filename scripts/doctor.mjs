@@ -90,7 +90,10 @@ try {
   check('V103 connector fabric', trust.includes('defineConnector') && trust.includes('createConnectorGrant') && trust.includes('authorizeConnectorCall') && trust.includes('createABAutomation') && trust.includes('authorizeABExecution') && trustTest.includes('connector fabric'), 'Third-party connectors and A-to-B automations use scoped grants, operations, expiries, idempotency and approval');
   check('V103 financial safety', trust.includes('createSpendPolicy') && trust.includes('authorizeSpend') && trust.includes('createLedgerTransaction') && trust.includes('createRefund') && trustTest.includes('ledger must balance'), 'Billing uses hard spend limits, approval thresholds, idempotency and balanced ledger transactions');
   check('V103 freelancer isolation', trust.includes('createFreelancerWorkspace') && trust.includes('authorizeFreelancerAction') && trustTest.includes('freelancer workspaces'), 'Contractor permissions are separated from money authority');
+  const seoPackage = await read('packages/atlas-seo/index.mjs');
+  const seoPackageTest = await read('packages/atlas-seo/index.test.mjs');
   check('V103 SEO contract', trust.includes('generateSeoMetadata') && trustTest.includes('SEO metadata'), 'Generated websites have deterministic SEO metadata with canonical and robots controls');
+  check('deep SEO readiness system', seoPackage.includes('assessSeoReadiness') && seoPackage.includes('assessSeoSite') && seoPackageTest.includes('SEO readiness'), 'SEO readiness scores metadata, content intent, discovery, structured data, media and page-experience inputs');
   check('V103 security control plane', trust.includes('createSecurityControlPlane') && trust.includes('assessHighValueAction') && trustTest.includes('high-value security'), 'Money, secret and break-glass actions fail closed behind step-up/dual approval controls');
   check('V103 tenant RLS', trustSql.includes('FORCE ROW LEVEL SECURITY') && trustSql.includes('atlas_billing_ledger') && trustSql.includes('atlas_security_events') && !/BYPASSRLS/i.test(trustSql), 'V103 persistence targets use forced tenant RLS and protect ledger/security rows from application updates/deletes');
 
