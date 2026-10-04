@@ -10,6 +10,8 @@ V114 connects the Growth Center modules to authenticated tenant-scoped PostgreSQ
 
 V114 makes customer records and builder definitions live after the migration and managed database are configured. AI inference/chat sessions, email/SMS delivery, active workflow/follow-up workers, social publishing, public websites, affiliate attribution/payouts, review collection, SaaS plan enforcement and a full customer inbox still need providers and service surfaces. No user-facing label implies a provider is connected when it is not. This release does not verify millions-of-users capacity.
 
+Production startup verifies the restricted `atlas_app` database role. The production Compose template requires a bootstrap password from deployment secrets and exposes the API only on loopback for a local HTTPS proxy. See [API deployment instructions](apps/api/README.md).
+
 ## Previous release: V113
 
 V113 adds a scenario-based agent evaluation runner for customer-facing AI releases. It requires prompt-injection, sensitive-data, human-handoff and out-of-scope test coverage, emits only redacted result metadata, signs evaluation evidence server-side and binds the evidence to the exact agent draft or promotion target. Publishing and traffic promotion now fail closed unless the trusted API/service layer verifies the report. Read the V113 agent evaluation guide at docs/V113-AGENT-EVALUATIONS.md and the current HighLevel/n8n feature inventory at docs/COMPETITOR-FEATURE-MATRIX-2026-10.md.

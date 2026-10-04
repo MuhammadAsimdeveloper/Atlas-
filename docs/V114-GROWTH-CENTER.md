@@ -71,6 +71,8 @@ psql $env:ATLAS_MIGRATION_DATABASE_URL -f infra/postgres/API-ROLE-GRANTS-V114.sq
 
 The API should continue to use the non-owner `atlas_app` database role. The migration is forward-only and checksum-tracked. Health readiness stays blocked until identity, Growth Center and Paddle tables are present. `FINAL-MIGRATION-V114.sql` was executed by the repository's ephemeral PostgreSQL-compatible migration/RLS tests; that does not mean it has been applied to a managed production database.
 
+Production API startup now queries PostgreSQL role/catalog metadata and exits if the connection is not `atlas_app`, has elevated database/role privileges or RLS bypass, can assume another role, or owns an Atlas relation. The check is exercised both through unit negative cases and the actual `atlas_app` PGlite RLS integration path.
+
 ## HighLevel and n8n coverage after V114
 
 V114 adds authenticated persistence and first-party UI for the 13 requested modules above, versioned drafts, lifecycle gates, Paddle transaction checkout/webhook reconciliation, tenant permission filters and record audit history. It adds policy-checked pipeline stage moves and a human-reviewable qualification scoring surface. It does not provide HighLevel parity for unified conversations, forms/surveys, calendar booking UI, bulk import/export, campaign delivery, social account integration, affiliate attribution/payouts, review aggregation, SaaS provisioning/white-label, membership courses or mobile app.
@@ -82,5 +84,7 @@ The larger family-by-family inventory and current official source links are in [
 ## Scale and production boundary
 
 The local JSON/state adapter remains development-only. Use managed PostgreSQL for authoritative records, managed Redis for queue distribution, separate horizontally scalable API/webhook/worker services, managed object storage for media, a CDN and WAF at the public edge, and an OpenTelemetry collector for redacted traces. Apply per-tenant quotas/fair scheduling, provider rate limits and graceful queue draining before turning on volume features. V114 includes queue/job table foundations, not a running Redis worker, object store, CDN, WAF, autoscaler or millions-of-users benchmark.
+
+The checked-in Docker Compose file is a deployment template: provide the PostgreSQL bootstrap password out of band, complete the documented migrations/runtime-role setup, configure the HTTPS edge and provider secrets, and run a Docker image build in the deployment pipeline. Docker is not installed in the current build environment, so the container build has not been verified here.
 
 Khan remains the only global Atlas platform owner. All Growth Center operations still require the account's current active tenant membership, even when the signed-in account is Khan's platform-owner account.

@@ -2,7 +2,9 @@
 - Consolidated repository and package metadata on release 114.0.0 while preserving historical engineering and migration records.
 - Connected tenant-scoped Growth Center records and builders for contacts, leads, pipelines, tasks, qualification profiles, follow-up sequences, workflow definitions, email templates, funnels, websites, social posts, affiliate campaigns and reputation policies.
 - Added PostgreSQL revisions and audit events, Paddle checkout and signed subscription webhooks, and tenant-scoped agent evaluation evidence gates.
+- Production now refuses elevated PostgreSQL runtime identities; the Compose example requires an injected bootstrap password and binds the API to loopback behind HTTPS.
 - Expanded the public marketing SEO pipeline with canonical metadata, social cards, structured data, controlled sitemap freshness and a reusable SEO readiness evaluator. Preview builds remain noindex.
+- Corrected the stale SEO title assertion that caused the current CI check to fail.
 - Provider delivery, workflow workers, AI inference, scheduling, SaaS entitlements, affiliate payouts, public domains, managed infrastructure and production capacity remain deployment/product work; they are not represented as connected.
 
 ## 113.0.0 — Customer-Agent Evaluation and Complete Competitor Feature Inventory

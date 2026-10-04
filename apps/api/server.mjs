@@ -70,6 +70,7 @@ if (env.ATLAS_DATABASE_URL) {
   pool = new Pool(await createPostgresPoolConfig(env, { application_name: `atlas-api-${release.toLowerCase()}` }));
   pool.on('error', error => process.stderr.write(`Atlas database pool error: ${error.message}\n`));
   authStore = new PostgresAuthStore(pool);
+  if (runtime === 'production') await authStore.assertSafeRuntimeRole();
   growthStore = new PostgresGrowthStore(pool);
   authApi = createAuthApi({ store: authStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
   growthApi = createGrowthApi({ store: growthStore, authStore, env });

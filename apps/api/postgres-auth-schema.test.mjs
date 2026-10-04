@@ -21,6 +21,7 @@ test('all PostgreSQL migrations apply in order and V114 tenant policies constrai
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V112.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V114.sql'), 'utf8'));
     await db.exec('SET ROLE atlas_app;');
+    assert.equal(await new PostgresAuthStore(db).assertSafeRuntimeRole(), true, 'restricted atlas_app passes the production startup check');
 
     const makeOrg = async ({ actor, email, tenant, name, slug }) => {
       await db.exec('BEGIN');

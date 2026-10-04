@@ -6,8 +6,10 @@ services:
     restart: unless-stopped
     env_file:
       - ../.env
+    environment:
+      ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -22,7 +24,7 @@ services:
     environment:
       POSTGRES_DB: atlas
       POSTGRES_USER: atlas
-      POSTGRES_PASSWORD: change-me-before-use
+      POSTGRES_PASSWORD: "${ATLAS_POSTGRES_SUPERUSER_PASSWORD:?Set ATLAS_POSTGRES_SUPERUSER_PASSWORD in the deployment environment}"
     volumes:
       - atlas-postgres:/var/lib/postgresql/data
     healthcheck:

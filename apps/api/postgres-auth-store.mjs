@@ -379,5 +379,30 @@ export class PostgresAuthStore {
     return Boolean(rows[0]?.auth_schema && rows[0]?.growth_schema && rows[0]?.versions_schema && rows[0]?.billing_schema);
   }
 
+  async assertSafeRuntimeRole() {
+    const { rows } = await this.pool.query(`SELECT
+      r.rolname AS role_name,
+      r.rolsuper,
+      r.rolbypassrls,
+      r.rolcreatedb,
+      r.rolcreaterole,
+      EXISTS (SELECT 1 FROM pg_auth_members m WHERE m.member = r.oid) AS has_role_memberships,
+      EXISTS (
+        SELECT 1
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND left(c.relname, 6) = 'atlas_'
+          AND c.relowner = r.oid
+      ) AS owns_atlas_relation
+    FROM pg_roles r
+    WHERE r.rolname = current_user`);
+    const role = rows[0];
+    if (!role || role.role_name !== 'atlas_app' || role.rolsuper || role.rolbypassrls || role.rolcreatedb || role.rolcreaterole || role.has_role_memberships || role.owns_atlas_relation) {
+      throw new Error('ATLAS_DATABASE_URL must use the restricted atlas_app role without elevated privileges, role memberships or Atlas table ownership.');
+    }
+    return true;
+  }
+
   async close() { await this.pool.end(); }
 }

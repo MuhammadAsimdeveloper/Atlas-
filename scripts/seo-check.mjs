@@ -87,7 +87,7 @@ try {
   verify((publicHtml.match(/name="robots"/g) || []).length === 1, 'Public page has exactly one robots directive');
   includes(publicHtml, 'name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"', 'Public landing has explicit crawl/index preview policy');
   includes(publicHtml, 'name="description" content="AI customer operations, customer service workflows and governed lead follow-up automation for service businesses."', 'Search description matches the release metadata');
-  includes(publicHtml, '<title>Atlas | AI Customer Operations for Service Businesses</title>', 'Title tag is search-intent aligned');
+  includes(publicHtml, '<title>Atlas | AI Customer Operations &amp; Lead Follow-Up for Service Businesses</title>', 'Title tag is search-intent aligned');
   includes(publicHtml, 'property="og:url" content="https://atlas-preview.com/"', 'Open Graph URL uses configured origin');
   includes(publicHtml, 'property="og:image" content="https://atlas-preview.com/social-card.svg"', 'Open Graph image uses the controlled social asset');
   includes(publicHtml, 'name="twitter:card" content="summary_large_image"', 'Twitter card uses a large image preview');

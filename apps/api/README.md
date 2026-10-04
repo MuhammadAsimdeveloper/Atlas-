@@ -12,6 +12,10 @@ V112 runs the authenticated same-origin workspace and account API. Set `ATLAS_DA
 
 The migration runner applies the versioned SQL files in numeric order, serializes migration operations with a PostgreSQL advisory lock and stores each file's SHA-256. It refuses to modify a migration already recorded as applied. API deployment does not run migrations automatically.
 
+Production startup verifies that `ATLAS_DATABASE_URL` is connected as `atlas_app`, with no superuser, `BYPASSRLS`, database/role creation privileges, role memberships or ownership of Atlas relations. An unsafe database identity stops API startup.
+
+The production Compose template requires `ATLAS_POSTGRES_SUPERUSER_PASSWORD` from the deployment environment and binds port 8080 to loopback for a local HTTPS proxy. Do not put the bootstrap database password in the API `.env` file; supply it separately to Compose. Example: `docker compose --env-file .env -f infra/docker-compose.production.yml up -d` after exporting that variable and completing the migration/runtime-role setup above.
+
 ## Request authority
 
 The API derives identity from the server-side opaque session cookie, then loads active organization memberships from PostgreSQL. Tenant routes re-check the actor's active membership and role before using a tenant transaction. Tenant selection is changed only after the session actor is confirmed as a member. Request-body tenant IDs, roles, owner flags and provider secrets are never used as authority.
