@@ -51,13 +51,13 @@ function jsonForHtml(value) {
 function replaceMeta(html, name, content) {
   const pattern = new RegExp('<meta\\s+name=["\\']' + name + '["\\'][^>]*>', 'i');
   const tag = '<meta name="' + name + '" content="' + escapeAttribute(content) + '">';
-  return pattern.test(html) ? html.replace(pattern, tag) : html.replace('</head>', '    ' + tag + '\\n  </head>');
+  return pattern.test(html) ? html.replace(pattern, tag) : html.replace('</head>', '    ' + tag + '\n  </head>');
 }
 
 function replaceTitle(html, title) {
-  return /<title>[^<]*<\\/title>/i.test(html)
-    ? html.replace(/<title>[^<]*<\\/title>/i, '<title>' + escapeAttribute(title) + '</title>')
-    : html.replace('</head>', '    <title>' + escapeAttribute(title) + '</title>\\n  </head>');
+  return /<title>[^<]*<\/title>/i.test(html)
+    ? html.replace(/<title>[^<]*<\/title>/i, '<title>' + escapeAttribute(title) + '</title>')
+    : html.replace('</head>', '    <title>' + escapeAttribute(title) + '\n  </head>');
 }
 
 export function renderPublicIndex(html, origin, {
@@ -158,7 +158,7 @@ export function renderPublicIndex(html, origin, {
     googleSiteVerification ? '<meta name="google-site-verification" content="' + escapeAttribute(googleSiteVerification) + '">' : '',
     bingSiteVerification ? '<meta name="msvalidate.01" content="' + escapeAttribute(bingSiteVerification) + '">' : '',
     '<script type="application/ld+json">' + jsonForHtml(graph) + '</script>',
-  ].filter(Boolean).join('\\n    ');
+  ].filter(Boolean).join('\n    ');
   let output = replaceTitle(html, SITE_TITLE);
   output = replaceMeta(output, 'description', SITE_DESCRIPTION);
   output = output.replace(/<meta\\s+name=["']robots["'][^>]*>/i, '<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">');
@@ -166,12 +166,12 @@ export function renderPublicIndex(html, origin, {
 }
 
 export function renderPreviewRobots() {
-  return 'User-agent: *\\nDisallow: /\\n';
+  return 'User-agent: *\nDisallow: /\n';
 }
 
 export function renderPublicRobots(origin) {
   const canonical = validatePublicOrigin(origin);
-  return 'User-agent: *\\nAllow: /\\n\\nSitemap: ' + canonical + '/sitemap.xml\\n';
+  return 'User-agent: *\nAllow: /\n\nSitemap: ' + canonical + '/sitemap.xml\n';
 }
 
 export function renderPublicSitemap(origin, entries=[{path:'/',lastmod:PUBLIC_LAST_MODIFIED}]) {
@@ -183,7 +183,7 @@ export function renderPublicSitemap(origin, entries=[{path:'/',lastmod:PUBLIC_LA
     const lastmod = typeof entry.lastmod === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(entry.lastmod) ? entry.lastmod : null;
     return '  <url><loc>' + canonical + path + '</loc>' + (lastmod ? '<lastmod>' + lastmod + '</lastmod>' : '') + '</url>';
   }).join('\\n');
-  return '<?xml version="1.0" encoding="UTF-8"?>\\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\\n' + urls + '\\n</urlset>\\n';
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + '\n</urlset>\n';
 }
 
 export function makeNoindex(html) {
