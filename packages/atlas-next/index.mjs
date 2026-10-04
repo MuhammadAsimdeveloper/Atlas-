@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { assessSeoReadiness, assessSeoSite } from '../atlas-seo/index.mjs';
 
 const freeze = value => Object.freeze(value);
 const canonicalize = value => Array.isArray(value)
@@ -10,6 +11,10 @@ const sha256 = value => crypto.createHash('sha256').update(JSON.stringify(canoni
 const text = (value, field, max = 500) => {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(field + ' invalid');
   return value.trim();
+};
+const optionalText = (value, field, max = 500) => {
+  if (value === undefined || value === null || value === '') return '';
+  return text(value, field, max);
 };
 const id = (value, field = 'id') => text(value, field, 180);
 const url = (value, field) => {
@@ -138,11 +143,28 @@ export function createSiteDefinition({ tenantId, siteId='site_'+crypto.randomUUI
     const title=text(page.title,'page title',120);
     const description=text(page.description,'page description',320);
     if (page.indexable && !/^https:\/\//.test(origin)) throw new Error('Indexable pages require HTTPS origin');
+    const canonicalPath=page.canonicalPath?normalizePath(page.canonicalPath):path;
+    const seo=page.seo && typeof page.seo==='object' ? {
+      h1:optionalText(page.seo.h1,'seo h1',200),
+      headings:Array.isArray(page.seo.headings)?page.seo.headings.slice(0,50):[],
+      bodyText:optionalText(page.seo.bodyText,'seo bodyText',100000),
+      focusKeywords:Array.isArray(page.seo.focusKeywords)?page.seo.focusKeywords.slice(0,12):[],
+      internalLinks:Number.isSafeInteger(page.seo.internalLinks)?Math.max(0,page.seo.internalLinks):0,
+      externalLinks:Number.isSafeInteger(page.seo.externalLinks)?Math.max(0,page.seo.externalLinks):0,
+      images:Array.isArray(page.seo.images)?page.seo.images.slice(0,100):[],
+      imageAltCoverage:Number.isFinite(page.seo.imageAltCoverage)?page.seo.imageAltCoverage:null,
+      mobileFriendly:typeof page.seo.mobileFriendly==='boolean'?page.seo.mobileFriendly:null,
+      coreWebVitals:page.seo.coreWebVitals ?? null,
+      updatedRecently:typeof page.seo.updatedRecently==='boolean'?page.seo.updatedRecently:null,
+      authorOrPublisher:optionalText(page.seo.authorOrPublisher,'seo authorOrPublisher',200),
+      transparentClaims:page.seo.transparentClaims===true
+    } : null;
     return {
       path,title,description,indexable:page.indexable!==false,
-      canonicalPath:page.canonicalPath?normalizePath(page.canonicalPath):path,
+      canonicalPath,
       ogImage:page.ogImage ? url(page.ogImage,'ogImage') : null,
-      structuredData:Array.isArray(page.structuredData)?page.structuredData.slice(0,20):[]
+      structuredData:Array.isArray(page.structuredData)?page.structuredData.slice(0,20):[],
+      seo
     };
   }).sort((a,b)=>a.path.localeCompare(b.path));
   const body={tenantId,siteId,origin,locale,pages:normalized};
@@ -165,9 +187,32 @@ export function createPublishPlan({ site, mode='preview', artifactHash, verified
     if (!site.origin.startsWith('https://')) throw new Error('Public publication requires HTTPS');
     if (!verifiedDomain) return freeze({status:'blocked',code:'DOMAIN_NOT_VERIFIED',mode,artifactHash,createdAt:now});
   }
-  const sitemapEntries = mode==='public' ? site.pages.filter(p=>p.indexable).map(p => site.origin + p.path) : [];
+  const seoPages=site.pages.map(page=>assessSeoReadiness({
+    title:page.title,
+    description:page.description,
+    canonicalUrl:site.origin + page.canonicalPath,
+    robots:page.indexable ? 'index,follow' : 'noindex,nofollow',
+    indexable:page.indexable,
+    sitemapIncluded:mode==='public' ? page.indexable : false,
+    structuredDataTypes:page.structuredData.map(item=>typeof item==='object' ? item['@type'] : '').filter(Boolean),
+    ...(page.seo || {})
+  }));
+  const seoReadiness=assessSeoSite({
+    pages:site.pages.map((page,index)=>({
+      path:page.path,
+      title:page.title,
+      description:page.description,
+      canonicalUrl:site.origin + page.canonicalPath,
+      indexable:page.indexable,
+      incomingLinks:page.seo?.internalLinks || 0,
+      sitemapIncluded:mode==='public' ? page.indexable : false,
+      ...page.seo,
+      _pageReadiness:seoPages[index]
+    }))
+  });
+  const sitemapEntries = mode==='public' ? site.pages.filter(p=>p.indexable).map(p=>site.origin + p.path) : [];
   const robots = mode==='public' ? 'index,follow,max-image-preview:large' : 'noindex,nofollow';
-  const body={status:'ready',mode,artifactHash,robots,canonicalOrigin:mode==='public'?site.origin:null,sitemapEntries,createdAt:now,rollbackKey:sha256({site:site.checksum,artifactHash})};
+  const body={status:'ready',mode,artifactHash,robots,canonicalOrigin:mode==='public'?site.origin:null,sitemapEntries,seoReadiness:mode==='public'?seoReadiness:null,createdAt:now,rollbackKey:sha256({site:site.checksum,artifactHash})};
   return freeze(body);
 }
 
