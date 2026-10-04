@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
 import { getProvider } from '../../packages/atlas-integrations/index.mjs';
 import { buildJobberAuthorizeUrl } from '../../packages/atlas-integrations/jobber.mjs';
@@ -225,7 +225,7 @@ export class PostgresIntegrationStore {
       );
       if (!connection.rows[0]) throw createAuthError(404, 'integration_connection_not_found');
       if (['disconnected'].includes(connection.rows[0].status)) throw createAuthError(409, 'integration_connection_disconnected');
-      const taskId = randomBytes(16).toString('hex');
+      const taskId = randomUUID();
       const { rows } = await client.query(`
         INSERT INTO atlas_integration_tasks(tenant_id,task_id,connection_id,operation,request,status,idempotency_key,created_by)
         VALUES($1,$2::uuid,$3,$4,$5::jsonb,'queued',$6,$7)
