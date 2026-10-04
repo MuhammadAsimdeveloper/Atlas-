@@ -1,106 +1,105 @@
-# V118 — Live Provider Connections and Execution
+# V118 — Live Provider Integrations
 
-V118 turns the V117 provider catalog into a real execution layer for the first two integrations:
+V118 adds a tenant-scoped execution layer for Jobber and Zapier on top of Atlas's durable queue, transactional outbox and worker runtime.
 
-- Jobber: OAuth 2.0 + PKCE, encrypted token storage, refresh-token rotation, account health checks, paginated client synchronization, verified HMAC webhooks, disconnect handling and tenant mapping into Atlas Contacts.
-- Zapier: per-workspace webhook connections, inbound webhook receipt, outbound Atlas-event delivery, optional HMAC signatures and an idempotent per-connection delivery ledger.
-- Other providers: HubSpot, Salesforce, Zoho CRM, Pipedrive, HighLevel, monday.com, ServiceTitan, Housecall Pro, Freshsales and Close remain cataloged but do not have live worker adapters yet.
+## Live provider coverage
 
-## Architecture
+Jobber
+- OAuth 2.0 authorization-code flow with PKCE
+- encrypted access/refresh token storage
+- refresh-token rotation protected by a PostgreSQL advisory transaction lock
+- GraphQL account health and paginated client synchronization
+- client create/edit primitives for Atlas-to-Jobber sync
+- raw-body HMAC webhook verification
+- client lifecycle webhook ingestion and APP_DISCONNECT
+- external ID mapping into Atlas Contacts
 
-The live path is split into four layers:
+Zapier
+- per-workspace webhook connection
+- inbound webhook receipt and durable queueing
+- outbound Atlas event delivery
+- optional HMAC event signature
+- per-connection/event delivery idempotency ledger
+- connection test delivery
 
-1. API: authenticates the Atlas workspace, enforces owner/admin or integrations.manage, starts OAuth, receives public webhooks and creates durable integration tasks.
-2. PostgreSQL: stores tenant-scoped connection metadata plus encrypted provider credentials, one-use OAuth state, external-ID mappings, webhook receipts, task state and delivery state. Integration tables use forced RLS.
-3. Worker: claims normal Atlas queue work and executes provider operations through integration.execute. Provider secrets are decrypted only inside the worker process.
-4. Provider adapter: contains OAuth/token handling, API calls, normalization, rate/error classification and provider-specific security checks.
+HubSpot, Salesforce, Zoho CRM, Pipedrive, HighLevel, monday.com, ServiceTitan, Housecall Pro, Freshsales and Close remain catalog-only until their own live adapters are enabled. The UI deliberately distinguishes catalog capability from an actually connected runtime adapter.
 
-## Jobber setup
+## Required deployment configuration
 
-Jobber uses OAuth 2.0 authorization-code flow with PKCE. Access tokens are short-lived and refresh tokens must be treated as rotating credentials. Atlas encrypts the verifier before storing temporary OAuth state and encrypts the resulting access/refresh token bundle before storing the connection.
-
-The production deployment must provide:
-
+Set these deployment secrets/variables:
+- ATLAS_PUBLIC_ORIGIN
+- ATLAS_INTEGRATION_ENCRYPTION_KEY
 - ATLAS_JOBBER_CLIENT_ID
 - ATLAS_JOBBER_CLIENT_SECRET
 - ATLAS_JOBBER_GRAPHQL_VERSION
-- ATLAS_INTEGRATION_ENCRYPTION_KEY
-- ATLAS_PUBLIC_ORIGIN
 
-The GraphQL version is deployment configuration because Jobber versions its API and expects the version in X-JOBBER-GRAPHQL-VERSION.
+The integration encryption key must encode exactly 32 bytes as either 64 hexadecimal characters or base64. Tenant provider tokens are never stored in .env.
 
-### Jobber webhooks
+For Jobber, register this callback:
 
-Configure this Atlas endpoint in the Jobber Developer Center:
+/api/v1/integrations/oauth/jobber/callback
 
-POST https://<atlas-origin>/api/v1/integrations/webhooks/jobber
+and expose this webhook endpoint:
 
-The endpoint verifies X-Jobber-Hmac-SHA256 over the raw request body using the Jobber OAuth client secret, stores/deduplicates the event and queues background work. It does not trust the webhook body as a source of customer fields; the worker re-queries Jobber using the webhook account/item identity.
+POST /api/v1/integrations/webhooks/jobber
 
-Subscribe to the client lifecycle topics required by the deployed feature set, including CLIENT_CREATE, CLIENT_UPDATE, CLIENT_ARCHIVE, CLIENT_RESTORE, plus APP_DISCONNECT.
+The Jobber webhook handler validates X-Jobber-Hmac-SHA256 over the raw body using the OAuth app client secret, persists the event, deduplicates it and queues background work.
 
-Jobber documents at-least-once webhook delivery and recommends asynchronous processing with a fast acknowledgement. Atlas therefore treats the webhook endpoint as an ingress/queue boundary rather than a synchronous sync endpoint.
+## Database rollout
 
-### Client synchronization
+Apply:
+1. infra/postgres/FINAL-MIGRATION-V118.sql
+2. infra/postgres/API-ROLE-GRANTS-V118.sql
 
-The current live adapter supports:
+V118 uses forced row-level security for connection, OAuth-state, mapping, webhook, task and delivery tables. The webhook ingress role is non-login and cannot bypass RLS.
 
+## Worker runtime
+
+The worker loads apps/worker/handlers/provider-integrations.mjs by default when ATLAS_WORKER_HANDLERS_MODULE is not explicitly set.
+
+Provider operations are durable tasks:
 - jobber.health
 - jobber.sync_clients
 - jobber.sync_client
+- jobber.upsert_client
+- zapier.receive
+- zapier.send_test
 
-Client pages are bounded to 100 records and full synchronization stops after 50 pages in one task to keep one job bounded. A later incremental-sync phase can add checkpointed cursors and backfill windows.
+Errors are converted into bounded error codes and retryable work is returned to the normal worker retry/dead-letter path.
 
-A Jobber client becomes an Atlas Contact only when Atlas has an acceptable email address or E.164 phone number. Provider data does not grant marketing consent: Atlas imports contact data with email/SMS/WhatsApp consent set to false unless a separate consent provider/evidence flow exists.
+## Atlas CRM mapping
 
-Mappings are keyed by tenant, connection, provider object type and external id. Source timestamps prevent stale webhook/sync data from overwriting newer Atlas state, and Atlas record checksums/version numbers are re-verified before worker updates.
+Jobber clients are normalized into the Atlas contacts module. Imported provider records do not create marketing consent: email/SMS/WhatsApp consent defaults to false unless a separate consent/evidence flow exists.
 
-## Zapier setup
+Mappings are keyed by tenant, connection, provider object type and external ID. Source timestamps prevent stale provider events from overwriting newer Atlas state. Atlas record checksums and versions are re-verified before worker updates.
 
-Create a Zapier Catch Hook and paste its webhook URL into Integrations → Zapier → Configure Zapier webhook.
+Atlas-to-Jobber contact upsert uses the existing mapping when available; otherwise it creates a new Jobber client and attaches the returned external ID to the Atlas contact.
 
-Atlas generates a separate inbound key per workspace. The key is stored as a hash and the encrypted connection payload also contains the Zapier destination URL. The public inbound endpoint is:
+## Zapier event contract
 
-POST https://<atlas-origin>/api/v1/integrations/webhooks/zapier/<one-time-key>
+Outbound events contain:
+- Atlas event id/type/time/version
+- workspace id
+- object id/type/title/state/version
+- the bounded Atlas record payload
 
-Use the endpoint as a Zapier webhook action target when you want Zapier to push data back into Atlas.
+When a signing secret is configured, Atlas sends X-Atlas-Event-Signature as HMAC-SHA256.
 
-### Outbound Atlas events
+Inbound Zapier requests are stored and acknowledged quickly. V118 persists and queues the inbound event; it intentionally does not execute arbitrary workflow graphs yet. That boundary keeps provider ingress separate from future workflow-action authorization.
 
-Atlas emits selected Growth Center outbox events to connected Zapier webhooks. The outbound payload contains Atlas event identity/type, workspace identity, object identity/module/title/state/version, and the bounded Atlas business payload.
+## Production completion gate
 
-An optional connection signing secret creates an X-Atlas-Event-Signature HMAC-SHA256 header. The worker also writes a connection/event delivery ledger row before sending so retrying the same Atlas outbox event does not create duplicate deliveries to a connection that already succeeded.
+A repository implementation is not the same thing as a live provider connection. Before production sign-off:
+- create the provider apps and set real deployment secrets
+- apply both V118 database scripts
+- configure HTTPS ATLAS_PUBLIC_ORIGIN
+- configure Jobber webhook subscriptions
+- create real Zapier Catch Hooks as required
+- deploy API and worker with restricted database roles
+- test OAuth callback, token refresh, disconnect, webhook replay and outbound retry behavior
+- verify provider rate limits, terms and data-retention requirements
 
-Current live outbound event families include contact, lead, pipeline and task mutations.
-
-### Inbound Zapier events
-
-Zapier inbound requests are stored as webhook events and queued as zapier.receive. V118 acknowledges and persists the event safely; a future workflow-execution phase will bind arbitrary inbound payloads to the Atlas workflow graph after node/action authorization is available at runtime.
-
-## Connection lifecycle
-
-Connections move through pending → connected → needs_reauth/error → disconnected.
-
-Deleting a connection clears the encrypted provider secret. OAuth state is one-use and expires after ten minutes. Jobber refresh operations use a PostgreSQL advisory transaction lock so concurrent workers do not race a rotating refresh token.
-
-## Production boundary
-
-V118 contains real provider execution code, but repository implementation is not the same thing as live production connectivity.
-
-A production deployment is incomplete until the deployment operator has:
-
-1. created the required provider applications and deployment secrets
-2. applied FINAL-MIGRATION-V118.sql and API-ROLE-GRANTS-V118.sql
-3. set the real HTTPS ATLAS_PUBLIC_ORIGIN
-4. configured Jobber webhook subscriptions
-5. configured at least one real Zapier Catch Hook when Zapier is used
-6. deployed the API and worker with a distinct restricted worker database role
-7. run end-to-end connection, webhook, refresh, disconnect and replay tests against provider sandbox/test accounts
-8. reviewed provider terms, rate limits and data-retention requirements
-
-V118 does not claim live adapters for the remaining catalog providers.
-
-## Official provider references
+## Official references
 
 - Jobber developer docs: https://developer.getjobber.com/docs/
 - Jobber OAuth authorization: https://developer.getjobber.com/docs/building_your_app/app_authorization/

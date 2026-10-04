@@ -3,15 +3,18 @@ import { timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createAuthApi } from './auth-routes.mjs';
 import { createGrowthApi } from './growth-routes.mjs';
+import { createIntegrationApi } from './integration-routes.mjs';
 import { createPostgresPoolConfig } from './database-config.mjs';
 import { createMailer } from './mail.mjs';
 import { PostgresAuthStore } from './postgres-auth-store.mjs';
 import { PostgresGrowthStore } from './growth-store.mjs';
+import { PostgresIntegrationStore } from './integration-store.mjs';
+import { createIntegrationCipher } from '../../packages/atlas-integrations/secrets.mjs';
 
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
 const runtime = env.NODE_ENV || 'development';
-const release = env.ATLAS_RELEASE || 'V116';
+const release = env.ATLAS_RELEASE || 'V118';
 const webAssets = new Map([
   ['/', ['../command-center/auth.html', 'text/html; charset=utf-8']],
   ['/login', ['../command-center/auth.html', 'text/html; charset=utf-8']],
@@ -24,6 +27,7 @@ const webAssets = new Map([
   ['/auth-modal.css', ['../command-center/auth-modal.css', 'text/css; charset=utf-8']],
   ['/growth.mjs', ['../command-center/growth.mjs', 'text/javascript; charset=utf-8']],
   ['/workflow-studio.mjs', ['../command-center/workflow-studio.mjs', 'text/javascript; charset=utf-8']],
+  ['/integrations.mjs', ['../command-center/integrations.mjs', 'text/javascript; charset=utf-8']],
   ['/growth.css', ['../command-center/growth.css', 'text/css; charset=utf-8']],
   ['/workspace.css', ['../command-center/workspace.css', 'text/css; charset=utf-8']]
 ]);
@@ -52,6 +56,7 @@ function assertProductionConfig() {
   }
   if (Buffer.byteLength(env.ATLAS_SESSION_SECRET) < 32) throw new Error('ATLAS_SESSION_SECRET must contain at least 32 bytes.');
   if (Buffer.byteLength(env.ATLAS_ACTION_APPROVAL_KEY) < 32) throw new Error('ATLAS_ACTION_APPROVAL_KEY must contain at least 32 bytes.');
+  try { createIntegrationCipher(env.ATLAS_INTEGRATION_ENCRYPTION_KEY); } catch (error) { throw new Error(`ATLAS_INTEGRATION_ENCRYPTION_KEY is required and must be a 32-byte key: ${error.message}`); }
   const owner = env.ATLAS_PLATFORM_OWNER_EMAIL.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner)) throw new Error('ATLAS_PLATFORM_OWNER_EMAIL must be a valid verified owner address.');
   if (env.ATLAS_EMAIL_PROVIDER !== 'postmark') throw new Error('ATLAS_EMAIL_PROVIDER must be postmark in production.');
@@ -67,6 +72,8 @@ let authStore = null;
 let authApi = null;
 let growthStore = null;
 let growthApi = null;
+let integrationApi = null;
+let integrationStore = null;
 if (env.ATLAS_DATABASE_URL) {
   const { Pool } = await import('pg');
   pool = new Pool(await createPostgresPoolConfig(env, { application_name: `atlas-api-${release.toLowerCase()}` }));
@@ -76,6 +83,10 @@ if (env.ATLAS_DATABASE_URL) {
   growthStore = new PostgresGrowthStore(pool);
   authApi = createAuthApi({ store: authStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
   growthApi = createGrowthApi({ store: growthStore, authStore, env });
+  if (env.ATLAS_INTEGRATION_ENCRYPTION_KEY) {
+    integrationStore = new PostgresIntegrationStore(pool, { cipher: createIntegrationCipher(env.ATLAS_INTEGRATION_ENCRYPTION_KEY), env });
+  }
+  integrationApi = createIntegrationApi({ authStore, integrationStore, env });
 }
 
 const server = createServer(async (req, res) => {
@@ -91,13 +102,17 @@ const server = createServer(async (req, res) => {
       return json(res, 503, { status: 'blocked', database: 'unavailable', schema: 'unknown' });
     }
   }
-  if (req.method === 'GET' && url.pathname === '/api/v1/status') return json(res, 200, { product: 'Atlas', release, environment: runtime, mode: 'authenticated-api', authenticatedApi: Boolean(authApi), growthApi: Boolean(growthApi), database: authStore ? 'configured' : 'missing', message: growthApi ? 'Authentication, tenant-scoped Growth Center and billing routes are enabled.' : 'Configure PostgreSQL and apply all versioned migrations to enable authenticated product routes.' });
+  if (req.method === 'GET' && url.pathname === '/api/v1/status') return json(res, 200, { product: 'Atlas', release, environment: runtime, mode: 'authenticated-api', authenticatedApi: Boolean(authApi), growthApi: Boolean(growthApi), integrationApi: Boolean(integrationApi), integrationConnections: Boolean(integrationStore), database: authStore ? 'configured' : 'missing', message: growthApi ? 'Authentication, tenant-scoped Growth Center, billing and provider-integration catalog routes are enabled.' : 'Configure PostgreSQL and apply all versioned migrations to enable authenticated product routes.' });
   if (authApi) {
     const handled = await authApi.handle(req, res);
     if (handled) return;
   }
   if (growthApi) {
     const handled = await growthApi.handle(req, res);
+    if (handled) return;
+  }
+  if (integrationApi) {
+    const handled = await integrationApi.handle(req, res);
     if (handled) return;
   }
   if (url.pathname.startsWith('/api/')) return json(res, authApi ? 404 : 503, { error: authApi ? 'not_found' : 'database_required' });

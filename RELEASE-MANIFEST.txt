@@ -1,3 +1,21 @@
+ATLAS V118.0.0 — Live Provider Connections and Execution
+
+Implemented
+- Added tenant-scoped encrypted provider connection storage, one-use OAuth state, PKCE verifier protection, external-ID mappings, webhook receipt persistence, integration tasks and idempotent outbound delivery records.
+- Added a live Jobber adapter covering OAuth 2.0 + PKCE, access-token refresh with rotating refresh-token protection, GraphQL account/client reads, client write primitives, HMAC webhook verification, disconnect handling and durable client synchronization.
+- Added a live Zapier adapter covering tenant-specific inbound webhook endpoints, test delivery, signed outbound event delivery and a connection/event delivery ledger.
+- Added V118 API routes and Command Center controls for connection lifecycle, OAuth, health, sync, disconnect and Zapier webhook setup.
+- Added a restricted atlas_integration_ingress database role, forced-RLS integration schema, worker handler module and V118 release checks.
+- Kept all other provider catalog entries explicitly catalog-only; V118 does not pretend HubSpot, Salesforce, Zoho CRM, Pipedrive, HighLevel, monday.com, ServiceTitan, Housecall Pro, Freshsales or Close are live.
+
+Verification boundary
+- The V118 source was edited through the connected GitHub repository tools. A local full Node/SQL test run was not possible in this environment because the container cannot resolve GitHub/network hosts.
+- GitHub Actions for the new head had not returned a workflow run at the time of this release edit, so no CI pass is claimed here.
+- Production PostgreSQL, provider credentials, public domain, Jobber Developer Center webhook configuration, real Zapier connections, backup/failover/load tests and provider end-to-end certification remain deployment validation work.
+
+Readiness
+- Use docs/V118-LIVE-PROVIDER-INTEGRATIONS.md for environment variables, provider setup, webhook endpoints, lifecycle behavior and the production completion checklist.
+
 ATLAS V116.0.0 — Durable runtime, visual workflow authoring and verified trial release
 
 Implemented

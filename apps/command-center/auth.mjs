@@ -188,7 +188,7 @@ const unavailableReasons = {
 function openPanel(panel, module = null, title = null, navKey = null, search = null) {
   state.activePanel = panel;
   if (!navKey) navKey = ({overview:'overview',team:'team',settings:'settings',payments:'payments'})[panel] || null;
-  const views = ['overview','growth','team','settings','unavailable','payments'];
+  const views = ['overview','growth','team','settings','unavailable','payments','integrations'];
   for (const view of views) $(`#${view}-panel`).hidden = view !== panel;
   const defaults = {
     overview: ['Dashboard','Workspace overview','Your workspace at a glance.'],
@@ -213,6 +213,7 @@ function openPanel(panel, module = null, title = null, navKey = null, search = n
   } else if (panel === 'payments') window.AtlasGrowth?.activatePayments();
   else if (panel === 'overview') loadDashboard();
   else if (panel === 'settings') renderSettings();
+  else if (panel === 'integrations') window.AtlasIntegrations?.render();
   else if (panel === 'unavailable') {
     const [summary, detail] = unavailableReasons[title] || ['This workspace area is not available yet.','Atlas shows a module here only after its real API, data and required services are implemented.'];
     $('#unavailable-title').textContent = title || 'Module unavailable';
@@ -227,6 +228,7 @@ function openNavButton(button) {
   const key = button.dataset.navKey || null;
   if (page === 'growth') openPanel('growth',button.dataset.module || 'contacts',title,key);
   else if (page === 'payments') openPanel('payments',null,'Payments',key);
+  else if (page === 'integrations') openPanel('integrations',null,'Integrations',key);
   else openPanel(page || 'overview',null,title,key);
 }
 
@@ -409,4 +411,5 @@ async function initialize() {
   }
 }
 
+window.AtlasAuth = { csrfToken: () => state.csrf };
 initialize();

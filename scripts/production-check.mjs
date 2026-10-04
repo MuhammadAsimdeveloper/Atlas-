@@ -55,6 +55,50 @@ const workerCompose = compose.split(/\r?\n  worker:\r?\n/)[1] || '';
 check('optional worker profile requires external handlers', compose.includes('profiles: ["workers"]') && workerCompose.includes('ATLAS_WORKER_HANDLERS_PATH:?') && workerCompose.includes('/app/apps/worker/handlers/production.mjs:ro') && !workerCompose.includes('env_file:'), 'Worker deployment stays opt-in until reviewed handlers are mounted and receives no shared API environment file');
 const readme = await readFile(path.join(root,'README.md'),'utf8');
 check('production boundary retained', readme.includes('Local JSON/state remains development-only') && readme.includes('millions-of-users capacity claim is verified') && readme.includes('TOTP/2FA') && readme.includes('remain future work'), 'Implemented foundations, local-state boundary and unverified scale are explicit');
+const v118Jobber = await readFile(path.join(root,'packages/atlas-integrations/jobber.mjs'),'utf8');
+const v118Secrets = await readFile(path.join(root,'packages/atlas-integrations/secrets.mjs'),'utf8');
+const v118Store = await readFile(path.join(root,'apps/api/integration-store.mjs'),'utf8');
+const v118Routes = await readFile(path.join(root,'apps/api/integration-routes.mjs'),'utf8');
+const v118Handler = await readFile(path.join(root,'apps/worker/handlers/provider-integrations.mjs'),'utf8');
+const v118Sql = await readFile(path.join(root,'infra/postgres/FINAL-MIGRATION-V118.sql'),'utf8');
+const v118Grants = await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V118.sql'),'utf8');
+check('V118 live provider execution assets',
+  await exists('packages/atlas-integrations/secrets.mjs') &&
+  await exists('packages/atlas-integrations/jobber.mjs') &&
+  await exists('apps/api/integration-store.mjs') &&
+  await exists('apps/worker/handlers/provider-integrations.mjs') &&
+  await exists('infra/postgres/FINAL-MIGRATION-V118.sql') &&
+  await exists('infra/postgres/API-ROLE-GRANTS-V118.sql'),
+  'Encrypted secret handling, Jobber adapter, durable connection store, worker handlers and database migrations exist');
+check('V118 production secret gate',
+  api.includes('ATLAS_INTEGRATION_ENCRYPTION_KEY') &&
+  v118Secrets.includes('aes-256-gcm') &&
+  v118Store.includes('secret_ciphertext') &&
+  v118Store.includes('decryptSecret'),
+  'Provider credentials are encrypted at rest and the API requires a deployment encryption key');
+check('V118 Jobber OAuth and webhook security',
+  v118Jobber.includes('code_challenge') &&
+  v118Jobber.includes('refreshJobberToken') &&
+  v118Jobber.includes('verifyJobberWebhook') &&
+  v118Jobber.includes('x-jobber-graphql-version'),
+  'Jobber adapter contains PKCE/token lifecycle code; route-level HMAC verification is checked separately');
+check('V118 Jobber async webhook boundary',
+  v118Routes.includes('/api/v1/integrations/webhooks/jobber') &&
+  v118Routes.includes('x-jobber-hmac-sha256') &&
+  v118Routes.includes('202'),
+  'Raw-body HMAC verification and immediate 202 response path exist');
+check('V118 Zapier inbound/outbound delivery',
+  v118Routes.includes('/api/v1/integrations/webhooks/zapier/') &&
+  v118Handler.includes('zapier.send_test') &&
+  v118Handler.includes('workerBeginZapierDelivery') &&
+  v118Sql.includes('atlas_integration_deliveries'),
+  'Zapier receives workspace webhooks and outbound events use an idempotent delivery ledger');
+check('V118 restricted integration database role',
+  v118Sql.includes('atlas_integration_ingress NOLOGIN NOSUPERUSER') &&
+  v118Sql.includes('FORCE ROW LEVEL SECURITY') &&
+  v118Grants.includes('rolbypassrls') &&
+  v118Grants.includes('atlas_integration_ingress'),
+  'Integration ingress uses forced RLS and a restricted non-bypass role');
 for (const r of checks) process.stdout.write((r.ok ? 'PASS ' : 'FAIL ') + r.name + ': ' + r.detail + '\n');
 const failed = checks.filter(r => !r.ok).length;
 process.stdout.write('Atlas production check: ' + (checks.length-failed) + '/' + checks.length + ' checks passed.\n');

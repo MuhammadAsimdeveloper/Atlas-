@@ -1,3 +1,22 @@
+## 118.0.0 — Live Provider Connections and Execution
+- Added tenant-scoped encrypted provider connection storage with one-use OAuth state, PKCE verifier protection, connection health state, external-ID mappings, webhook receipts, integration tasks and idempotent delivery records.
+- Added a live Jobber adapter for OAuth 2.0 + PKCE, token refresh/rotation protection, GraphQL account/client reads and client create/edit primitives, HMAC webhook verification and background client synchronization.
+- Added a live Zapier webhook adapter with per-workspace inbound endpoints, optional signed outbound events, test delivery and connection/event delivery idempotency.
+- Added API lifecycle routes for Jobber OAuth start/callback, Jobber webhooks, Zapier webhooks, provider connections, health/sync/test/disconnect actions and Zapier connection setup.
+- Added V118 worker handlers, restricted integration database role, forced-RLS migration and production readiness checks.
+- Updated the Integrations workspace to show real connection state and provide Jobber/Zapier connection controls.
+- Only Jobber and Zapier are live worker adapters in V118. HubSpot, Salesforce, Zoho CRM, Pipedrive, HighLevel, monday.com, ServiceTitan, Housecall Pro, Freshsales and Close remain catalog-only.
+
+## 117.0.0 — Provider Integration Center
+
+- Added a provider-neutral integration catalog covering Jobber, Zapier, HubSpot, Salesforce, Zoho CRM, Pipedrive, HighLevel, monday.com, ServiceTitan, Housecall Pro, Freshsales and Close.
+- Added normalized CRM record mapping, provider capability negotiation, sync-mode validation and reusable Atlas↔provider workflow recipes.
+- Added authenticated `/api/v1/integrations/providers`, `/api/v1/integrations/providers/:id`, `/api/v1/integrations/recipes` and `/api/v1/integrations/connection-plan` routes.
+- Added an Integrations workspace surface with provider search/filtering and administrator-gated connection-plan preparation.
+- Added provider OAuth/configuration placeholders without storing tenant secrets or falsely reporting a provider as connected.
+- Jobber is modeled for OAuth 2.0, GraphQL, scoped client/job/quote/invoice/payment/appointment access and signed webhooks; Zapier is modeled for trigger/action/search/webhook handoffs.
+- External provider credentials, OAuth callback exchange, encrypted tenant credential vault, live webhook ingress and worker delivery remain deployment-dependent and are explicitly not represented as connected until implemented.
+
 ## 116.0.0 — Visual workflow authoring
 - Added a laptop-first visual workflow editor inside the authenticated workspace for triggers, node settings, connection paths and ports, backed by the existing checksummed/versioned graph contract.
 - Added a read-only workflow catalog endpoint. It resolves the current session and active tenant and enforces the workspace’s workflow-read permission before returning canonical event/node metadata.

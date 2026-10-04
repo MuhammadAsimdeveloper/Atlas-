@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '116.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '118.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   const authority = await read('packages/atlas-core/authority.mjs');
