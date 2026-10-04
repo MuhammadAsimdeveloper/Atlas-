@@ -1,10 +1,38 @@
-# SEO and Search Indexing
+# SEO, Search Visibility and Publishing
 
 ## Current state
 
-Atlas does not have a public domain yet. The default build is a preview and deliberately cannot be indexed: the landing page and command-center app use `noindex,nofollow`, and `robots.txt` denies crawling. There is no canonical host or sitemap in the preview output.
+Atlas treats SEO as a publishing contract, not a collection of isolated head tags. The default build remains preview-safe: the landing page and command-center app use `noindex,nofollow`, `robots.txt` denies crawling, and there is no public canonical origin or sitemap in preview mode.
 
 The marketing page is a static, laptop-first product preview. Its claims distinguish implemented contracts from unconnected production services; pricing is explicitly marked as a target and not a checkout offer. Structured data is generated only for text already visible on the page and does not publish plan offers, reviews, ratings, availability or customer counts.
+
+## Search-quality system
+
+The reusable `packages/atlas-seo/` package provides an SEO-readiness assessment for each page and for the site as a whole. It evaluates metadata quality, search-intent alignment, content depth and uniqueness, internal-link discovery, sitemap inclusion, structured data/entity clarity, image alternative-text coverage, HTTPS/mobile readiness, Core Web Vitals inputs, freshness and claim transparency.
+
+The score is an internal readiness and prioritization score, **not a prediction of a Google or Bing ranking position**. Search engines use many signals and rankings depend on query intent, relevance, content quality, competition, links, context and systems outside Atlas.
+
+`packages/atlas-next/` now accepts optional per-page SEO context and reports site SEO readiness in public publish plans. A future AI/page generator can therefore propose content while the publishing layer still surfaces technical and content gaps before publication.
+
+Atlas deliberately does not emit a `meta name="keywords"` tag. Use useful visible content, headings, descriptive links, metadata and accurate structured data instead.
+
+## Content and ranking strategy
+
+The core topic cluster is **AI customer operations for service businesses**, supported by **AI customer service**, **service-desk automation**, **lead follow-up automation**, **appointment follow-up**, **governed AI agents** and **customer operations analytics**.
+
+Each indexable URL should serve one dominant search intent. Give every page a unique title and description, one clear H1, descriptive H2/H3 headings, useful visible content, relevant internal links and only the schema types that accurately describe visible page content.
+
+Grow topical authority with genuinely useful use-case pages, guides, implementation explanations and comparisons rather than multiple near-duplicate pages with keyword substitutions.
+
+Do not manufacture reviews, ratings, customer counts, availability, prices, certifications or case studies in structured data. Claims should be supportable from the page and real product evidence.
+
+## Technical indexing rules
+
+Only include canonical, indexable URLs in the sitemap. Use crawlable HTML links for discovery. Keep private/authenticated pages out of the sitemap and use `noindex` where appropriate.
+
+Do not use `robots.txt` as a substitute for `noindex`: a crawler has to access the page to see the `noindex` directive.
+
+After launch, verify the real domain externally in Google Search Console and Bing Webmaster Tools, check canonical redirects, sitemap processing, structured data, mobile rendering, Core Web Vitals and indexing status.
 
 ## Build preview
 
@@ -26,11 +54,15 @@ node scripts/build-site.mjs --mode public --origin https://www.your-real-domain.
 node scripts/seo-check.mjs
 ```
 
-Or set `ATLAS_PUBLIC_ORIGIN` in the deployment environment and run `node scripts/build-site.mjs --mode public`. Public mode rejects missing origins, HTTP URLs, URL paths, credentials, query strings, fragments, local/reserved hostnames and IP addresses. It emits:
+Or set `ATLAS_PUBLIC_ORIGIN` in the deployment environment and run `node scripts/build-site.mjs --mode public`. Public mode rejects missing origins, HTTP URLs, URL paths, credentials, query strings, fragments, local/reserved hostnames and IP addresses.
+
+Optional deployment variables are `ATLAS_SITE_LASTMOD`, `ATLAS_GOOGLE_SITE_VERIFICATION` and `ATLAS_BING_SITE_VERIFICATION`. Keep `ATLAS_SITE_LASTMOD` tied to the actual visible-content revision; do not bump it on every deployment. It emits:
 
 - one canonical URL for the marketing root;
-- Open Graph and Twitter title/description/URL metadata;
-- Organization, WebSite, SoftwareApplication and visible FAQ structured data;
+- Open Graph and Twitter title/description/URL metadata, including a 1200×630 social preview asset;
+- `WebSite`, `Organization`, `WebPage`, `SoftwareApplication` and visible FAQ structured data;
+- optional Google Search Console and Bing Webmaster verification tags;
+- an explicit content freshness date in the sitemap;
 - an allow-crawl `robots.txt` with the absolute sitemap location;
 - a sitemap containing only the marketing root.
 
