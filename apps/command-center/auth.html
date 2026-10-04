@@ -141,12 +141,28 @@
         </div>
       </section>
       <section id="integrations-panel" class="panel-section" hidden aria-labelledby="page-title">
-        <div class="growth-intro"><div><span class="eyebrow">Provider ecosystem</span><h2>Connect Atlas to your stack</h2><p>Use the same tenant-safe CRM and workflow model across service-business platforms, CRMs and automation tools.</p></div><div class="growth-status"><span class="status-dot"></span><span>Provider catalog</span></div></div>
-        <div class="content-card integration-toolbar"><label>Search providers<input id="integration-search" type="search" placeholder="Jobber, HubSpot, CRM…" maxlength="80"></label><label>Provider type<select id="integration-category"><option value="">All provider types</option></select></label></div>
+        <div class="growth-intro"><div><span class="eyebrow">Provider ecosystem</span><h2>Connect Atlas to your stack</h2><p>Live provider connections currently include Jobber OAuth/client synchronization and Zapier webhook delivery. Other providers remain in the catalog until their adapters are enabled.</p></div><div class="growth-status"><span class="status-dot"></span><span>V118 live adapters</span></div></div>
         <div id="integration-feedback" class="notice" role="status" aria-live="polite" hidden></div>
+        <section class="content-card integration-connection-card">
+          <div class="section-heading"><div><span class="eyebrow">Connected services</span><h2>Your connections</h2></div><span class="module-state">Tenant-scoped</span></div>
+          <div id="integration-connections" class="integration-connection-list"></div>
+        </section>
+        <section class="content-card integration-setup-card">
+          <div class="section-heading"><div><span class="eyebrow">Zapier inbound</span><h2>Receive events in Atlas</h2></div><span class="module-state">Webhook</span></div>
+          <p class="settings-copy">Create a per-workspace inbound endpoint for a Zap. The generated endpoint key is shown once and stored encrypted at rest.</p>
+          <form id="zapier-form" class="integration-form" hidden>
+            <label>Connection name<input id="zapier-display-name" type="text" maxlength="160" placeholder="Main Zapier"></label>
+            <label>Zapier Catch Hook URL<input id="zapier-target-url" type="url" maxlength="2048" placeholder="https://hooks.zapier.com/hooks/catch/…"></label>
+            <label>Optional signing secret<input id="zapier-signing-secret" type="password" maxlength="512" autocomplete="new-password" placeholder="16+ characters"></label>
+            <button id="zapier-submit" class="button primary" type="button">Create webhook connection</button>
+          </form>
+          <button id="zapier-open-setup" class="button secondary" type="button" data-zapier-setup>Configure Zapier webhook</button>
+          <div id="zapier-result" class="integration-result" hidden></div>
+        </section>
+        <div class="content-card integration-toolbar"><label>Search providers<input id="integration-search" type="search" placeholder="Jobber, HubSpot, CRM…" maxlength="80"></label><label>Provider type<select id="integration-category"><option value="">All provider types</option></select></label></div>
         <div id="integration-list" class="two-column integration-grid"></div>
         <div id="integration-empty" class="content-card empty-state" hidden>No matching providers.</div>
-        <div class="content-card"><span class="eyebrow">How Atlas handles connections</span><h2>Scoped, idempotent, provider-neutral</h2><p class="field-help">Atlas plans OAuth/API/webhook connections, maps provider records into its CRM model, and keeps workflow actions behind tenant authorization. A provider is not shown as connected until its credentials, webhook verification, health check and worker delivery are actually configured.</p></div>
+        <div class="content-card"><span class="eyebrow">How Atlas handles connections</span><h2>Scoped, encrypted, idempotent</h2><p class="field-help">Tenant credentials are encrypted at rest. OAuth state uses one-time PKCE verifiers, webhook events are deduplicated, provider work runs through the durable worker queue, and connection status is based on actual provider state rather than catalog metadata.</p></div>
       </section>
       <section id="unavailable-panel" class="panel-section" hidden aria-labelledby="page-title">
         <div class="content-card unavailable-card"><span class="module-icon" aria-hidden="true">◇</span><span id="unavailable-state" class="live-tag">Not available yet</span><h2 id="unavailable-title">Module unavailable</h2><p id="unavailable-copy">This module does not have a live workspace service connected.</p><div class="unavailable-details" id="unavailable-details"></div><button class="button secondary" type="button" data-nav-page="settings" data-nav-key="settings">Open settings</button></div>
