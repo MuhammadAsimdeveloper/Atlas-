@@ -1,5 +1,7 @@
 import { createHmac } from 'node:crypto';
 import {
+  createJobberClient,
+  editJobberClient,
   getJobberAccount,
   listJobberClientsPage,
   refreshJobberToken
@@ -212,6 +214,54 @@ export async function createHandlers({ runtimeStore, integrationStore, env = pro
     return { mode: onlyId ? 'single' : 'full', pages, processed, created, updated, skipped };
   }
 
+  async function upsertJobberClient(task) {
+    const atlasItemId = typeof task.request?.atlasItemId === 'string' ? task.request.atlasItemId : null;
+    if (!/^[0-9a-f-]{36}$/i.test(atlasItemId || '')) providerError('A valid Atlas contact id is required.', 'atlas_contact_id_invalid', 400);
+    const record = await integrationStore.workerGetGrowthRecord({ tenantId: task.tenant_id, itemId: atlasItemId });
+    if (!record || record.module_key !== 'contacts') providerError('Atlas contact was not found.', 'atlas_contact_not_found', 404);
+    const valid = verifyGrowthRecord({
+      id: record.item_id, tenantId: task.tenant_id, module: record.module_key, title: record.title, state: record.state,
+      version: Number(record.version), payload: record.payload, checksum: String(record.checksum).trim(), actorId: record.updated_by,
+      createdAt: new Date(record.created_at).toISOString(), updatedAt: new Date(record.updated_at).toISOString()
+    });
+    if (!valid) providerError('Atlas contact integrity check failed.', 'atlas_contact_integrity_failed', 500);
+    const email = safeEmail(record.payload?.email);
+    if (!email) providerError('Jobber client write requires a valid Atlas contact email.', 'jobber_contact_email_required', 400);
+    const { accessToken, version } = await jobberAccess(task);
+    const mapped = await integrationStore.workerGetMappingForAtlasItem({
+      tenantId: task.tenant_id, connectionId: task.connection_id, atlasItemId, providerObjectType: 'Client'
+    });
+    let external;
+    if (mapped?.external_id) {
+      external = await editJobberClient({
+        accessToken, graphqlVersion: version, clientId: mapped.external_id,
+        firstName: record.payload?.firstName || undefined,
+        lastName: record.payload?.lastName || undefined,
+        companyName: record.payload?.company || null,
+        email
+      });
+    } else {
+      external = await createJobberClient({
+        accessToken, graphqlVersion: version,
+        firstName: record.payload?.firstName || String(record.title || 'Customer').split(/\s+/)[0] || 'Customer',
+        lastName: record.payload?.lastName || '',
+        companyName: record.payload?.company || null,
+        email
+      });
+    }
+    await integrationStore.workerAttachMapping({
+      tenantId: task.tenant_id,
+      connectionId: task.connection_id,
+      providerObjectType: 'Client',
+      externalId: external.id,
+      atlasModule: 'contacts',
+      atlasItemId,
+      sourceUpdatedAt: record.updated_at
+    });
+    await integrationStore.workerMarkHealth({ tenantId: task.tenant_id, connectionId: task.connection_id, healthy: true });
+    return { status: mapped?.external_id ? 'updated' : 'created', externalId: external.id, atlasItemId };
+  }
+
   async function executeJobberTask(task) {
     try {
       if (task.operation === 'jobber.health') {
@@ -231,6 +281,7 @@ export async function createHandlers({ runtimeStore, integrationStore, env = pro
         await integrationStore.workerMarkHealth({ tenantId: task.tenant_id, connectionId: task.connection_id, healthy: true });
         return result;
       }
+      if (task.operation === 'jobber.upsert_client') return await upsertJobberClient(task);
       throw Object.assign(new Error(`Unsupported Jobber integration operation: ${task.operation}`), { code: 'integration_operation_unsupported', status: 400 });
     } catch (error) {
       if (error?.code === 'jobber_reauth_required' || error?.code === 'jobber_token_expired' || error?.code === 'jobber_oauth_invalid_grant') {
