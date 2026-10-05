@@ -39,7 +39,7 @@ async function fixture({workflowState='published'}={}) {
     async approve(data){calls.push(['approve',data]);return {...executions.get(data.executionId),status:'queued',version:2};},
     async replay(data){calls.push(['replay',data]);return {executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',status:'queued',workflowVersion:3};}
   };
-  const growthStore={async get(data){calls.push(['workflowGet',data]);return workflowRecord(workflowState);}};
+  const growthStore={async get(data){calls.push(['workflowGet',data]);return workflowRecord(workflowState);},async getActivationChecklist(data){calls.push(['activation',data]);return {workspace:{tenantId},steps:[{id:'capture_lead',status:'complete'},{id:'publish_workflow',status:'ready'},{id:'connect_provider',status:'blocked'}],nextAction:'publish_workflow'};}};
   const env={NODE_ENV:'development',ATLAS_PLATFORM_OWNER_EMAIL:'khan@example.net',ATLAS_WORKFLOW_EXECUTION_ENABLED:'true',ATLAS_WORKFLOW_EXECUTION_HANDLER_READY:'true'};
   const api=createGrowthApi({store:growthStore,executionStore,authStore,env});
   const server=createServer(async(req,res)=>{if(!(await api.handle(req,res))){res.writeHead(404);res.end();}});
