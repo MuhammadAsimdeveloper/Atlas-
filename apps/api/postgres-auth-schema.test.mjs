@@ -42,6 +42,15 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V126.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V127.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V128.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V129.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V130.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V131.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V132.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V133.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V134.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V135.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V136.sql'), 'utf8'));
+
     await db.exec('SET ROLE atlas_app;');
     assert.equal(await new PostgresAuthStore(db).assertSafeRuntimeRole(), true, 'restricted atlas_app passes the production startup check');
 
