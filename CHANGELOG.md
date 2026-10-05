@@ -1,3 +1,11 @@
+## 122.0.0 — Complete capability fabric
+- Registered all 60 requested communication, automation, CRM, marketing, AI, SaaS/agency and enterprise capabilities with explicit risk policy.
+- Added tenant-scoped provider connections, credential references, conversations/messages, webhook endpoints, OAuth state, CRM definitions, marketing definitions, agency relationships and enterprise controls.
+- Added unified conversation threading/handoff contracts, signed webhook verification, SSRF-resistant provider boundaries and Postmark/Twilio/WhatsApp production adapter implementations.
+- Added a durable production workflow executor that persists V119 state transitions and fails closed when a verified provider adapter is unavailable.
+- Added tenant APIs for capability inventory, integrations, inbox, CRM/marketing definitions and enterprise controls.
+- Added a V122 completeness gate and hardened reference-only secret policy. Production KMS, real provider credentials, WAF, SSO/SCIM, penetration-test evidence and measured DR/load/failover remain deployment evidence, not simulated claims.
+
 ## 119.0.0 — Durable Workflow Execution Engine
 - Added a version-pinned workflow execution state machine with durable queued/running/waiting/approval/retry/cancel/completed/dead-letter transitions.
 - Added PostgreSQL workflow execution state and append-only execution timeline tables with forced tenant RLS and reference-only event/result storage.
