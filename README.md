@@ -1,5 +1,9 @@
 # Atlas Business Operating System
 
+## V122 — Complete capability fabric
+
+V122 adds a hardened runtime foundation for the complete 60-capability surface: unified communications and channel adapters, durable workflow execution, signed webhook/event ingress, OAuth/credential references, advanced CRM and marketing definitions, AI/SaaS/agency capability policy, and enterprise security/DR control metadata. See [V122 capability fabric](docs/V122-COMPLETE-CAPABILITY-FABRIC.md). External providers remain fail-closed until credentials, callbacks, sandbox delivery and monitoring are verified.
+
 Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
 
 ## Current release: V121
