@@ -31,8 +31,8 @@ function ref(value, label) {
   return value;
 }
 
-function text(value, label, max = 500) {
-  if (typeof value !== 'string' || !value.trim() || value.length > max || /[\\r\\n\\u0000]/.test(value)) throw new TypeError(label + ' must be bounded text');
+function text(value, label, max = 500, { empty = false } = {}) {
+  if (typeof value !== 'string' || (!empty && !value.trim()) || value.length > max || /[\\r\\n\\u0000]/.test(value)) throw new TypeError(label + ' must be bounded text');
   return value.trim();
 }
 
