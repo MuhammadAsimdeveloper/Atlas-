@@ -237,6 +237,7 @@ export function simulateWorkflow({
 
   const start = graph.nodes.find(node => node.type === 'trigger');
   if (!start) fail('Workflow trigger is missing');
+  if (event?.type !== start.config?.eventType) fail('Preview event does not match the workflow trigger.', 'trigger_mismatch');
 
   const context = safeJson({ event, output: {}, execution: { id: executionId, mode: 'preview', tenantId } }, 'context');
   const approvalSet = new Set(approvedNodeIds);
