@@ -62,6 +62,28 @@ export class PostgresRuntimeStore {
     });
   }
 
+  async recordAutomationEvent({ actorId, tenantId, eventRef, eventType, resourceRef, payloadHash }) {
+    if (!/^[A-Za-z0-9_.:/@+-]{1,240}$/.test(eventRef || '') || !/^[a-z][a-z0-9_.:-]{0,119}$/.test(eventType || '') || !resourceRef || typeof resourceRef !== 'object' || Array.isArray(resourceRef) || !SHA256.test(payloadHash || '')) {
+      throw createAuthError(400, 'automation_event_invalid');
+    }
+    if (!/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(String(resourceRef.id || '')) || !/^[a-z][a-z0-9_.-]{0,79}$/.test(String(resourceRef.kind || '')) || (resourceRef.version !== undefined && (!Number.isSafeInteger(resourceRef.version) || resourceRef.version < 1))) {
+      throw createAuthError(400, 'automation_resource_ref_invalid');
+    }
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      const { rows } = await client.query('SELECT * FROM atlas_v127_record_automation_event($1,$2,$3,$4::jsonb,$5)', [tenantId,eventRef,eventType,JSON.stringify(resourceRef),payloadHash]);
+      return { eventId: rows[0].event_id, inserted: rows[0].inserted };
+    });
+  }
+
+  async finalizeAutomationEvent({ actorId, tenantId, eventId, matchedWorkflows, failedWorkflows }) {
+    if (!UUID.test(eventId || '') || !Number.isInteger(matchedWorkflows) || !Number.isInteger(failedWorkflows)) throw createAuthError(400, 'automation_event_invalid');
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      const { rows } = await client.query('SELECT atlas_v127_finalize_automation_event($1,$2,$3,$4) AS finalized', [tenantId,eventId,matchedWorkflows,failedWorkflows]);
+      if (!rows[0]?.finalized) throw createAuthError(404, 'automation_event_not_found');
+      return true;
+    });
+  }
+
   async assertSafeWorkerRole() {
     const { rows } = await this.pool.query(`SELECT r.rolname,r.rolsuper,r.rolbypassrls,r.rolcreatedb,r.rolcreaterole,r.rolinherit,
       EXISTS(SELECT 1 FROM pg_auth_members m WHERE m.member=r.oid) AS has_memberships,
