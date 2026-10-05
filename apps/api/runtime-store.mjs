@@ -347,13 +347,13 @@ export class PostgresRuntimeStore {
   }
 
   async recordRuntimeHeartbeat({ poolId, workerId, queueDepth=0, activeJobs=0 } = {}) {
-    if(!UUID.test(poolId||'')||!/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId||'')||!Number.isInteger(queueDepth)||queueDepth<0||!Number.isInteger(activeJobs)||activeJobs<0) throw new TypeError('runtime_heartbeat_invalid');
+    if(!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId||'')||!/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId||'')||!Number.isInteger(queueDepth)||queueDepth<0||!Number.isInteger(activeJobs)||activeJobs<0) throw new TypeError('runtime_heartbeat_invalid');
     const {rows}=await this.pool.query('INSERT INTO atlas_runtime_pool_heartbeats(pool_id,worker_id,queue_depth,active_jobs) VALUES($1,$2,$3,$4) ON CONFLICT(pool_id,worker_id) DO UPDATE SET queue_depth=EXCLUDED.queue_depth,active_jobs=EXCLUDED.active_jobs,observed_at=now() RETURNING observed_at',[poolId,workerId,queueDepth,activeJobs]);
     return rows[0];
   }
 
   async recordRuntimeSlo({ poolId, metric, value, target } = {}) {
-    if(!UUID.test(poolId||'')||!['queue_latency_ms','job_duration_ms','error_rate','success_rate','lease_recovery_rate'].includes(metric)||!Number.isFinite(value)||!Number.isFinite(target)) throw new TypeError('runtime_slo_invalid');
+    if(!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId||'')||!['queue_latency_ms','job_duration_ms','error_rate','success_rate','lease_recovery_rate'].includes(metric)||!Number.isFinite(value)||!Number.isFinite(target)) throw new TypeError('runtime_slo_invalid');
     const {rows}=await this.pool.query('INSERT INTO atlas_runtime_slo_samples(sample_id,pool_id,metric,value,target) VALUES($1,$2,$3,$4,$5) RETURNING sample_id,observed_at',[randomUUID(),poolId,metric,value,target]);
     return rows[0];
   }
