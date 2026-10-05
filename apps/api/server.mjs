@@ -8,6 +8,7 @@ import { createMailer } from './mail.mjs';
 import { PostgresAuthStore } from './postgres-auth-store.mjs';
 import { PostgresGrowthStore } from './growth-store.mjs';
 import { PostgresWorkflowExecutionStore } from './workflow-execution-store.mjs';
+import { securityHeaders, validateHealthToken } from './security.mjs';
 
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
@@ -30,7 +31,7 @@ const webAssets = new Map([
 ]);
 
 function json(res, status, body, headers = {}) {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer', 'permissions-policy': 'camera=(), microphone=(), geolocation=()', 'content-security-policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'", ...(runtime === 'production' ? { 'strict-transport-security': 'max-age=31536000; includeSubDomains' } : {}), ...headers });
+  res.writeHead(status, { ...securityHeaders(env), ...headers, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(body));
 }
 
@@ -47,6 +48,7 @@ function requireHealthToken(req) {
 
 function assertProductionConfig() {
   if (runtime !== 'production') return;
+  validateHealthToken(env);
   if (env.ATLAS_TRUST_PROXY !== 'true') throw new Error('ATLAS_TRUST_PROXY=true is required in production behind the trusted HTTPS edge.');
   for (const [key, value] of [['ATLAS_DATABASE_URL', env.ATLAS_DATABASE_URL], ['ATLAS_SESSION_SECRET', env.ATLAS_SESSION_SECRET], ['ATLAS_ACTION_APPROVAL_KEY', env.ATLAS_ACTION_APPROVAL_KEY], ['ATLAS_PLATFORM_OWNER_EMAIL', env.ATLAS_PLATFORM_OWNER_EMAIL], ['ATLAS_PUBLIC_ORIGIN', env.ATLAS_PUBLIC_ORIGIN], ['ATLAS_EMAIL_PROVIDER_TOKEN', env.ATLAS_EMAIL_PROVIDER_TOKEN], ['ATLAS_EMAIL_FROM', env.ATLAS_EMAIL_FROM]]) {
     if (!value) throw new Error(`${key} is required in production.`);
@@ -108,7 +110,7 @@ const server = createServer(async (req, res) => {
     const [relativePath, contentType] = webAssets.get(url.pathname);
     try {
       const body = await readFile(new URL(relativePath, import.meta.url));
-      const headers = { 'content-type': contentType, 'content-length': body.length, 'cache-control': contentType.startsWith('text/html') ? 'no-store' : 'public, max-age=300', 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer', 'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'", ...(runtime === 'production' ? { 'strict-transport-security': 'max-age=31536000; includeSubDomains' } : {}) };
+      const headers = { ...securityHeaders(env, { html: contentType.startsWith('text/html') }), 'content-type': contentType, 'content-length': body.length, 'cache-control': contentType.startsWith('text/html') ? 'no-store' : 'public, max-age=300' };
       res.writeHead(200, headers);
       res.end(req.method === 'HEAD' ? undefined : body);
       return;

@@ -69,6 +69,27 @@ Each item should produce code, tests, observability and documentation where appl
 - [ ] Add operator retry controls
 - [ ] Add redacted execution diagnostics
 
+## V120 — Security hardening
+
+### P0
+
+- [x] Remove direct worker workflow-execution table privileges
+- [x] Add lease-bound execution RPCs
+- [x] Centralize browser/API security headers
+- [x] Fail closed on missing trusted proxy client IP
+- [x] Rate-limit Growth/Billing mutations and Paddle webhook ingress
+- [x] Require a production health token
+- [x] Add CI least-privilege permissions and bounded job runtime
+- [x] Add automated dependency-update policy
+
+### P1
+
+- [ ] External penetration test
+- [ ] WAF-managed rate-limit policy
+- [ ] MFA/2FA and SSO
+- [ ] Managed KMS/secret rotation
+- [ ] Container/runtime hardening review
+
 ## V120 — Communications
 
 ### P0

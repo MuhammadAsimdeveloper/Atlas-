@@ -100,6 +100,32 @@ export class PostgresRuntimeStore {
     return rows[0].renewed;
   }
 
+  async getWorkflowExecutionForJob(job, workerId) {
+    const { rows } = await this.pool.query('SELECT * FROM atlas_v120_get_execution_for_job($1,$2,$3)', [job.tenant_id, job.job_id, workerId]);
+    return rows[0] || null;
+  }
+
+  async updateWorkflowExecutionForJob(job, workerId, update) {
+    if (!update || typeof update !== 'object') throw new TypeError('Workflow execution update is required.');
+    const { rows } = await this.pool.query(
+      'SELECT atlas_v120_update_execution_for_job($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13) AS updated',
+      [job.tenant_id, job.job_id, workerId, update.expectedVersion, update.status, update.currentNodeId || null,
+        JSON.stringify(update.state), update.stateChecksum, update.lastErrorCode || null, update.retryAt || null,
+        update.finishedAt || null, update.canceledBy || null, update.updatedAt || null]
+    );
+    return rows[0]?.updated === true;
+  }
+
+  async appendWorkflowExecutionEventForJob(job, workerId, event = {}) {
+    if (!event || typeof event !== 'object') throw new TypeError('Workflow execution event is required.');
+    const { rows } = await this.pool.query(
+      'SELECT atlas_v120_append_execution_event_for_job($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) AS event_id',
+      [job.tenant_id, job.job_id, workerId, event.actorId || null, event.eventType, event.nodeId || null, event.attempt || null,
+        event.status || null, JSON.stringify(event.detailsRef || {}), event.createdAt || null]
+    );
+    return rows[0]?.event_id || null;
+  }
+
   async completeJob(job, workerId) {
     const { rows } = await this.pool.query('SELECT atlas_v115_complete_job($1,$2,$3) AS completed', [job.tenant_id, job.job_id, workerId]);
     return rows[0].completed;

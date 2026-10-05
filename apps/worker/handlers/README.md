@@ -22,6 +22,20 @@ export const eventHandlers = {
 The sample above documents the contract; it is not an executable provider integration. Atlas V115 ships no default business handlers, so the worker refuses to start without an operator-supplied module. Handler functions receive resource references, a stable idempotency key or event ID, and an abort signal. They do not receive raw customer data from the queue.
 
 
+## V120 workflow execution security boundary
+
+V120 removes direct SELECT/INSERT/UPDATE privileges on `atlas_workflow_executions` and `atlas_workflow_execution_events` from `atlas_worker`.
+
+A `workflow.execute` handler must use the worker execution adapter exposed by `apps/api/runtime-store.mjs`:
+
+- `getWorkflowExecutionForJob(job, workerId)`
+- `updateWorkflowExecutionForJob(job, workerId, update)`
+- `appendWorkflowExecutionEventForJob(job, workerId, event)`
+
+Those methods call lease-bound V120 PostgreSQL RPCs. Do not connect a handler directly to the workflow execution tables and do not add broader table grants to `atlas_worker`.
+
+The adapter returns no execution when the queue lease is missing, expired or owned by a different worker. This is intentional fail-closed behavior.
+
 ## V119 workflow execution handler boundary
 
 V119 introduces the canonical job type `workflow.execute`.

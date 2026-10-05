@@ -94,6 +94,15 @@
 
 # Changelog
 
+## 120.0.0 — Security Hardening
+- Removed direct workflow execution table privileges from the restricted `atlas_worker` role.
+- Added lease-bound PostgreSQL RPCs and worker adapter methods for durable execution reads, updates and timeline events.
+- Centralized API/browser security headers with CSP, COOP, CORP, HSTS, frame denial and cache protections.
+- Added distributed HMAC-keyed rate limiting for Growth/Billing mutations and Paddle webhook ingress.
+- Added a production health-token configuration gate and regression tests for worker isolation, proxy identity and abuse controls.
+- Kept production workflow/provider execution behind the existing reviewed-handler feature gate.
+
+
 ## 100.0.0 — Voice Quality Reviews and Agent Coaching
 - Added authenticated, tenant-pinned voice QA for completed calls with a fixed six-part rubric covering policy/privacy, disclosure, booking/intake completion, grounded answers, handoff quality and approved follow-up.
 - Added immutable checksummed reviews with bounded scores, confidence and structured evidence references; the review record never accepts or stores transcripts, audio, prompts or free-text notes.
