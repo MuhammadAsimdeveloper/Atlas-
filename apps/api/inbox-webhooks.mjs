@@ -21,7 +21,7 @@ export async function parseAndVerifyInboxWebhook({providerKey,endpoint,secret,ra
  let event;try{event=JSON.parse(rawBody)}catch{event=Object.fromEntries(new URLSearchParams(rawBody));}
  const hash=payloadHash(rawBody);
  if(providerKey==='postmark.email'){
-   const eventRef=safeRef(event.MessageID||event.RecordType==='Inbound'?'postmark-'+hash.slice(0,32):'');
+   const eventRef=safeRef(event.RecordType==='Inbound'?event.MessageID:(headerValue(headers,'x-pm-webhook-trace-id')||event.MessageID+'-'+String(event.Recipient||'')+'-'+String(event.DeliveredAt||event.BouncedAt||hash.slice(0,16))));
    if(event.RecordType&&event.RecordType!=='Inbound'&&event.RecordType!=='Delivery'&&event.RecordType!=='Bounce'&&event.RecordType!=='SpamComplaint'&&event.RecordType!=='SubscriptionChange')return {kind:'ignored',payloadHash:hash,eventRef,eventType:String(event.RecordType)};
    if(event.RecordType&&event.RecordType!=='Inbound')return {kind:'receipt',payloadHash:hash,eventRef,eventType:String(event.RecordType),providerMessageRef:event.MessageID,status:event.RecordType==='Delivery'?'delivered':'failed',metadata:{description:String(event.Description||'').slice(0,240)}};
    const headersMap=postmarkHeaders(event),thread=headersMap['in-reply-to']||event.MessageID;
