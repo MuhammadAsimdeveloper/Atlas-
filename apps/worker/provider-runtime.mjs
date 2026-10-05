@@ -4,7 +4,7 @@ import {executeProviderAction} from '../../packages/atlas-core/provider-adapters
 
 const KEY=/^[a-z][a-z0-9_.-]{1,79}$/;
 const REF=/^[A-Za-z0-9_.:/-]{8,240}$/;
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_BODY=100_000;
 
 function text(v,label,max=240){if(typeof v!=='string'||!v.trim()||v.length>max||/[\r\n\u0000]/.test(v))throw Object.assign(new Error(label+' is invalid'),{code:'provider_request_invalid'});return v.trim();}
