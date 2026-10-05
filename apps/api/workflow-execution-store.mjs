@@ -74,7 +74,7 @@ export class PostgresWorkflowExecutionStore{
       try{
         await client.query(`INSERT INTO atlas_workflow_executions
           (tenant_id,execution_id,workflow_id,workflow_version,graph_checksum,status,current_node_id,trigger_event_type,trigger_event_ref,state,state_checksum,created_by,version,started_at,finished_at,created_at,updated_at)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$14,$14)`,
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17)`,
           [tenantId,state.executionId,state.workflowId,state.workflowVersion,state.graphChecksum,state.status,state.currentNodeId,state.triggerEventType,state.triggerEventRef,JSON.stringify(state),state.checksum,actorId,state.version,state.startedAt,state.endedAt,state.createdAt,state.updatedAt]);
       }catch(error){
         if(error?.code==='23505') throw createAuthError(409,'workflow_execution_already_exists','That execution identity is already in use.');
@@ -130,7 +130,7 @@ export class PostgresWorkflowExecutionStore{
       const next=replayWorkflowExecution({execution:current,replayExecutionId:replayExecutionId||undefined,requestedByActorId:actorId,now});
       await client.query(`INSERT INTO atlas_workflow_executions
         (tenant_id,execution_id,workflow_id,workflow_version,graph_checksum,status,current_node_id,trigger_event_type,trigger_event_ref,state,state_checksum,created_by,replay_of_execution_id,version,started_at,finished_at,created_at,updated_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$15,$15)`,
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18)`,
         [tenantId,next.executionId,next.workflowId,next.workflowVersion,next.graphChecksum,next.status,next.currentNodeId,next.triggerEventType,next.triggerEventRef,JSON.stringify(next),next.checksum,actorId,current.executionId,next.version,next.startedAt,next.endedAt,next.createdAt,next.updatedAt]);
       const idempotencyKey=digest({tenantId,executionId:next.executionId,graphChecksum:next.graphChecksum});
       await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7)',[
