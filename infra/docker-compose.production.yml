@@ -52,13 +52,15 @@ services:
       ATLAS_DATABASE_URL: "${ATLAS_WORKER_DATABASE_URL:?Set a restricted atlas_worker database URL}"
       ATLAS_WORKER_DATABASE_URL: "${ATLAS_WORKER_DATABASE_URL:?Set a restricted atlas_worker database URL}"
       ATLAS_DATABASE_SSL_CA_FILE: "${ATLAS_DATABASE_SSL_CA_FILE:-}"
-      ATLAS_WORKER_HANDLERS_MODULE: production.mjs
+      ATLAS_WORKER_HANDLERS_MODULE: v125-production.mjs
+      ATLAS_WORKER_SECRET_RESOLVER_MODULE: "${ATLAS_WORKER_SECRET_RESOLVER_MODULE:?Set the reviewed secret resolver module}"
       ATLAS_WORKER_CONCURRENCY: "${ATLAS_WORKER_CONCURRENCY:-4}"
       ATLAS_WORKER_LEASE_SECONDS: "${ATLAS_WORKER_LEASE_SECONDS:-60}"
       ATLAS_WORKER_POLL_MS: "${ATLAS_WORKER_POLL_MS:-1000}"
       ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
     volumes:
-      - "${ATLAS_WORKER_HANDLERS_PATH:?Mount a reviewed local worker handler module}:/app/apps/worker/handlers/production.mjs:ro"
+      - "${ATLAS_WORKER_HANDLERS_PATH:-/dev/null}:/app/apps/worker/handlers/v125-production.mjs:ro"
+      - "${ATLAS_WORKER_SECRETS_PATH:?Mount a reviewed local secret resolver directory}:/app/apps/worker/secrets:ro"
     depends_on:
       postgres:
         condition: service_healthy
