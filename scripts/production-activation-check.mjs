@@ -12,14 +12,15 @@ const adapters=await read('apps/worker/provider-adapters.mjs');
 const integration=await read('apps/worker/integration-runtime.mjs');
 const security=await read('apps/api/security.mjs');
 const ci=await read('.github/workflows/ci.yml');
-check('release metadata is aligned',pkg.version==='143.0.0'&&env.includes('ATLAS_RELEASE=V143'),'Package and environment release identifiers agree.');
+check('release metadata is aligned',pkg.version==='144.0.0'&&env.includes('ATLAS_RELEASE=V143'),'Package and environment release identifiers agree.');
 check('production secrets are explicit',['ATLAS_DATABASE_URL','ATLAS_SESSION_SECRET','ATLAS_PLATFORM_OWNER_EMAIL','ATLAS_HEALTH_TOKEN','ATLAS_INBOX_CONTENT_MODULE','ATLAS_WEBHOOK_SECRET_RESOLVER_MODULE','ATLAS_WORKFLOW_EVENT_INGRESS_ENABLED'].every(k=>env.includes(k)),'Critical production configuration keys are declared.');
 check('provider runtime is fail-closed',adapters.includes('assertSafeProviderUrl')&&adapters.includes('validateProviderAdapter')&&integration.includes('executeWithRetry'),'Provider calls require validated destinations and bounded retries.');
 check('API security boundary is wired',api.includes('securityHeaders')&&security.includes('enforceRateLimit')&&security.includes('clientIdentity')&&api.includes('ATLAS_TRUST_PROXY'),'API security headers, rate limiting and trusted-proxy client identity are wired.');
 check('worker is independently deployable',worker.includes('ATLAS_WORKER_HANDLERS_MODULE')&&worker.includes('ATLAS_WORKER_CONCURRENCY'),'Worker identity, handler module and concurrency are configurable.');
 check('production image is non-root',dockerfile.includes('USER node'),'Production container drops root privileges.');
 check('runtime SLO control plane is wired',api.includes('ATLAS_RUNTIME_POOL_ID') || worker.includes('ATLAS_RUNTIME_POOL_ID'),'Runtime pool identity remains explicitly configured for worker telemetry.');
-const fabric=await read('packages/atlas-runtime/distributed-fabric.mjs');
+const fabric=await read('packages/atlas-runtime/distributed-fabric.mjs'); const controlPlane=await read('packages/atlas-runtime/control-plane.mjs');
+check('V144 runtime control-plane is wired',controlPlane.includes('createOtlpHttpExporter')&&controlPlane.includes('buildControlEvent'),'Runtime control events and optional OTLP export are wired without making external infrastructure look live.');
 check('V139-V143 distributed fabric is wired',fabric.includes('RedisTransport')&&fabric.includes('computeScaleDecision')&&fabric.includes('evaluateFailover')&&fabric.includes('buildOtlpSpan')&&fabric.includes('deploymentReadiness'),'Distributed dispatch, autoscaling, failover, OTLP and deployment gates are present without claiming external infrastructure is live.');
 
 check('CI has bounded permissions',ci.includes('permissions:')&&ci.includes('contents: read'),'CI uses explicit least-privilege permissions.');
