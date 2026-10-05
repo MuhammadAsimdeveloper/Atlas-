@@ -12,7 +12,7 @@ function safeEventDetails(value){
  return value??{};
 }
 
-export async function executeWorkflowJob({store,job,workerId,resolveAction=async()=>({status:'completed'}),now=Date.now()}){
+export async function executeWorkflowJob({store,job,workerId,resolveAction=async()=>({status:'completed'}),signal=null,now=Date.now()}){
  if(!store||!job||typeof workerId!=='string')throw new TypeError('Workflow executor requires store, leased job and worker.');
  let execution=await store.getWorkflowExecutionForJob(job,workerId);
  if(!execution)throw Object.assign(new Error('Execution is unavailable for the leased job.'),{code:'execution_unavailable'});
@@ -44,7 +44,7 @@ export async function executeWorkflowJob({store,job,workerId,resolveAction=async
    const providerStatus=node.config?.providerStatus;
    if(node.requiresAdapter&&(!effectiveCapabilityId||!externalSideEffectAllowed({capabilityId:effectiveCapabilityId,providerStatus,consent:node.config?.consent===true,approved:node.config?.approved===true})))
      throw Object.assign(new Error('External side effect is not verified for this node.'),{code:'provider_not_verified'});
-   const result=await resolveAction(Object.freeze({node,execution,tenantId:job.tenant_id,jobId:job.job_id,workerId,attempt,signal:undefined}));
+   const result=await resolveAction(Object.freeze({node,execution,tenantId:job.tenant_id,jobId:job.job_id,workerId,attempt,signal}));
    next=completeWorkflowStep({execution,nodeId,attempt,resultRef:result?.resultRef||null,selectedPort:result?.selectedPort||'next',now});
  }catch(error){
    next=failWorkflowStep({execution,nodeId,attempt,errorCode:/^[a-z][a-z0-9_.-]{0,79}$/.test(error?.code||'')?error.code:'handler_failed',now});
