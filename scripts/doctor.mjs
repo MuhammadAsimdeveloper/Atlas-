@@ -11,9 +11,11 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '126.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '127.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
+  const v127 = await read('infra/postgres/FINAL-MIGRATION-V127.sql');
+  check('V127 automation event ingress', v127.includes('atlas_v127_automation_events') && v127.includes('FORCE ROW LEVEL SECURITY') && v127.includes('atlas_v127_record_automation_event') && v127.includes('atlas_v127_finalize_automation_event'), 'Live automation events use a replay-safe tenant ledger with bounded resource references and forced RLS.');
   const authority = await read('packages/atlas-core/authority.mjs');
   check('single-owner authority', authority.includes("actor?.emailVerified === true") && authority.includes('verifiedActorEmail === configuredOwner') && authority.includes('trustedAuthorities.add(authority)'), 'Global owner requires verified configured identity and an internally resolved authority object');
 
