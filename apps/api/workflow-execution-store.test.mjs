@@ -18,6 +18,7 @@ const eventRef='evt_v119_0001';
 async function setup(){
   const db=new PGlite();
   const migrationDirectory=path.join(root,'infra/postgres');
+  await db.exec('CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;');
   const files=(await readdir(migrationDirectory)).filter(name=>/^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b)=>Number(a.match(/V([0-9]+)/)[1])-Number(b.match(/V([0-9]+)/)[1])||a.localeCompare(b));
   for(const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
   await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
@@ -29,7 +30,7 @@ async function setup(){
   for(const [actor,tenant,email,slug] of [[actorA,tenantA,'a@example.net','v119-a'],[actorB,tenantB,'b@example.net','v119-b']]){
     await db.exec('BEGIN');
     await db.query("SELECT set_config('app.auth_email',$1,true)",[email]);
-    await db.query('INSERT INTO atlas_auth_users(user_id,email,display_name,password_hash,email_verified_at) VALUES ($1,$2,$3,$4,now())',[actor,email,actor===''+actorA?'A':'B','scrypt$test']);
+    await db.query('INSERT INTO atlas_auth_users(user_id,email,display_name,password_hash,email_verified_at) VALUES ($1,$2,$3,$4,now())',[actor,email,actor===actorA?'A':'B','scrypt$test']);
     await db.query("SELECT set_config('app.actor_id',$1,true)",[actor]);
     await db.query('INSERT INTO atlas_organizations(tenant_id,name,slug,created_by) VALUES ($1,$2,$3,$4)',[tenant,slug,slug,actor]);
     await db.query("SELECT set_config('app.tenant_id',$1,true)",[tenant]);
@@ -46,11 +47,7 @@ test('V119 persists a pinned workflow execution and atomically queues its execut
   const {db,pool}=await setup();
   try{
     const store=new PostgresWorkflowExecutionStore(pool);
-    const workflow={id:workflowId,tenantId:tenantA,module:'workflows',state:'published',payload:{graph:createWorkflowGraph({
-      tenantId:tenantA,id:workflowId,version:5,name:'Lead journey',
-      nodes:[{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'stop',type:'stop'}],
-      edges:[{id:'e1',from:'start',to:'stop',port:'next'}]
-    })}};
+    const workflow={id:workflowId,tenantId:tenantA,module:'workflows',state:'published',payload:{graph:createWorkflowGraph({tenantId:tenantA,id:workflowId,version:5,name:'Lead journey',nodes:[{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'stop',type:'stop'}],edges:[{id:'e1',from:'start',to:'stop',port:'next'}]})}};
     const execution=await store.create({actorId:actorA,tenantId:tenantA,workflow,triggerEventRef:eventRef,executionId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',now:'2026-10-05T10:00:00Z'});
     assert.equal(execution.status,'queued');
     assert.equal(execution.workflowVersion,5);
@@ -68,11 +65,7 @@ test('V119 execution control actions are optimistic and cross-tenant lookups fai
   const {db,pool}=await setup();
   try{
     const store=new PostgresWorkflowExecutionStore(pool);
-    const workflow={id:workflowId,tenantId:tenantA,module:'workflows',state:'published',payload:{graph:createWorkflowGraph({
-      tenantId:tenantA,id:workflowId,version:5,name:'Lead journey',
-      nodes:[{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'stop',type:'stop'}],
-      edges:[{id:'e1',from:'start',to:'stop'}]
-    })}};
+    const workflow={id:workflowId,tenantId:tenantA,module:'workflows',state:'published',payload:{graph:createWorkflowGraph({tenantId:tenantA,id:workflowId,version:5,name:'Lead journey',nodes:[{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'stop',type:'stop'}],edges:[{id:'e1',from:'start',to:'stop'}]})}};
     const execution=await store.create({actorId:actorA,tenantId:tenantA,workflow,triggerEventRef:'evt_v119_0002',executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',now:'2026-10-05T10:00:00Z'});
     const canceled=await store.cancel({actorId:actorA,tenantId:tenantA,workflowId,executionId:execution.executionId,expectedVersion:1,now:'2026-10-05T10:01:00Z'});
     assert.equal(canceled.status,'canceled');
