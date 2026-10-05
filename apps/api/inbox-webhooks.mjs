@@ -1,6 +1,7 @@
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 function equal(a,b){const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&timingSafeEqual(x,y);}
 function basicOk(header,secret){if(typeof header!=='string'||!header.startsWith('Basic ')||typeof secret!=='string')return false;return equal(Buffer.from(header.slice(6),'base64').toString('utf8'),secret);}
+function twilioJsonOk({url,rawBody,bodySHA256,signature,secret}){if(typeof signature!=='string'||typeof secret!=='string'||typeof bodySHA256!=='string')return false;const digestBody=createHash('sha256').update(rawBody).digest('hex');if(!equal(digestBody,bodySHA256))return false;const digest=createHmac('sha1',secret).update(url+rawBody).digest('base64');return equal(digest,signature);}
 function twilioOk({url,params,signature,secret}){if(typeof signature!=='string'||typeof secret!=='string')return false;const base=url+Object.keys(params||{}).sort().map(k=>k+String(params[k]??'')).join('');const digest=createHmac('sha1',secret).update(base).digest('base64');return equal(digest,signature);}
 function metaOk(body,signature,secret){if(typeof signature!=='string'||!signature.startsWith('sha256=')||typeof secret!=='string')return false;const digest=createHmac('sha256',secret).update(body).digest('hex');return equal('sha256='+digest,signature);}
 function headerValue(headers,name){return headers[String(name).toLowerCase()]||headers[name]||'';}
@@ -11,11 +12,11 @@ function firstAddress(value){if(Array.isArray(value)&&value[0]?.Email)return val
 export async function parseAndVerifyInboxWebhook({providerKey,endpoint,secret,rawBody,headers,url,query={}}){
  if(!endpoint?.enabled)throw Object.assign(new Error('Webhook endpoint is disabled.'),{code:'webhook_disabled'});
  if(providerKey==='postmark.email'&&!basicOk(headerValue(headers,'authorization'),secret))throw Object.assign(new Error('Postmark webhook authentication failed.'),{code:'webhook_auth_failed'});
- if(providerKey.startsWith('twilio.')&&!twilioOk({url,params:query,signature:headerValue(headers,'x-twilio-signature'),secret})){
+ if(providerKey.startsWith('twilio.')){
    const contentType=String(headerValue(headers,'content-type')).toLowerCase();
-   if(contentType.includes('application/x-www-form-urlencoded')){
-     const params={...query,...Object.fromEntries(new URLSearchParams(rawBody))};if(!twilioOk({url,params,signature:headerValue(headers,'x-twilio-signature'),secret}))throw Object.assign(new Error('Twilio webhook signature invalid.'),{code:'webhook_signature_invalid'});
-   } else throw Object.assign(new Error('Twilio webhook signature invalid.'),{code:'webhook_signature_invalid'});
+   const signature=headerValue(headers,'x-twilio-signature');
+   if(contentType.includes('application/json')){const bodySHA256=String(query.bodySHA256||'');if(!twilioJsonOk({url,rawBody,bodySHA256,signature,secret}))throw Object.assign(new Error('Twilio webhook signature invalid.'),{code:'webhook_signature_invalid'});}
+   else {const params={...query,...Object.fromEntries(new URLSearchParams(rawBody))};if(!twilioOk({url,params,signature,secret}))throw Object.assign(new Error('Twilio webhook signature invalid.'),{code:'webhook_signature_invalid'});}
  }
  if(providerKey==='meta.whatsapp'&&!metaOk(rawBody,headerValue(headers,'x-hub-signature-256'),secret))throw Object.assign(new Error('WhatsApp webhook signature invalid.'),{code:'webhook_signature_invalid'});
  let event;try{event=JSON.parse(rawBody)}catch{event=Object.fromEntries(new URLSearchParams(rawBody));}
