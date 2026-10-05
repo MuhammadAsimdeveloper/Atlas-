@@ -7,6 +7,7 @@ import { createPostgresPoolConfig } from './database-config.mjs';
 import { createMailer } from './mail.mjs';
 import { PostgresAuthStore } from './postgres-auth-store.mjs';
 import { PostgresGrowthStore } from './growth-store.mjs';
+import { PostgresWorkflowExecutionStore } from './workflow-execution-store.mjs';
 
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
@@ -66,6 +67,7 @@ let pool = null;
 let authStore = null;
 let authApi = null;
 let growthStore = null;
+let workflowExecutionStore = null;
 let growthApi = null;
 if (env.ATLAS_DATABASE_URL) {
   const { Pool } = await import('pg');
@@ -74,8 +76,9 @@ if (env.ATLAS_DATABASE_URL) {
   authStore = new PostgresAuthStore(pool);
   if (runtime === 'production') await authStore.assertSafeRuntimeRole();
   growthStore = new PostgresGrowthStore(pool);
+  workflowExecutionStore = new PostgresWorkflowExecutionStore(pool);
   authApi = createAuthApi({ store: authStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
-  growthApi = createGrowthApi({ store: growthStore, authStore, env });
+  growthApi = createGrowthApi({ store: growthStore, executionStore: workflowExecutionStore, authStore, env });
 }
 
 const server = createServer(async (req, res) => {
