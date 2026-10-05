@@ -1,3 +1,11 @@
+## V127 — Automation execution control plane
+
+V127 begins the next production layer after the unified inbox: tenant-authenticated event ingress now records replay-safe automation events, resolves published workflows by trigger type, creates durable version-pinned executions, and reports matched/failed workflow starts. Event/resource payloads are reference-only; raw customer payloads are never persisted in the trigger ledger. Ingress is fail-closed behind `ATLAS_WORKFLOW_EVENT_INGRESS_ENABLED` plus the existing production workflow-handler gate.
+
+This closes the first major gap between Atlas's workflow contracts and a live n8n/HighLevel-style event-driven automation loop. Scheduling, durable wait/resume, full execution inspector, connector lifecycle, AI agent runtime and broad app/action catalog remain subsequent phases.
+
+See [P127 Automation Execution Control Plane](docs/P127-AUTOMATION-EXECUTION-CONTROL-PLANE.md).
+
 ## V126 — Unified communications and production inbox
 
 V126 finishes the first real unified communications layer on top of V125: tenant-scoped conversation queues, message timelines, human handoff/read state, atomic outbound queueing, provider-worker delivery, inbound webhook threading and delivery receipts. Message bodies and attachments remain behind a deployment-reviewed encrypted content-store module; PostgreSQL and queue payloads contain only opaque references. Provider callbacks are deduplicated and reconciled into durable message state.
