@@ -199,7 +199,7 @@ try {
   const capabilityCheck = await read('scripts/capabilities-check.mjs');
   const capabilityMigration = await read('infra/postgres/FINAL-MIGRATION-V122.sql');
   const capabilityGrants = await read('infra/postgres/API-ROLE-GRANTS-V122.sql');
-  check('V122 complete capability fabric', capabilityFabric.includes('ATLAS_CAPABILITIES') && capabilityFabric.includes("communication.unified_inbox") && capabilityFabric.includes("enterprise.load_failover") && capabilityCheck.includes('exactly 60') && capabilityMigration.includes('atlas_v122_conversations') && capabilityMigration.includes('ROW LEVEL SECURITY') && capabilityGrants.includes('atlas_app'), 'All 60 requested capabilities have governed runtime registration, tenant persistence, API grants and fail-closed security boundaries');
+  check('V122 complete capability fabric', capabilityFabric.includes('ATLAS_CAPABILITIES') && capabilityFabric.includes("communication.unified_inbox") && capabilityFabric.includes("enterprise.load_failover") && capabilityCheck.includes('62 registered capabilities') && capabilityMigration.includes('atlas_v122_conversations') && capabilityMigration.includes('ROW LEVEL SECURITY') && capabilityGrants.includes('atlas_app'), 'All 60 requested capabilities plus two provider runtime actions have governed runtime registration, tenant persistence, API grants and fail-closed security boundaries');
 
   const executionSql = await read('infra/postgres/FINAL-MIGRATION-V119.sql');
   const executionGrants = await read('infra/postgres/API-ROLE-GRANTS-V119.sql');
