@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import {assertSafeProviderUrl} from '../../packages/atlas-core/provider-adapters.mjs';
 const RETRYABLE=new Set([408,425,429,500,502,503,504]);
 async function request({url,method='POST',headers={},body,fetchImpl=fetch,signal,timeoutMs=15000}){
