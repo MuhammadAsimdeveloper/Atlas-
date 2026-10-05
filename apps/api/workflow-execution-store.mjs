@@ -17,6 +17,12 @@ function rowToState(row){
   if(!verifyWorkflowExecution(state) || state.tenantId!==row.tenant_id || state.executionId!==row.execution_id || state.version!==row.version || state.status!==row.status) throw createAuthError(500,'workflow_execution_integrity_failed');
   return state;
 }
+function boundedFilter(value, pattern, label) {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string' || value.length > 80 || !pattern.test(value)) throw createAuthError(400, 'invalid_' + label);
+  return value;
+}
+
 function boundedLimit(value, fallback=50){
   const limit=Number(value??fallback);
   if(!Number.isSafeInteger(limit)||limit<1||limit>100) throw createAuthError(400,'invalid_execution_limit');
@@ -98,13 +104,21 @@ export class PostgresWorkflowExecutionStore{
     });
   }
 
-  async list({actorId,tenantId,workflowId,limit=50}){
+  async list({actorId,tenantId,workflowId,limit=50,status=null,triggerEventType=null,errorCode=null}){
     if(!UUID.test(workflowId||'')) throw createAuthError(400,'invalid_workflow_id');
     const safeLimit=boundedLimit(limit);
     return this.#transaction(async client=>{
       await this.#scope(client,{actorId,tenantId});
+      const safeStatus=boundedFilter(status,/^[a-z][a-z0-9_]{0,39}$/,'execution_status');
+      const safeTrigger=boundedFilter(triggerEventType,/^[a-z][a-z0-9_.:-]{0,79}$/,'trigger_event_type');
+      const safeError=boundedFilter(errorCode,ERROR_CODE,'error_code');
       const result=await client.query(`SELECT execution_id,workflow_id,workflow_version,graph_checksum,status,current_node_id,trigger_event_type,trigger_event_ref,version,retry_at,last_error_code,replay_of_execution_id,started_at,finished_at,created_at,updated_at
-        FROM atlas_workflow_executions WHERE tenant_id=$1 AND workflow_id=$2 ORDER BY created_at DESC,execution_id DESC LIMIT $3`,[tenantId,workflowId,safeLimit]);
+        FROM atlas_workflow_executions
+        WHERE tenant_id=$1 AND workflow_id=$2
+          AND ($3::text IS NULL OR status=$3)
+          AND ($4::text IS NULL OR trigger_event_type=$4)
+          AND ($5::text IS NULL OR last_error_code=$5)
+        ORDER BY created_at DESC,execution_id DESC LIMIT $6`,[tenantId,workflowId,safeStatus,safeTrigger,safeError,safeLimit]);
       return {items:result.rows.map(row=>({
         executionId:row.execution_id,workflowId:row.workflow_id,workflowVersion:row.workflow_version,graphChecksum:row.graph_checksum?.trim(),status:row.status,currentNodeId:row.current_node_id,triggerEventType:row.trigger_event_type,triggerEventRef:row.trigger_event_ref,version:row.version,retryAt:row.retry_at,lastErrorCode:row.last_error_code,replayOfExecutionId:row.replay_of_execution_id,startedAt:row.started_at,endedAt:row.finished_at,createdAt:row.created_at,updatedAt:row.updated_at
       }))};
