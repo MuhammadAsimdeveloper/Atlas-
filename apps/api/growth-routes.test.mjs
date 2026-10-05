@@ -16,7 +16,7 @@ async function createTestApi({ tenantId = tenantA, email = ownerEmail, membershi
   const store={
     async overview(data) { seen.push(['overview',data]); return {status:'tenant_database_backed'}; },
     async list(data) { seen.push(['list',data]); return {items:[],canWrite:true}; },
-    async getWorkflowCatalog(data) { seen.push(['workflow_catalog',data]); return { executionAvailable:false, triggers:[{type:'contact.created'}], nodes:[{type:'trigger'},{type:'stop'}] }; },
+    async getWorkflowCatalog(data) { seen.push(['workflow_catalog',data]); return { executionAvailable:false, previewAvailable:true, triggers:[{type:'contact.created'}], nodes:[{type:'trigger'},{type:'stop'}] }; },
     async listPublishedQualificationProfiles(data) { seen.push(['qualification_profiles',data]); return {items:[{id:'44444444-4444-4444-8444-444444444444',state:'published'}],canWrite:false}; },
     async get(data) { seen.push(['get',data]); return {id:data.id,tenantId:data.tenantId,module:data.module}; },
     async create(data) { seen.push(['create',data]); return {id:'22222222-2222-4222-8222-222222222222',tenantId:data.tenantId,module:data.module,payload:data.payload}; },
@@ -64,6 +64,7 @@ test('workflow capability catalog is available only through the authenticated ac
     const catalog=await response.json();
     assert.equal(response.status,200);
     assert.equal(catalog.executionAvailable,false);
+    assert.equal(catalog.previewAvailable,true);
     assert.deepEqual(catalog.nodes.map(node=>node.type),['trigger','stop']);
     const scope=api.seen.find(([kind])=>kind==='workflow_catalog')[1];
     assert.equal(scope.actorId,actor); assert.equal(scope.tenantId,tenantA);
