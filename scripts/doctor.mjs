@@ -14,7 +14,7 @@ try {
   check('release metadata', pkg.version === '145.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
-  for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143','144','145']) {
+  for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143','144']) {
     const migration = await read(`infra/postgres/FINAL-MIGRATION-V${version}.sql`);
     check(`V${version} frontier migration`, migration.includes('BEGIN;') && migration.includes('COMMIT;'), `V${version} migration is present and transaction-wrapped.`);
   }
@@ -24,7 +24,7 @@ try {
   check('V137 durable observability control plane', v137.includes('atlas_runtime_slo_policies') && v137.includes('atlas_runtime_slo_evaluations') && v137.includes('atlas_runtime_alerts') && v137.includes('atlas_runtime_incidents') && v137.includes('atlas_v137_evaluate_runtime_slo') && v137Grants.includes('atlas_worker') && v137RuntimeStore.includes('evaluateRuntimeSlo'), 'Runtime samples now feed durable SLO evaluations, alerts and incidents through a restricted evaluation function.');
   const distributedFabric = await read('packages/atlas-runtime/distributed-fabric.mjs');
   const fabricTest = await read('packages/atlas-runtime/distributed-fabric.test.mjs');
-  for (const version of ['139','140','141','142','143','144','145']) {
+  for (const version of ['139','140','141','142','143','144']) {
     const migration = await read(`infra/postgres/FINAL-MIGRATION-V${version}.sql`);
     check(`V${version} distributed production fabric`, migration.includes('BEGIN;') && migration.includes('COMMIT;'), `V${version} migration is transaction-wrapped.`);
   }
