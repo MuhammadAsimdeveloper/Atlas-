@@ -31,7 +31,7 @@ async function fixture() {
   const authStore={async getSession({sessionHash}){return sessionHash===session.tokenHash?session:null;}};
   const executions=new Map();
   const executionStore={
-    async create(data){calls.push(['create',data]);executions.set(executionId,{executionId,tenantId,status:'queued',version:1,currentNodeId:'start'});return executions.get(executionId);},
+    async create(data){calls.push(['create',data]);executions.set(executionId,{executionId,tenantId,status:'queued',version:1,currentNodeId:'start',workflowVersion:3});return executions.get(executionId);},
     async list(data){calls.push(['list',data]);return {items:[...executions.values()]};},
     async get(data){calls.push(['get',data]);return executions.get(data.executionId)||null;},
     async cancel(data){calls.push(['cancel',data]);return {...executions.get(data.executionId),status:'canceled',version:2};},
@@ -51,7 +51,7 @@ async function fixture() {
 test('starting a published workflow creates a durable queued execution',async()=>{
   const api=await fixture();
   try{
-    const response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions',{method:'POST',headers:api.headers,body:JSON.stringify({triggerEventType:'contact.created',triggerEventRef:'evt_001'})});
+    const response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions',{method:'POST',headers:api.headers,body:JSON.stringify({triggerEventType:'contact.created',triggerEventRef:'evt_001',executionId})});
     const body=await response.json();
     assert.equal(response.status,202);
     assert.equal(body.execution.status,'queued');
@@ -67,7 +67,7 @@ test('execution route refuses drafts and validates trigger identity before creat
     const response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions',{method:'POST',headers:api.headers,body:JSON.stringify({triggerEventType:'payment.failed',triggerEventRef:'evt_002'})});
     assert.equal(response.status,400);
     assert.equal(api.calls.some(([kind])=>kind==='create'),false);
-    const response2=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions',{method:'POST',headers:api.headers,body:JSON.stringify({triggerEventType:'contact.created',triggerEventRef:'evt_003'})});
+    const response2=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions',{method:'POST',headers:api.headers,body:JSON.stringify({triggerEventType:'contact.created',triggerEventRef:'evt_003',executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'})});
     assert.equal(response2.status,202);
   }finally{await api.close();}
 });
@@ -80,10 +80,10 @@ test('execution cancellation, approval and replay stay tenant-scoped and require
     response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions/'+executionId+'/cancel',{method:'POST',headers:api.headers,body:JSON.stringify({})});
     assert.equal(response.status,200);
     assert.equal(api.calls.at(-1)[1].tenantId,tenantId);
-    response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions/'+executionId+'/approve',{method:'POST',headers:api.headers,body:JSON.stringify({approvedByActorId:'88888888-8888-4888-8888-888888888888',evidenceRef:{kind:'approval',id:'evidence-1'}})});
+    response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions/'+executionId+'/approve',{method:'POST',headers:api.headers,body:JSON.stringify({expectedVersion:2,approvalId:'approval_1',evidenceRef:{kind:'approval',id:'evidence-1'}})});
     assert.equal(response.status,200);
     assert.equal(api.calls.at(-1)[1].approvedByActorId,'88888888-8888-4888-8888-888888888888');
-    response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions/'+executionId+'/replay',{method:'POST',headers:api.headers,body:JSON.stringify({})});
+    response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions/'+executionId+'/replay',{method:'POST',headers:api.headers,body:JSON.stringify({expectedVersion:2,executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'})});
     assert.equal(response.status,202);
     assert.equal(api.calls.at(-1)[1].tenantId,tenantId);
   }finally{await api.close();}
