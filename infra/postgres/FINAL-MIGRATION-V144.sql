@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS atlas_runtime_control_events(event_id UUID PRIMARY KE
 CREATE INDEX IF NOT EXISTS atlas_runtime_control_events_recent ON atlas_runtime_control_events(occurred_at DESC,event_type);
 ALTER TABLE atlas_runtime_control_events ENABLE ROW LEVEL SECURITY; ALTER TABLE atlas_runtime_control_events FORCE ROW LEVEL SECURITY;
 CREATE POLICY atlas_runtime_control_events_worker ON atlas_runtime_control_events USING(current_user='atlas_worker') WITH CHECK(current_user='atlas_worker');
-REVOKE ALL ON atlas_runtime_control_events FROM PUBLIC,atlas_app;
+REVOKE ALL ON atlas_runtime_control_events FROM PUBLIC;
 COMMIT;
