@@ -62,6 +62,15 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
 
     await db.exec('SET ROLE atlas_app;');
     assert.equal(await new PostgresAuthStore(db).assertSafeRuntimeRole(), true, 'restricted atlas_app passes the production startup check');
+    await db.query("INSERT INTO atlas_runtime_pools(pool_id,mode,desired_workers,max_concurrency,enabled) VALUES ('pool-v137','postgres',1,10,true)");
+    await db.query("INSERT INTO atlas_runtime_slo_samples(sample_id,pool_id,metric,value,target) VALUES ('44444444-4444-4444-8444-444444444444','pool-v137','success_rate',0,0.995)");
+    const evaluation = await db.query("SELECT * FROM atlas_v137_evaluate_runtime_slo('runtime.success-rate','pool-v137','55555555-5555-4555-8555-555555555555')");
+    assert.equal(evaluation.rows[0].status, 'critical');
+    assert.ok(evaluation.rows[0].alert_id);
+    const alert = await db.query("SELECT status,severity FROM atlas_runtime_alerts WHERE pool_id='pool-v137'");
+    assert.deepEqual(alert.rows[0], { status:'open', severity:'critical' });
+    const incident = await db.query("SELECT status,severity FROM atlas_runtime_incidents WHERE fingerprint=md5('incident:runtime.success-rate:pool-v137')");
+    assert.deepEqual(incident.rows[0], { status:'open', severity:'critical' });
 
     const makeOrg = async ({ actor, email, tenant, name, slug }) => {
       await db.exec('BEGIN');
