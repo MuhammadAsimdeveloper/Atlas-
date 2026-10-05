@@ -3,6 +3,7 @@ import {
 } from './auth-contracts.mjs';
 import { resolveAtlasAuthority } from '../../packages/atlas-core/authority.mjs';
 import { paddlePlanCatalog, verifyPaddleFreeTrialPrice, createPaddleCheckout, createPaddlePortalSession, normalizePaddleBillingEvent, paddleBodySha256, verifyPaddleSignature } from './paddle-billing.mjs';
+import { simulateWorkflow } from '../../packages/atlas-target/workflow-simulator.mjs';
 
 const MAX_BODY_BYTES = 110_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -139,6 +140,23 @@ export function createGrowthApi({ store, authStore, env = process.env, fetchImpl
       if (!match) return send(res, 404, { error: 'not_found' }, env);
       const [, module, id, action] = match;
       if (id && !UUID.test(id)) return send(res, 404, { error: 'growth_record_not_found' }, env);
+      if (req.method === 'POST' && module === 'workflows' && id && action === 'simulate') {
+        await requireMutation(req, who.session);
+        const body = await readJson(req);
+        exact(body, ['event', 'executionId', 'approvedNodeIds', 'now', 'maxSteps']);
+        const workflow = await store.get({ ...who, module, id });
+        if (!workflow?.payload?.graph) throw createAuthError(409, 'workflow_graph_unavailable', 'The workflow has no valid graph to preview.');
+        const result = simulateWorkflow({
+          graph: workflow.payload.graph,
+          tenantId: who.tenantId,
+          executionId: body.executionId,
+          event: body.event,
+          approvedNodeIds: body.approvedNodeIds,
+          now: body.now === undefined ? Date.now() : body.now,
+          maxSteps: body.maxSteps === undefined ? 100 : body.maxSteps
+        });
+        return send(res, 200, result, env);
+      }
       if (req.method === 'GET' && module === 'ai-qualification' && url.searchParams.get('publishedOnly') === 'true') {
         const limit = Number(url.searchParams.get('limit') || 100);
         return send(res, 200, await store.listPublishedQualificationProfiles({ ...who, limit }), env);
