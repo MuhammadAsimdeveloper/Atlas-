@@ -6,6 +6,7 @@ import {
   requestWorkflowApproval,
   approveWorkflowExecution,
   completeWorkflowStep,
+  resumeWorkflowExecution,
   failWorkflowStep,
   cancelWorkflowExecution,
   replayWorkflowExecution
@@ -245,4 +246,51 @@ test('workflow result references reject direct email or URL destinations', () =>
     resultRef: { kind: 'provider', id: 'https://example.com' },
     now: '2026-10-05T10:00:00Z'
   }), /opaque reference/i);
+});
+
+
+test('delay and wait nodes pause execution with a bounded resume time', () => {
+  const now = Date.parse('2026-10-05T10:00:00.000Z');
+  const graph = workflow({
+    nodes: [
+      { id: 'trigger', type: 'trigger', name: 'Lead created', config: { eventType: 'lead.created' } },
+      { id: 'wait', type: 'delay', name: 'Wait one minute', config: { delayMs: 60_000 } },
+      { id: 'stop', type: 'stop', name: 'Done', config: {} }
+    ],
+    edges: [
+      { id: 'e1', from: 'trigger', to: 'wait', port: 'next' },
+      { id: 'e2', from: 'wait', to: 'stop', port: 'next' }
+    ]
+  });
+  let execution = createWorkflowExecution({ tenantId, executionId, workflow: graph, triggerEventRef: 'event_1', createdByActorId: actorId, now });
+  execution = completeWorkflowStep({ execution, nodeId: 'trigger', now });
+  execution = startWorkflowStep(execution, { nodeId: 'wait', now });
+  execution = completeWorkflowStep({ execution, nodeId: 'wait', now });
+  assert.equal(execution.status, 'waiting');
+  assert.equal(execution.currentNodeId, 'wait');
+  assert.equal(execution.resumeAt, '2026-10-05T10:01:00.000Z');
+  const before = resumeWorkflowExecution({ execution, now: now + 59_999 });
+  assert.equal(before, execution);
+  const resumed = resumeWorkflowExecution({ execution, now: now + 60_000 });
+  assert.equal(resumed.status, 'queued');
+  assert.equal(resumed.currentNodeId, 'stop');
+  assert.equal(resumed.resumeAt, null);
+});
+
+test('wait-until nodes reject unbounded or past resume times', () => {
+  const now = Date.parse('2026-10-05T10:00:00.000Z');
+  const graph = workflow({
+    nodes: [
+      { id: 'trigger', type: 'trigger', name: 'Lead created', config: { eventType: 'lead.created' } },
+      { id: 'wait', type: 'wait_until', name: 'Wait', config: { resumeAt: '2026-10-05T10:05:00.000Z' } },
+      { id: 'stop', type: 'stop', name: 'Done', config: {} }
+    ],
+    edges: [{ id: 'e1', from: 'trigger', to: 'wait', port: 'next' }, { id: 'e2', from: 'wait', to: 'stop', port: 'next' }]
+  });
+  let execution = createWorkflowExecution({ tenantId, executionId: crypto.randomUUID(), workflow: graph, triggerEventRef: 'event_2', createdByActorId: actorId, now });
+  execution = completeWorkflowStep({ execution, nodeId: 'trigger', now });
+  execution = startWorkflowStep(execution, { nodeId: 'wait', now });
+  execution = completeWorkflowStep({ execution, nodeId: 'wait', now });
+  assert.equal(execution.resumeAt, '2026-10-05T10:05:00.000Z');
+  assert.throws(() => resumeWorkflowExecution({ execution, now: now + 5 * 60_000 - 1 }), /not ready/);
 });
