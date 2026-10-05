@@ -35,7 +35,10 @@ export class AtlasQueueWorker {
 
   async runOnce() {
     await this.store.reapJobs(100);
-    if (this.jobHandlers.size) await this.store.tickSchedules(100);
+    if (this.jobHandlers.size) {
+      await this.store.tickSchedules(100);
+      if (this.jobHandlers.has('workflow.execute') && typeof this.store.tickWorkflowExecutions === 'function') await this.store.tickWorkflowExecutions(100);
+    }
     if (this.eventHandlers.size) await this.store.reapOutbox(500);
     const jobsEnabled=this.jobHandlers.size>0, eventsEnabled=this.eventHandlers.size>0;
     let jobs=[],events=[];

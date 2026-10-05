@@ -31,6 +31,7 @@ export async function executeWorkflowJob({store,job,workerId,resolveAction=async
  const attempt=currentAttempt(execution,nodeId);
  if(attempt>node.retry.maxAttempts)throw Object.assign(new Error('Workflow step attempt limit exceeded.'),{code:'workflow_attempt_limit'});
  let next=startWorkflowStep(execution,{nodeId,attempt,now});
+ if(next===execution && ['waiting','retryable','running'].includes(execution.status)) return {status:'deferred',execution};
  if(next!==execution){
    const ok=await store.updateWorkflowExecutionForJob(job,workerId,{expectedVersion:execution.version,status:next.status,currentNodeId:next.currentNodeId,state:next,stateChecksum:next.checksum,lastErrorCode:next.lastErrorCode,retryAt:next.retryAt,finishedAt:next.endedAt});
    if(!ok)throw Object.assign(new Error('Execution changed while starting step.'),{code:'execution_version_conflict'});

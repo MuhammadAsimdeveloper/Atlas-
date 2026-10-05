@@ -101,6 +101,11 @@ export class PostgresRuntimeStore {
     return rows[0].count;
   }
 
+  async tickWorkflowExecutions(limit = 100) {
+    const { rows } = await this.pool.query('SELECT atlas_v128_tick_workflow_executions($1) AS count', [limit]);
+    return Number(rows[0]?.count || 0);
+  }
+
   async reapJobs(limit = 100) {
     const { rows } = await this.pool.query('SELECT atlas_v115_reap_jobs($1) AS count', [limit]);
     return rows[0].count;
