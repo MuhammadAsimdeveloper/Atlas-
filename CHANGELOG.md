@@ -1,3 +1,11 @@
+## 145.0.0 — Cross-product Lead-to-Booking Integration + MiroFish scenarios
+- Added a tenant-scoped orchestration service connecting funnel/web lead capture, CRM contact/lead creation, deterministic qualification, follow-up planning, calendar availability/hold/booking, pipeline stage movement and redacted journey reporting.
+- Added replay-stable idempotency references and fail-closed behavior for missing qualification evidence, invalid source assets and unavailable calendar slots.
+- Added a provider-required voice follow-up intent without claiming external telephony execution.
+- Extended `npm run mirofish:check` into deterministic stakeholder/scenario simulations covering the flagship journey, replay, tenant injection, qualification failure, calendar conflict, SEO and agent authorization boundaries.
+- Added the V145+ engineering plan and release boundary documentation.
+- V145 remains source/runtime-ready, not externally live: provider credentials, managed infrastructure and production evidence remain deployment gates.
+
 ## 143.0.0 — Distributed production execution fabric (V139–V143)
 - Added a Redis transport abstraction with priority queues and bounded dispatch envelopes.
 - Kept PostgreSQL as the durable execution authority and added explicit Redis-failure fallback/recovery semantics.
