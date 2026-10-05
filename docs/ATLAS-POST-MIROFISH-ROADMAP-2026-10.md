@@ -8,10 +8,11 @@ The roadmap deliberately favors **depth of one complete customer outcome** over 
 
 ## Baseline
 
-The repository README and master roadmap identify V119 as the current documented release baseline.
+The repository README and master roadmap identify V120 as the current documented release baseline.
 
 Important repository truth:
 
+- V120: worker execution isolation, centralized API security headers, production health-token and distributed rate-limit controls
 - V119: durable workflow execution state/control plane, version pinning, replay/cancel/approval and atomic queue handoff
 - V117: authenticated visual Workflow Studio and safe workflow preview
 - V115: durable queue/outbox/scheduler primitives
