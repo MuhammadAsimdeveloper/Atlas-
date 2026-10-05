@@ -198,6 +198,47 @@ export function createWorkflowStudio(host, request) {
 
     const footer = element('p', `Capability registry: ${state.catalog.triggers.length} event types · ${state.catalog.nodes.length} node types. “Adapter needed” means the provider operation has a contract but is not configured here.`, 'workflow-studio-footer');
     if (state.workflowId) {
+      const historySection = element('section', '', 'growth-special-card workflow-execution-history');
+      historySection.append(element('h4', 'Execution history'));
+      historySection.append(element('p', 'Durable runs are version-pinned. A queued state means the control plane accepted the run; it does not mean an external provider action has completed.', 'field-help'));
+      const historyBody = element('div', '', 'workflow-history-body');
+      const refreshRuns = element('button', 'Refresh runs', 'button subtle');
+      refreshRuns.type = 'button';
+      const historyStatus = element('p', '', 'field-help');
+      refreshRuns.addEventListener('click', loadExecutionHistory);
+      async function loadExecutionHistory() {
+        refreshRuns.disabled = true;
+        historyStatus.textContent = 'Loading runs…';
+        try {
+          const result = await request('/growth/workflows/' + state.workflowId + '/executions?limit=20');
+          historyBody.replaceChildren();
+          if (!result.items?.length) {
+            historyBody.append(element('p', 'No durable executions yet.', 'field-help'));
+          } else {
+            for (const run of result.items) {
+              const row = element('article', '', 'workflow-history-row');
+              const main = element('div', '', 'workflow-history-main');
+              main.append(element('strong', run.status.replaceAll('_', ' ')));
+              main.append(element('span', 'v' + run.workflowVersion + ' · ' + (run.triggerEventType || 'manual trigger'), 'field-help'));
+              const meta = element('small', run.lastErrorCode ? ('Error: ' + run.lastErrorCode) : ('Run ' + run.executionId), 'field-help');
+              row.append(main, meta);
+              historyBody.append(row);
+            }
+          }
+          historyStatus.textContent = 'Showing the latest ' + (result.items?.length || 0) + ' run(s).';
+        } catch (error) {
+          historyBody.replaceChildren();
+          historyStatus.textContent = error.message || 'Execution history unavailable.';
+        } finally {
+          refreshRuns.disabled = false;
+        }
+      }
+      historySection.append(refreshRuns, historyStatus, historyBody);
+      host.append(historySection);
+      void loadExecutionHistory();
+    }
+
+    if (state.workflowId) {
       const previewSection = element('section', '', 'growth-special-card workflow-preview');
       const previewTitle = element('h4', 'Safe workflow preview');
       const previewHelp = element('p', 'Test the saved version with sample event data. Provider, AI, payment and messaging steps are simulated and produce zero external side effects.', 'field-help');
