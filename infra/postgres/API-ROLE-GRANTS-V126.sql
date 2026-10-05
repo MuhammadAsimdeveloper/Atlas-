@@ -1,3 +1,9 @@
 BEGIN;
 GRANT SELECT,INSERT,UPDATE ON atlas_v126_inbox_events,atlas_v126_message_receipts TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v126_create_outbound_message(uuid,uuid,uuid,text,uuid,text,text,text,text,text,uuid) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v126_resolve_webhook_endpoint(text) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v126_ingest_inbound(uuid,uuid,text,text,text,text,text,text,text,text,text,text,text) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v126_apply_receipt(uuid,text,text,text,text,jsonb) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v126_get_message_for_worker(uuid,uuid,text,uuid) TO atlas_worker;
+GRANT EXECUTE ON FUNCTION atlas_v126_mark_message_for_worker(uuid,uuid,text,uuid,text,text,text) TO atlas_worker;
 COMMIT;
