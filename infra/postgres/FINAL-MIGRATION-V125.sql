@@ -21,7 +21,7 @@ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path=pg_catalog,public
 AS $$
 BEGIN
-  IF current_user <> 'atlas_worker' THEN RAISE EXCEPTION 'worker_role_required'; END IF;
+  IF session_user <> 'atlas_worker' THEN RAISE EXCEPTION 'worker_role_required'; END IF;
   IF p_worker_id !~ '^[a-zA-Z0-9_.:-]{1,120}$' THEN RAISE EXCEPTION 'worker_identity_invalid'; END IF;
 
   IF NOT EXISTS (
