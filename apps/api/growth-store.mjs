@@ -114,6 +114,28 @@ export class PostgresGrowthStore {
     });
   }
 
+  async listPublishedWorkflowsForEvent({ actorId, tenantId, eventType, limit = 100 }) {
+    if (!/^[a-z][a-z0-9_.:-]{0,119}$/.test(eventType || '')) throw createAuthError(400, 'invalid_event_type');
+    return this.#transaction(async client => {
+      await this.#scope(client, { actorId, tenantId }, { module: 'workflows' });
+      const safeLimit = Math.min(100, Math.max(1, Number.isInteger(limit) ? limit : 100));
+      const { rows } = await client.query(`
+        SELECT DISTINCT g.*
+        FROM atlas_growth_items g
+        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(g.payload->'graph'->'nodes','[]'::jsonb)) node
+        WHERE g.tenant_id=$1
+          AND g.module_key='workflows'
+          AND g.state='published'
+          AND node->>'type'='trigger'
+          AND node->'config'->>'eventType'=$2
+        ORDER BY g.updated_at DESC,g.item_id
+        LIMIT $3`, [tenantId, eventType, safeLimit]);
+      const items = rows.map(rowToRecord);
+      if (items.some(record => !verifyGrowthRecord(record))) throw createAuthError(500, 'growth_integrity_failed');
+      return { items, limit: safeLimit };
+    });
+  }
+
   async getWorkflowCatalog({ actorId, tenantId }) {
     return this.#transaction(async client => {
       await this.#scope(client, { actorId, tenantId }, { module: 'workflows' });
