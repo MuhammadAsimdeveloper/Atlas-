@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS atlas_workflow_rollbacks (
 ALTER TABLE atlas_workflow_environments ENABLE ROW LEVEL SECURITY; ALTER TABLE atlas_workflow_environments FORCE ROW LEVEL SECURITY;
 ALTER TABLE atlas_workflow_promotions ENABLE ROW LEVEL SECURITY; ALTER TABLE atlas_workflow_promotions FORCE ROW LEVEL SECURITY;
 ALTER TABLE atlas_workflow_rollbacks ENABLE ROW LEVEL SECURITY; ALTER TABLE atlas_workflow_rollbacks FORCE ROW LEVEL SECURITY;
-CREATE POLICY atlas_workflow_env_tenant ON atlas_workflow_environments USING(tenant_id=nullif(current_setting('app.tenant_id',true))::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true))::uuid);
-CREATE POLICY atlas_workflow_promotions_tenant ON atlas_workflow_promotions USING(tenant_id=nullif(current_setting('app.tenant_id',true))::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true))::uuid);
-CREATE POLICY atlas_workflow_rollbacks_tenant ON atlas_workflow_rollbacks USING(tenant_id=nullif(current_setting('app.tenant_id',true))::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true))::uuid);
+CREATE POLICY atlas_workflow_env_tenant ON atlas_workflow_environments USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+CREATE POLICY atlas_workflow_promotions_tenant ON atlas_workflow_promotions USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+CREATE POLICY atlas_workflow_rollbacks_tenant ON atlas_workflow_rollbacks USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
 COMMIT;
