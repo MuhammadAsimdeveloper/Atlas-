@@ -20,6 +20,7 @@ export const jobHandlers=Object.freeze({'workflow.execute':async(_payloadRef,con
  const providerRuntime=createProviderRuntime({connectionStore:store,secretResolver});
  return executeWorkflowJob({
   store,job:{tenant_id:context.tenantId,job_id:context.jobId},workerId:context.workerId,
+  signal:context.signal,
   resolveAction:async({node,execution,tenantId,jobId,signal})=>{
    const cap=node.config?.capabilityId;
    if(node.requiresAdapter===true||typeof cap==='string'&&/^(communication\.|automation\.webhook|service\.jobber)/.test(cap))
