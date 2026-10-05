@@ -34,10 +34,34 @@ export class EmailAlertSender{
   }
 }
 
+export class OtlpAlertSender{
+  constructor({fetchImpl=fetch,timeoutMs=3000}={}){this.fetchImpl=fetchImpl;this.timeoutMs=Math.max(1000,Math.min(10000,timeoutMs));}
+  async send({endpoint,secret=null,alert}){
+    if(typeof endpoint!=='string') throw Object.assign(new Error('OTLP alert endpoint is invalid'),{code:'alert_endpoint_invalid'});
+    let url;try{url=new URL(endpoint);}catch{throw Object.assign(new Error('OTLP alert endpoint is invalid'),{code:'alert_endpoint_invalid'});}
+    if(url.protocol!=='https:') throw Object.assign(new Error('OTLP alert endpoint must use HTTPS'),{code:'alert_endpoint_invalid'});
+    const record={timeUnixNano:String(Date.now()*1_000_000),severityText:String(alert.severity||'warning').toUpperCase(),body:{kvlistValue:{values:[
+      {key:'alert_id',value:{stringValue:String(alert.alertId).slice(0,160)}},
+      {key:'policy_id',value:{stringValue:String(alert.policyId).slice(0,160)}},
+      {key:'pool_id',value:{stringValue:String(alert.poolId).slice(0,120)}},
+      {key:'severity',value:{stringValue:String(alert.severity).slice(0,32)}}
+    ]}}};
+    const body=JSON.stringify({resourceLogs:[{resource:{attributes:[{key:'service.name',value:{stringValue:'atlas-runtime'}}]},scopeLogs:[{logRecords:[record]}]}]});
+    if(Buffer.byteLength(body,'utf8')>8192) throw Object.assign(new Error('OTLP alert payload too large'),{code:'alert_payload_too_large'});
+    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),this.timeoutMs);timer.unref?.();
+    try{
+      const response=await this.fetchImpl(url.href,{method:'POST',headers:{accept:'application/json','content-type':'application/json',...(secret?{authorization:'Bearer '+secret}:{})},body,signal:controller.signal});
+      if(!response.ok)throw Object.assign(new Error('otlp_alert_http_'+response.status),{code:'otlp_alert_http_'+response.status});
+      return true;
+    }catch(error){throw Object.assign(new Error('OTLP alert delivery failed',{cause:error}),{code:error?.name==='AbortError'?'otlp_alert_timeout':error?.code||'otlp_alert_failed'});}
+    finally{clearTimeout(timer);}
+  }
+}
+
 export class AlertRouter{
-  constructor({store,secretResolver=null,webhookSender=new WebhookAlertSender(),emailSender=null,logger=console,maxPerCycle=50}={}){
+  constructor({store,secretResolver=null,webhookSender=new WebhookAlertSender(),emailSender=null,otlpSender=new OtlpAlertSender(),logger=console,maxPerCycle=50}={}){
     if(!store||typeof store.listRuntimeAlerts!=='function'||typeof store.listObservabilityDestinations!=='function'||typeof store.claimAlertDelivery!=='function') throw new TypeError('Alert router store is incomplete');
-    this.store=store; this.secretResolver=secretResolver; this.webhookSender=webhookSender; this.emailSender=emailSender; this.logger=logger; this.maxPerCycle=Math.max(1,Math.min(200,maxPerCycle));
+    this.store=store; this.secretResolver=secretResolver; this.webhookSender=webhookSender; this.emailSender=emailSender; this.otlpSender=otlpSender; this.logger=logger; this.maxPerCycle=Math.max(1,Math.min(200,maxPerCycle));
   }
   async runOnce(){
     const alerts=await this.store.listRuntimeAlerts({status:'open',limit:this.maxPerCycle});
@@ -57,8 +81,8 @@ export class AlertRouter{
             if(!this.emailSender) throw Object.assign(new Error('Email alert sender is unavailable'),{code:'alert_email_sender_unavailable'});
             await this.emailSender.sendAlert({address:destination.endpoint_ref,alert:safeAlert});
           }else if(destination.kind==='otlp'){
-            if(typeof this.store.exportAlertOtlp!=='function') throw Object.assign(new Error('OTLP alert exporter is unavailable'),{code:'alert_otlp_exporter_unavailable'});
-            await this.store.exportAlertOtlp({destination,alert:safeAlert});
+            const token=destination.secret_ref&&this.secretResolver?await this.secretResolver({secretRef:destination.secret_ref}):null;
+            await this.otlpSender.send({endpoint:destination.endpoint_ref,secret:token,alert:safeAlert});
           }else{
             throw Object.assign(new Error('Unsupported alert destination'),{code:'alert_destination_unsupported'});
           }
