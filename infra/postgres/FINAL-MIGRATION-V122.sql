@@ -127,8 +127,8 @@ DO $policies$
 DECLARE t TEXT;
 BEGIN
   FOR t IN SELECT unnest(ARRAY['atlas_v122_provider_connections','atlas_v122_credentials','atlas_v122_conversations','atlas_v122_messages','atlas_v122_webhook_endpoints','atlas_v122_oauth_connections','atlas_v122_crm_definitions','atlas_v122_marketing_definitions']) AS table_name LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I_tenant ON %I',t.table_name,t.table_name);
-    EXECUTE format('CREATE POLICY %I_tenant ON %I USING (tenant_id::text=nullif(current_setting(''app.tenant_id'',true),'''')) WITH CHECK (tenant_id::text=nullif(current_setting(''app.tenant_id'',true),''''))',t.table_name,t.table_name);
+    EXECUTE format('DROP POLICY IF EXISTS %I_tenant ON %I',t,t);
+    EXECUTE format('CREATE POLICY %I_tenant ON %I USING (tenant_id::text=nullif(current_setting(''app.tenant_id'',true),'''')) WITH CHECK (tenant_id::text=nullif(current_setting(''app.tenant_id'',true),''''))',t,t);
   END LOOP;
 END;
 $policies$;
