@@ -124,6 +124,7 @@ ALTER TABLE atlas_v122_marketing_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atlas_v122_enterprise_controls ENABLE ROW LEVEL SECURITY;
 
 DO $policies$
+DECLARE t TEXT;
 BEGIN
   FOR t IN SELECT unnest(ARRAY['atlas_v122_provider_connections','atlas_v122_credentials','atlas_v122_conversations','atlas_v122_messages','atlas_v122_webhook_endpoints','atlas_v122_oauth_connections','atlas_v122_crm_definitions','atlas_v122_marketing_definitions']) AS table_name LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I_tenant ON %I',t.table_name,t.table_name);
