@@ -51,7 +51,7 @@ CREATE OR REPLACE FUNCTION atlas_v146_acquire_scaler_lease(
   p_worker_id TEXT,
   p_lease_seconds INTEGER DEFAULT 60
 ) RETURNS BOOLEAN
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public
+LANGUAGE plpgsql SET search_path=pg_catalog,public
 AS $$
 BEGIN
   IF p_pool_id !~ '^[A-Za-z0-9_.:-]{1,120}$'
