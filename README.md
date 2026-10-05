@@ -1,3 +1,13 @@
+## V137 — Durable observability and SLO control plane
+
+V137 turns V136's runtime samples into an operational control plane: bounded SLO policies, evaluation windows, error-budget state, deterministic alerts and critical incidents. Workers emit only metric values and opaque runtime identifiers; no customer payloads, secrets or message bodies enter telemetry. External OTel collectors, paging integrations and production SLO evidence still require deployment.
+
+## V129–V136 — Production automation frontier
+
+Atlas now contains the durable control-plane foundations for execution inspection/replay, timezone-aware schedules, event routing and deduplication, connector lifecycle/health, governed action catalog bindings, AI workforce sessions/tool approvals, environment promotion/rollback, and distributed runtime capacity/SLO evidence. These are tenant-isolated and reference-only where secrets/customer content would otherwise leak.
+
+The repository deliberately distinguishes **implemented control-plane code** from **externally live infrastructure**. Real OAuth providers, KMS/vault, model providers, Redis, WAF, object storage, production scheduler fleet, load/failover testing and SLO telemetry still require deployment evidence.
+
 ## V128 — Durable workflow wake/resume control
 
 V128 closes a critical execution gap after V127: durable `waiting` and `retryable` workflow states are now re-queued when their `resumeAt` or `retryAt` becomes due. The wake path is tenant-safe, uses `FOR UPDATE SKIP LOCKED`, creates only opaque `workflow.execute` references, and keeps actual execution behind the reviewed V125 worker/provider boundary.

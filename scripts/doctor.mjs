@@ -11,9 +11,17 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '128.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '137.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
+  for (const version of ['129','130','131','132','133','134','135','136','137']) {
+    const migration = await read(`infra/postgres/FINAL-MIGRATION-V${version}.sql`);
+    check(`V${version} frontier migration`, migration.includes('BEGIN;') && migration.includes('COMMIT;'), `V${version} migration is present and transaction-wrapped.`);
+  }
+  const v137 = await read('infra/postgres/FINAL-MIGRATION-V137.sql');
+  const v137Grants = await read('infra/postgres/API-ROLE-GRANTS-V137.sql');
+  const v137RuntimeStore = await read('apps/api/runtime-store.mjs');
+  check('V137 durable observability control plane', v137.includes('atlas_runtime_slo_policies') && v137.includes('atlas_runtime_slo_evaluations') && v137.includes('atlas_runtime_alerts') && v137.includes('atlas_runtime_incidents') && v137.includes('atlas_v137_evaluate_runtime_slo') && v137Grants.includes('atlas_worker') && v137RuntimeStore.includes('evaluateRuntimeSlo'), 'Runtime samples now feed durable SLO evaluations, alerts and incidents through a restricted evaluation function.');
   const v128 = await read('infra/postgres/FINAL-MIGRATION-V128.sql');
   check('V128 durable workflow wake scheduler', v128.includes('atlas_v128_tick_workflow_executions') && v128.includes('FOR UPDATE SKIP LOCKED') && v128.includes("'workflow.execute'"), 'Due waiting/retryable workflow executions are re-queued through an idempotent reference-only wake job.');
   const v127 = await read('infra/postgres/FINAL-MIGRATION-V127.sql');
@@ -229,6 +237,20 @@ try {
   check('V115 isolated worker role and leases', runtimeGrants.includes('atlas_worker LOGIN NOSUPERUSER') && runtimeGrants.includes('atlas_v115_claim_jobs') && runtimeGrants.includes('atlas_v115_reap_jobs') && runtimeStore.includes("role.rolname !== 'atlas_worker'") && runtimeTests.includes('previous worker cannot complete after lease loss'), 'A distinct non-bypass worker role can claim/recover leases but cannot read customer tables');
   check('V115 registered worker and honest external handler boundary', workerRuntime.includes('claimJobs(this.workerId') && workerRuntime.includes('controller.abort()') && workerRuntime.includes('worker refuses to claim work') && handlerContract.includes('no default business handlers'), 'Worker loop filters registered types, renews leases, drains safely and refuses to imply unimplemented workflow/provider handlers');
   check('V115 workflow/event groundwork is explicitly documented', await read('docs/EXECUTION-ENGINE.md').then(text => text.includes('No default event or job handlers ship') && text.includes('at-least-once')) && await read('docs/ATLAS-MASTER-ROADMAP.md').then(text => text.includes('0. Foundation') && text.includes('BLOCKED BY EXTERNAL DEPENDENCY')) && workerTests.includes('worker shutdown'), 'Execution semantics and remaining external/provider blockers are documented and tested');
+  const frontier = await read('packages/atlas-core/production-frontier.mjs');
+  const frontierTest = await read('packages/atlas-core/production-frontier.test.mjs');
+  const scheduler = await read('apps/api/workflow-scheduler.mjs');
+  const frontierStore = await read('apps/api/runtime-store.mjs');
+  const frontierRoutes = await read('apps/api/growth-routes.mjs');
+  const v130 = await read('infra/postgres/FINAL-MIGRATION-V130.sql');
+  const v133 = await read('infra/postgres/FINAL-MIGRATION-V133.sql');
+  const v136 = await read('infra/postgres/API-ROLE-GRANTS-V136.sql');
+  check('P129-P136 executable runtime primitives', frontier.includes('nextCronOccurrence') && frontier.includes('evaluatePredicate') && frontier.includes('actionAllowed') && frontier.includes('createPromotionManifest') && frontierTest.includes('promotion hashes are stable'), 'Scheduling, routing predicates, risk approval and promotion manifest primitives are regression-tested.');
+  check('P129-P136 durable APIs', frontierStore.includes('getExecutionInspector') && frontierStore.includes('createWorkflowEventRoute') && frontierStore.includes('upsertConnectorInstallation') && frontierStore.includes('createAgentSession') && frontierStore.includes('createWorkflowPromotion') && frontierRoutes.includes('/api/v1/growth/executions/inspect') && frontierRoutes.includes('/api/v1/growth/promotions/manifest'), 'Inspector/replay, event routes, connectors, agent sessions and environment promotion are exposed through authenticated tenant routes.');
+  check('P130 durable scheduler', scheduler.includes('createScheduled') && frontierStore.includes('atlas_v130_claim_workflow_schedules') && v130.includes('FOR UPDATE SKIP LOCKED') && v130.includes('SECURITY DEFINER'), 'Due schedules are atomically claimed, pinned to immutable workflow versions and converted into durable executions.');
+  check('P133 governed action catalog', v133.includes('communication.email') && v133.includes('automation.webhook') && frontierRoutes.includes('/api/v1/growth/actions/catalog'), 'Core provider capabilities are seeded into the governed action catalog and tenant binding API.');
+  check('P136 restricted runtime telemetry', workerRuntime.includes('runtimePoolId') && frontierStore.includes('recordRuntimeHeartbeat') && v136.includes('atlas_worker'), 'Workers can emit pool heartbeats/SLO evidence without customer-table access.');
+
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
 }

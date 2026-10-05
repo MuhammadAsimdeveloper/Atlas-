@@ -66,3 +66,22 @@ test('worker shutdown wakes a long polling delay and refuses to claim without co
   const result=await Promise.race([running,new Promise((_,reject)=>setTimeout(()=>reject(new Error('worker did not drain promptly')),500))]);
   assert.equal(result.jobsSucceeded,0);
 });
+
+
+test('worker emits per-job SLO samples and evaluates enabled runtime policies', async () => {
+  const store=fakeStore({jobs:[job('job-slo')]});
+  store.calls = [];
+  store.recordRuntimeSlo = async args => { store.calls.push(['recordRuntimeSlo',args]); return { sample_id:'sample' }; };
+  store.listRuntimeSloPolicies = async () => [{ policy_id:'runtime.job-duration' }];
+  store.evaluateRuntimeSlo = async args => { store.calls.push(['evaluateRuntimeSlo',args]); return { status:'ok' }; };
+  const worker=new AtlasQueueWorker({
+    store,workerId:'worker-slo',runtimePoolId:'pool-prod',sloEvaluationIntervalMs:5_000,
+    jobHandlers:{'test.ok':async()=>{}},logger:{warn:()=>{},error:()=>{}}
+  });
+  await worker.runOnce();
+  const samples=store.calls.filter(call=>call[0]==='recordRuntimeSlo');
+  assert.ok(samples.some(call=>call[1].metric==='job_duration_ms' && call[1].target===30_000));
+  assert.ok(samples.some(call=>call[1].metric==='success_rate' && call[1].value===1));
+  assert.ok(samples.some(call=>call[1].metric==='error_rate' && call[1].value===0));
+  assert.ok(store.calls.some(call=>call[0]==='evaluateRuntimeSlo' && call[1].poolId==='pool-prod'));
+});

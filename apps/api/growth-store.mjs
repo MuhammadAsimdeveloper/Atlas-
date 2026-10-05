@@ -148,6 +148,18 @@ export class PostgresGrowthStore {
     });
   }
 
+  async getWorkflowVersionForScheduler({tenantId,workflowId,workflowVersion}) {
+    const client=await this.pool.connect();
+    try{
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);
+      const {rows}=await client.query("SELECT * FROM atlas_growth_item_versions WHERE tenant_id=$1 AND item_id=$2 AND module_key='workflows' AND version=$3 LIMIT 1",[tenantId,workflowId,workflowVersion]);
+      await client.query('COMMIT');
+      if(!rows[0]) throw createAuthError(404,'scheduled_workflow_version_not_found');
+      return {id:rows[0].item_id,tenantId:rows[0].tenant_id,module:rows[0].module_key,title:rows[0].title,state:rows[0].state,version:rows[0].version,payload:rows[0].payload,checksum:rows[0].checksum.trim(),actorId:rows[0].actor_id,createdAt:new Date(rows[0].created_at).toISOString(),updatedAt:new Date(rows[0].created_at).toISOString()};
+    }catch(error){try{await client.query('ROLLBACK');}catch{} throw error;}finally{client.release();}
+  }
+
   async get({ actorId, tenantId, module, id }) {
     if (!GROWTH_MODULES.includes(module)) throw createAuthError(404, 'growth_module_not_found');
     return this.#transaction(async client => {

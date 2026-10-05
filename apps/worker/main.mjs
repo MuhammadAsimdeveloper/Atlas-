@@ -37,7 +37,9 @@ const worker = new AtlasQueueWorker({
   eventHandlers,
   concurrency: Number(env.ATLAS_WORKER_CONCURRENCY || 4),
   leaseSeconds: Number(env.ATLAS_WORKER_LEASE_SECONDS || 60),
-  pollMs: Number(env.ATLAS_WORKER_POLL_MS || 1000)
+  pollMs: Number(env.ATLAS_WORKER_POLL_MS || 1000),
+  runtimePoolId: env.ATLAS_RUNTIME_POOL_ID || null,
+  sloEvaluationIntervalMs: Number(env.ATLAS_SLO_EVALUATION_INTERVAL_MS || 30000)
 });
 
 let stopping = false;

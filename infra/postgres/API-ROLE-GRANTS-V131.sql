@@ -1,0 +1,1 @@
+GRANT SELECT,INSERT,UPDATE ON atlas_workflow_event_routes,atlas_workflow_event_dedup TO atlas_app;

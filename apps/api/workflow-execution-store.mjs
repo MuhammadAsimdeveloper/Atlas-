@@ -94,6 +94,22 @@ export class PostgresWorkflowExecutionStore{
     });
   }
 
+  async createScheduled({tenantId,workflow,triggerEventRef,executionId=null,now=Date.now()}) {
+    if(!workflow||workflow.tenantId!==tenantId||workflow.module!=='workflows'||workflow.state!=='published'||typeof workflow.payload?.graph!=='object') throw createAuthError(409,'scheduled_workflow_unavailable');
+    return this.#transaction(async client=>{
+      await client.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);
+      const state=createWorkflowExecution({tenantId,executionId:executionId||undefined,workflow:workflow.payload.graph,triggerEventRef,createdByActorId:undefined,now});
+      const idempotencyKey=digest({tenantId,executionId:state.executionId,graphChecksum:state.graphChecksum});
+      await client.query(`INSERT INTO atlas_workflow_executions
+        (tenant_id,execution_id,workflow_id,workflow_version,graph_checksum,status,current_node_id,trigger_event_type,trigger_event_ref,state,state_checksum,checksum,created_by,version,started_at,finished_at,created_at,updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$11,NULL,$12,$13,$14,$15,$16)`,
+        [tenantId,state.executionId,state.workflowId,state.workflowVersion,state.graphChecksum,state.status,state.currentNodeId,state.triggerEventType,state.triggerEventRef,JSON.stringify(state),state.checksum,state.version,state.startedAt,state.endedAt,state.createdAt,state.updatedAt]);
+      await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7)',[tenantId,state.executionId,'workflow.execute',JSON.stringify({kind:'workflow_execution',id:state.executionId,version:1}),idempotencyKey,null,8]);
+      await this.#event(client,state,{actorId:null,eventType:'execution.scheduled',status:state.status,nodeId:state.currentNodeId,detailsRef:{kind:'workflow_execution',id:state.executionId,version:1}});
+      return state;
+    });
+  }
+
   async get({actorId,tenantId,workflowId,executionId}){
     if(!UUID.test(workflowId||'')||!UUID.test(executionId||'')) throw createAuthError(404,'workflow_execution_not_found');
     return this.#transaction(async client=>{

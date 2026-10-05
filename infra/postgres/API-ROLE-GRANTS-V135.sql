@@ -1,0 +1,1 @@
+GRANT SELECT,INSERT,UPDATE ON atlas_workflow_environments,atlas_workflow_promotions,atlas_workflow_rollbacks TO atlas_app;

@@ -1,3 +1,21 @@
+## 137.0.0 — Durable observability and SLO control plane
+- Added versioned runtime SLO policies for queue latency, job duration, error rate, success rate and lease recovery.
+- Added durable SLO evaluation snapshots with bounded error-budget state.
+- Added deterministic alert fingerprints and durable open/acknowledged/resolved alert state.
+- Added durable runtime incident records for critical SLO breaches.
+- Added a restricted evaluator RPC so worker telemetry can create operational evidence without customer-data access.
+- Workers now emit reference-only job duration/success/error samples and periodically evaluate enabled runtime SLO policies.
+
+## 136.0.0 — P129–P136 production frontier foundation
+- Added execution inspector diagnostics and replay request persistence.
+- Added cron/interval/calendar schedule definitions with timezone and DST policy.
+- Added event predicates, branches and deduplication policy storage.
+- Added connector installation lifecycle and health evidence without storing credentials.
+- Added governed action catalog and tenant capability bindings.
+- Added AI workforce session and sensitive-tool approval state.
+- Added environment promotion and rollback evidence structures.
+- Added distributed runtime pool, worker heartbeat and SLO sample structures.
+
 ## 128.0.0 — Durable workflow wake/resume control
 - Added a database-backed wake scheduler for due `waiting` and `retryable` workflow executions.
 - Added idempotent reference-only `workflow.execute` wake jobs and worker integration.

@@ -1,0 +1,1 @@
+GRANT SELECT,INSERT,UPDATE ON atlas_workflow_execution_diagnostics,atlas_workflow_execution_replays TO atlas_app;

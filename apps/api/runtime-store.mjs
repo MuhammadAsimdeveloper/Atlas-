@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
+import { nextScheduleOccurrence, assertIanaTimezone, boundedJson, eventDedupKey } from '../../packages/atlas-core/production-frontier.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -174,6 +176,222 @@ export class PostgresRuntimeStore {
         event.status || null, JSON.stringify(event.detailsRef || {}), event.createdAt || null]
     );
     return rows[0]?.event_id || null;
+  }
+
+  async getExecutionInspector({ actorId, tenantId, executionId, limit = 200 } = {}) {
+    if (!UUID.test(executionId || '') || !Number.isInteger(limit) || limit < 1 || limit > 500) throw createAuthError(400, 'execution_inspector_invalid');
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      const execution = await client.query('SELECT execution_id,workflow_id,workflow_version,status,started_at,finished_at,summary,checksum,graph_checksum,current_node_id,trigger_event_type,trigger_event_ref,last_error_code,retry_at,created_by,canceled_by,replay_of_execution_id,version,created_at,updated_at FROM atlas_workflow_executions WHERE tenant_id=$1 AND execution_id=$2', [tenantId, executionId]);
+      if (!execution.rowCount) throw createAuthError(404, 'execution_not_found');
+      const timeline = await client.query('SELECT event_id,event_type,node_id,attempt,status,details_ref,created_at FROM atlas_workflow_execution_events WHERE tenant_id=$1 AND execution_id=$2 ORDER BY created_at ASC,event_id ASC LIMIT $3', [tenantId, executionId, limit]);
+      const diagnostics = await client.query('SELECT diagnostic_id,event_id,severity,code,node_id,attempt,details_ref,created_at FROM atlas_workflow_execution_diagnostics WHERE tenant_id=$1 AND execution_id=$2 ORDER BY created_at ASC,diagnostic_id ASC LIMIT $3', [tenantId, executionId, limit]);
+      const replays = await client.query('SELECT replay_id,source_version,target_workflow_version,requested_by,status,reason,created_at,updated_at FROM atlas_workflow_execution_replays WHERE tenant_id=$1 AND source_execution_id=$2 ORDER BY created_at DESC LIMIT 50', [tenantId, executionId]);
+      return { execution: execution.rows[0], timeline: timeline.rows, diagnostics: diagnostics.rows, replays: replays.rows };
+    });
+  }
+
+  async requestExecutionReplay({ actorId, tenantId, replayId, sourceExecutionId, sourceVersion, targetWorkflowVersion, reason = null } = {}) {
+    if (!UUID.test(replayId || '') || !Number.isInteger(sourceVersion) || sourceVersion < 1 || !Number.isInteger(targetWorkflowVersion) || targetWorkflowVersion < 1 || !/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(sourceExecutionId || '')) throw createAuthError(400, 'execution_replay_invalid');
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      const source = await client.query('SELECT 1 FROM atlas_workflow_executions WHERE tenant_id=$1 AND execution_id=$2 AND version >= $3', [tenantId, sourceExecutionId, sourceVersion]);
+      if (!source.rowCount) throw createAuthError(404, 'execution_not_found');
+      await client.query('INSERT INTO atlas_workflow_execution_replays(tenant_id,replay_id,source_execution_id,source_version,target_workflow_version,requested_by,reason) VALUES($1,$2,$3,$4,$5,$6,$7)', [tenantId,replayId,sourceExecutionId,sourceVersion,targetWorkflowVersion,actorId,reason]);
+      return replayId;
+    });
+  }
+
+  async createWorkflowSchedule({ actorId, tenantId, scheduleId, workflowId, workflowVersion, scheduleKind, expression, timezone, dstPolicy = 'skip', nextRunAt } = {}) {
+    if (!UUID.test(scheduleId || '') || !/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(workflowId || '') || !Number.isInteger(workflowVersion) || workflowVersion < 1 || !['cron','interval','calendar'].includes(scheduleKind) || typeof expression !== 'string' || expression.length < 1 || expression.length > 240 || typeof timezone !== 'string' || !['skip','shift_forward','run_once'].includes(dstPolicy) || !Number.isFinite(Date.parse(nextRunAt))) throw createAuthError(400, 'workflow_schedule_invalid');
+    try { assertIanaTimezone(timezone); if(scheduleKind === 'cron') nextScheduleOccurrence({schedule_kind:scheduleKind,expression,timezone,dst_policy:dstPolicy},new Date(nextRunAt)); } catch { throw createAuthError(400,'workflow_schedule_invalid'); }
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      await client.query('INSERT INTO atlas_workflow_schedules(tenant_id,schedule_id,workflow_id,workflow_version,schedule_kind,expression,timezone,dst_policy,next_run_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)', [tenantId,scheduleId,workflowId,workflowVersion,scheduleKind,expression,timezone,dstPolicy,nextRunAt]);
+      return scheduleId;
+    });
+  }
+
+  async listWorkflowEventRoutes({ actorId, tenantId, eventType = null, limit = 100 } = {}) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw createAuthError(400, 'event_route_invalid');
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      const { rows } = await client.query(`SELECT route_id,workflow_id,workflow_version,event_type,priority,predicate,branch_key,dedup_window_seconds,enabled,created_at,updated_at FROM atlas_workflow_event_routes WHERE tenant_id=$1 AND ($2::text IS NULL OR event_type=$2) ORDER BY priority DESC,route_id LIMIT $3`, [tenantId,eventType,limit]);
+      return rows;
+    });
+  }
+
+  async createWorkflowEventRoute({ actorId, tenantId, routeId, workflowId, workflowVersion, eventType, priority = 0, predicate = {}, branchKey = null, dedupWindowSeconds = 0 }) {
+    if (!UUID.test(routeId || '') || !/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(workflowId || '') || !Number.isInteger(workflowVersion) || workflowVersion < 1 || !/^[a-z][a-z0-9_.:-]{0,119}$/.test(eventType || '') || !Number.isInteger(priority) || priority < -10000 || priority > 10000 || !Number.isInteger(dedupWindowSeconds) || dedupWindowSeconds < 0 || dedupWindowSeconds > 604800) throw createAuthError(400,'event_route_invalid');
+    boundedJson(predicate,16000);
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      await client.query('INSERT INTO atlas_workflow_event_routes(tenant_id,route_id,workflow_id,workflow_version,event_type,priority,predicate,branch_key,dedup_window_seconds) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)',[tenantId,routeId,workflowId,workflowVersion,eventType,priority,JSON.stringify(predicate),branchKey,dedupWindowSeconds]);
+      return routeId;
+    });
+  }
+
+  async recordEventRouteDedup({ actorId, tenantId, routeId, eventType, eventRef, payloadHash, windowSeconds = 60 } = {}) {
+    if (!UUID.test(routeId || '') || !/^[a-z][a-z0-9_.:-]{0,119}$/.test(eventType || '') || !/^[A-Za-z0-9_.:/@+-]{1,240}$/.test(eventRef || '') || !SHA256.test(payloadHash || '') || !Number.isInteger(windowSeconds) || windowSeconds < 1 || windowSeconds > 604800) throw createAuthError(400,'event_dedup_invalid');
+    const key=eventDedupKey({tenantId,eventType,eventRef,payloadHash});
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      const { rows }=await client.query(`INSERT INTO atlas_workflow_event_dedup(tenant_id,dedup_key,route_id,expires_at) VALUES($1,$2,$3,now()+make_interval(secs=>$4)) ON CONFLICT(tenant_id,dedup_key) DO UPDATE SET expires_at=EXCLUDED.expires_at WHERE atlas_workflow_event_dedup.expires_at < now() RETURNING dedup_key`,[tenantId,key,routeId,windowSeconds]);
+      return { key, inserted:Boolean(rows.length) };
+    });
+  }
+
+  async listConnectorInstallations({ actorId, tenantId, status = null, limit = 100 } = {}) {
+    if (!Number.isInteger(limit)||limit<1||limit>500) throw createAuthError(400,'connector_invalid');
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      const {rows}=await client.query(`SELECT installation_id,connector_key,external_account_ref,scopes_hash,token_expires_at,last_health_at,status,last_error_code,installed_by,created_at,updated_at FROM atlas_connector_installations WHERE tenant_id=$1 AND ($2::text IS NULL OR status=$2) ORDER BY created_at DESC LIMIT $3`,[tenantId,status,limit]);
+      return rows;
+    });
+  }
+
+  async upsertConnectorInstallation({ actorId, tenantId, installationId, connectorKey, externalAccountRef, credentialRef = null, scopesHash = null, tokenExpiresAt = null, status='pending' }) {
+    if(!UUID.test(installationId||'')||!/^[a-z][a-z0-9_.-]{1,79}$/.test(connectorKey||'')||!/^[A-Za-z0-9_.:/@+-]{1,240}$/.test(externalAccountRef||'')||!['pending','active','degraded','reauth_required','revoked','disabled'].includes(status)) throw createAuthError(400,'connector_invalid');
+    if(credentialRef!==null && !/^[A-Za-z0-9_.:/@+-]{1,240}$/.test(credentialRef)) throw createAuthError(400,'credential_ref_invalid');
+    if(scopesHash!==null&&!SHA256.test(scopesHash)) throw createAuthError(400,'scopes_hash_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      await client.query(`INSERT INTO atlas_connector_installations(tenant_id,installation_id,connector_key,external_account_ref,credential_ref,scopes_hash,token_expires_at,status,installed_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(tenant_id,connector_key,external_account_ref) DO UPDATE SET credential_ref=EXCLUDED.credential_ref,scopes_hash=EXCLUDED.scopes_hash,token_expires_at=EXCLUDED.token_expires_at,status=EXCLUDED.status,updated_at=now()`,[tenantId,installationId,connectorKey,externalAccountRef,credentialRef,scopesHash,tokenExpiresAt,status,actorId]);
+      return installationId;
+    });
+  }
+
+  async recordConnectorHealth({ actorId, tenantId, installationId, status, code = null, detailsRef = {} } = {}) {
+    if(!UUID.test(installationId||'')||!['pending','active','degraded','reauth_required','revoked','disabled'].includes(status)) throw createAuthError(400,'connector_health_invalid');
+    boundedJson(detailsRef,8000);
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query('INSERT INTO atlas_connector_health_events(tenant_id,installation_id,status,code,details_ref) VALUES($1,$2,$3,$4,$5::jsonb) RETURNING event_id',[tenantId,installationId,status,code,JSON.stringify(detailsRef)]);
+      await client.query('UPDATE atlas_connector_installations SET status=$3,last_health_at=now(),last_error_code=$4,updated_at=now() WHERE tenant_id=$1 AND installation_id=$2',[tenantId,installationId,status,code]);
+      return rows[0].event_id;
+    });
+  }
+
+  async listActionCatalog({ actorId, tenantId, connectorKey = null, limit = 200 } = {}) {
+    if(!Number.isInteger(limit)||limit<1||limit>500) throw createAuthError(400,'action_catalog_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query(`SELECT a.action_key,a.connector_key,a.action_version,a.input_schema,a.output_schema,a.risk_class,a.requires_approval,a.enabled,b.enabled AS tenant_enabled,b.installation_id FROM atlas_action_catalog a LEFT JOIN atlas_tenant_action_bindings b ON b.action_key=a.action_key AND b.tenant_id=$1 WHERE ($2::text IS NULL OR a.connector_key=$2) ORDER BY a.connector_key,a.action_key LIMIT $3`,[tenantId,connectorKey,limit]);
+      return rows;
+    });
+  }
+
+  async bindTenantAction({ actorId, tenantId, actionKey, enabled = true, installationId = null }) {
+    if(typeof actionKey!=='string'||actionKey.length<2||actionKey.length>160||!/^[a-z][a-z0-9_.:-]+$/.test(actionKey)||(installationId!==null&&!UUID.test(installationId))) throw createAuthError(400,'action_binding_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      await client.query('INSERT INTO atlas_tenant_action_bindings(tenant_id,action_key,enabled,installation_id) VALUES($1,$2,$3,$4) ON CONFLICT(tenant_id,action_key) DO UPDATE SET enabled=EXCLUDED.enabled,installation_id=EXCLUDED.installation_id',[tenantId,actionKey,Boolean(enabled),installationId]);
+      return actionKey;
+    });
+  }
+
+  async createAgentSession({ actorId, tenantId, sessionId, agentReleaseRef, channel, customerRef = null, memoryScope='session' }) {
+    if(!UUID.test(sessionId||'')||!/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(agentReleaseRef||'')||!/^[a-z][a-z0-9_.-]{1,79}$/.test(channel||'')||!['none','session','tenant'].includes(memoryScope)) throw createAuthError(400,'agent_session_invalid');
+    if(customerRef!==null&&!/^[A-Za-z0-9_.:/@+-]{1,240}$/.test(customerRef)) throw createAuthError(400,'customer_ref_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      await client.query('INSERT INTO atlas_ai_agent_sessions(tenant_id,session_id,agent_release_ref,channel,customer_ref,memory_scope,created_by) VALUES($1,$2,$3,$4,$5,$6,$7)',[tenantId,sessionId,agentReleaseRef,channel,customerRef,memoryScope,actorId]);
+      return sessionId;
+    });
+  }
+
+  async requestAgentToolApproval({ actorId, tenantId, approvalId, sessionId, actionKey }) {
+    if(!UUID.test(approvalId||'')||!UUID.test(sessionId||'')||typeof actionKey!=='string'||!/^[a-z][a-z0-9_.:-]+$/.test(actionKey)) throw createAuthError(400,'agent_approval_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      await client.query('INSERT INTO atlas_agent_tool_approvals(tenant_id,approval_id,session_id,action_key) VALUES($1,$2,$3,$4)',[tenantId,approvalId,sessionId,actionKey]);
+      return approvalId;
+    });
+  }
+
+  async decideAgentToolApproval({ actorId, tenantId, approvalId, status }) {
+    if(!UUID.test(approvalId||'')||!['approved','denied','expired'].includes(status)) throw createAuthError(400,'agent_approval_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query('UPDATE atlas_agent_tool_approvals SET status=$3,decided_at=now(),decided_by=$4 WHERE tenant_id=$1 AND approval_id=$2 AND status=\'pending\' RETURNING approval_id',[tenantId,approvalId,status,actorId]);
+      if(!rows.length) throw createAuthError(404,'agent_approval_not_found');
+      return approvalId;
+    });
+  }
+
+  async transitionAgentSession({ actorId, tenantId, sessionId, status }) {
+    if(!UUID.test(sessionId||'')||!['active','waiting_approval','handoff','completed','failed','canceled'].includes(status)) throw createAuthError(400,'agent_session_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query('UPDATE atlas_ai_agent_sessions SET status=$3,updated_at=now() WHERE tenant_id=$1 AND session_id=$2 RETURNING session_id,status,updated_at',[tenantId,sessionId,status]);
+      if(!rows.length) throw createAuthError(404,'agent_session_not_found');
+      return rows[0];
+    });
+  }
+
+  async listWorkflowEnvironments({ actorId, tenantId }) {
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query('SELECT environment_id,name,stage,created_at FROM atlas_workflow_environments WHERE tenant_id=$1 ORDER BY stage,name',[tenantId]); return rows;
+    });
+  }
+
+  async createWorkflowPromotion({ actorId, tenantId, promotionId, workflowId, sourceEnvironmentId, targetEnvironmentId, sourceVersion, targetVersion, manifestSha256 }) {
+    if(!UUID.test(promotionId||'')||!/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(workflowId||'')||!UUID.test(sourceEnvironmentId||'')||!UUID.test(targetEnvironmentId||'')||!Number.isInteger(sourceVersion)||sourceVersion<1||!Number.isInteger(targetVersion)||targetVersion<1||!SHA256.test(manifestSha256||'')) throw createAuthError(400,'promotion_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      await client.query('INSERT INTO atlas_workflow_promotions(tenant_id,promotion_id,workflow_id,source_environment_id,target_environment_id,source_version,target_version,manifest_sha256,requested_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[tenantId,promotionId,workflowId,sourceEnvironmentId,targetEnvironmentId,sourceVersion,targetVersion,manifestSha256,actorId]);
+      return promotionId;
+    });
+  }
+
+  async approveWorkflowPromotion({ actorId, tenantId, promotionId, approve = true }) {
+    if(!UUID.test(promotionId||'')) throw createAuthError(400,'promotion_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query(`UPDATE atlas_workflow_promotions SET status=$3,approved_by=$4,updated_at=now() WHERE tenant_id=$1 AND promotion_id=$2 AND status IN ('requested','approved') RETURNING promotion_id,status`,[tenantId,promotionId,approve?'approved':'failed',actorId]);
+      if(!rows.length) throw createAuthError(404,'promotion_not_found');
+      return rows[0];
+    });
+  }
+
+  async rollbackWorkflowPromotion({ actorId, tenantId, promotionId, fromVersion, toVersion, reason }) {
+    if(!UUID.test(promotionId||'')||!Number.isInteger(fromVersion)||!Number.isInteger(toVersion)||!reason||reason.length>1000) throw createAuthError(400,'rollback_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query('INSERT INTO atlas_workflow_rollbacks(tenant_id,promotion_id,from_version,to_version,reason,requested_by) VALUES($1,$2,$3,$4,$5,$6) RETURNING rollback_id',[tenantId,promotionId,fromVersion,toVersion,reason,actorId]);
+      await client.query("UPDATE atlas_workflow_promotions SET status='rolled_back',updated_at=now() WHERE tenant_id=$1 AND promotion_id=$2",[tenantId,promotionId]);
+      return rows[0].rollback_id;
+    });
+  }
+
+  async recordRuntimeHeartbeat({ poolId, workerId, queueDepth=0, activeJobs=0 } = {}) {
+    if(!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId||'')||!/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId||'')||!Number.isInteger(queueDepth)||queueDepth<0||!Number.isInteger(activeJobs)||activeJobs<0) throw new TypeError('runtime_heartbeat_invalid');
+    const {rows}=await this.pool.query('INSERT INTO atlas_runtime_pool_heartbeats(pool_id,worker_id,queue_depth,active_jobs) VALUES($1,$2,$3,$4) ON CONFLICT(pool_id,worker_id) DO UPDATE SET queue_depth=EXCLUDED.queue_depth,active_jobs=EXCLUDED.active_jobs,observed_at=now() RETURNING observed_at',[poolId,workerId,queueDepth,activeJobs]);
+    return rows[0];
+  }
+
+  async recordRuntimeSlo({ poolId, metric, value, target } = {}) {
+    if(!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId||'')||!['queue_latency_ms','job_duration_ms','error_rate','success_rate','lease_recovery_rate'].includes(metric)||!Number.isFinite(value)||!Number.isFinite(target)) throw new TypeError('runtime_slo_invalid');
+    const {rows}=await this.pool.query('INSERT INTO atlas_runtime_slo_samples(sample_id,pool_id,metric,value,target) VALUES($1,$2,$3,$4,$5) RETURNING sample_id,observed_at',[randomUUID(),poolId,metric,value,target]);
+    return rows[0];
+  }
+
+  async listRuntimeSloPolicies() {
+    const { rows } = await this.pool.query('SELECT policy_id,metric,window_seconds,target,allowed_bad_ratio,warning_bad_ratio,critical_bad_ratio,enabled FROM atlas_runtime_slo_policies WHERE enabled=true ORDER BY policy_id');
+    return rows;
+  }
+
+  async evaluateRuntimeSlo({ poolId, policyId, evaluationId = randomUUID() } = {}) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '') || !/^[A-Za-z0-9_.:-]{1,120}$/.test(policyId || '') || !UUID.test(evaluationId || '')) throw new TypeError('runtime_slo_evaluation_invalid');
+    const { rows } = await this.pool.query('SELECT * FROM atlas_v137_evaluate_runtime_slo($1,$2,$3)', [policyId, poolId, evaluationId]);
+    return rows[0] || null;
+  }
+
+  async listRuntimeAlerts({ poolId = null, status = 'open', limit = 100 } = {}) {
+    if (poolId !== null && !/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '')) throw new TypeError('runtime_alert_pool_invalid');
+    if (!['open','acknowledged','resolved'].includes(status) || !Number.isInteger(limit) || limit < 1 || limit > 500) throw new TypeError('runtime_alert_filter_invalid');
+    const { rows } = await this.pool.query('SELECT alert_id,fingerprint,policy_id,pool_id,severity,status,current_value,threshold,first_seen_at,last_seen_at,acknowledged_at,resolved_at FROM atlas_runtime_alerts WHERE ($1::text IS NULL OR pool_id=$1) AND status=$2 ORDER BY last_seen_at DESC LIMIT $3', [poolId,status,limit]);
+    return rows;
+  }
+
+  async claimWorkflowSchedules(limit=100) {
+    if(!Number.isInteger(limit)||limit<1||limit>500) throw new TypeError('schedule_claim_invalid');
+    const {rows}=await this.pool.query('SELECT * FROM atlas_v130_claim_workflow_schedules($1)',[limit]);
+    return rows;
+  }
+
+  async finalizeWorkflowSchedule({tenantId,scheduleId,nextRunAt,state='active'}) {
+    if(!UUID.test(tenantId||'')||!UUID.test(scheduleId||'')||!Number.isFinite(Date.parse(nextRunAt))||!['active','paused','completed'].includes(state)) throw new TypeError('schedule_finalize_invalid');
+    const client=await this.pool.connect();
+    try{
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);
+      const {rows}=await client.query('UPDATE atlas_workflow_schedules SET next_run_at=$3,state=$4,updated_at=now() WHERE tenant_id=$1 AND schedule_id=$2 RETURNING schedule_id,next_run_at,state',[tenantId,scheduleId,nextRunAt,state]);
+      await client.query('COMMIT');
+      return rows[0]||null;
+    }catch(error){try{await client.query('ROLLBACK');}catch{} throw error;}finally{client.release();}
   }
 
   async completeJob(job, workerId) {
