@@ -322,7 +322,7 @@ export function failWorkflowStep({
   if (!Number.isSafeInteger(attempt) || attempt < 1 || attempt > 10) throw new Error('Workflow step attempt is invalid');
   const node = nodeFor(execution, nodeId);
   const failedAt = timestamp(now, 'now');
-  const retryAllowed = attempt < node.retry.maxAttempts && node.retrySafe;
+  const retryAllowed = errorCode !== 'provider_retry_unsafe' && attempt < node.retry.maxAttempts && node.retrySafe;
   const retryAt = retryAllowed
     ? failedAt + Math.min(60 * 60_000, node.retry.backoffMs * (2 ** (attempt - 1)))
     : null;
