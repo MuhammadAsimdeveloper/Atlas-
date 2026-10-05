@@ -100,6 +100,17 @@ export class PostgresRuntimeStore {
     return rows[0].renewed;
   }
 
+  async getProviderConnectionForWorker(job, workerId, connectionId) {
+    if (!job || !UUID.test(job.tenant_id || '') || !UUID.test(job.job_id || '') || !UUID.test(connectionId || '') || !/^[a-zA-Z0-9_.:-]{1,120}$/.test(workerId || '')) {
+      throw new TypeError('Worker provider connection identity is invalid.');
+    }
+    const { rows } = await this.pool.query(
+      'SELECT * FROM atlas_v125_get_provider_connection_for_worker($1,$2,$3,$4)',
+      [job.tenant_id, job.job_id, workerId, connectionId]
+    );
+    return rows[0] || null;
+  }
+
   async getWorkflowExecutionForJob(job, workerId) {
     const { rows } = await this.pool.query('SELECT * FROM atlas_v120_get_execution_for_job($1,$2,$3)', [job.tenant_id, job.job_id, workerId]);
     return rows[0] || null;

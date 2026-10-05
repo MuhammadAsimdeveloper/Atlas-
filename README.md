@@ -1,3 +1,9 @@
+## V125 — Production worker and provider action runtime
+
+V125 activates the durable workflow executor with a deployment-reviewed production handler, lease-bound provider connection lookup, KMS/vault secret resolver boundary, explicit consent/approval enforcement, bounded provider requests, deterministic retry/dead-letter behavior and provider-neutral action dispatch for Postmark, Twilio, WhatsApp Cloud, Zapier and Jobber. Provider source presence still does not mean Live: each tenant connection must be verified and tested end-to-end before delivery is enabled.
+
+See [P125 Production Worker Runtime](docs/P125-PRODUCTION-WORKER-RUNTIME.md).
+
 # Atlas Business Operating System
 
 ## V124 — Production activation and trust gate

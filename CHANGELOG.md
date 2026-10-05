@@ -1,3 +1,12 @@
+## 125.0.0 — Production worker + provider action runtime
+- Added the deployment-reviewed V125 production workflow handler and hardened secret-manager boundary.
+- Added lease-bound provider connection lookup through a worker-only SECURITY DEFINER RPC.
+- Added real provider dispatch for Postmark, Twilio SMS/Voice, WhatsApp Cloud, Zapier webhooks and Jobber GraphQL.
+- Enforced tenant ownership, verified connection state, explicit consent/approval, bounded payloads and abortable provider calls.
+- Fixed deterministic workflow retry attempt numbering and persisted redacted execution receipts.
+- External provider retries that cannot guarantee exactly-once delivery now fail closed into dead-letter/reconciliation instead of blindly resending.
+- Added focused provider/runtime security tests and V125 production deployment documentation.
+
 ## 123.0.0 — Production integration + service operations
 - Added service-business primitives: requests, jobs, visits, crews/assignees, checklists/notes, quotes and invoices.
 - Added production-safe OAuth state/code exchange and token-reference persistence.
