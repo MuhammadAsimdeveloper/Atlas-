@@ -229,7 +229,7 @@ export function resumeWorkflowExecution({ execution, now = Date.now() } = {}) {
   if (!execution.resumeAt) throw new Error('Workflow execution has no resume time');
   const current = timestamp(now, 'now');
   const resumeAt = timestamp(execution.resumeAt, 'resumeAt');
-  if (current < resumeAt) throw new Error('Workflow execution is not ready to resume');
+  if (current < resumeAt) return execution;
   const node = nodeFor(execution, execution.currentNodeId);
   const nextNodeId = node.type === 'stop' ? null : nextNodeFor(execution, node.id, 'next');
   const completed = !nextNodeId;
