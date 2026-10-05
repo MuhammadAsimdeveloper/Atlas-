@@ -1,0 +1,1 @@
+GRANT SELECT ON atlas_runtime_observability_destinations TO atlas_worker;
