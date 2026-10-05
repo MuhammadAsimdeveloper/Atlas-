@@ -94,7 +94,7 @@ test('approval requests pause execution and approval resumes the exact node', ()
       name: 'Lead journey',
       nodes: [
         { id: 'start', type: 'trigger', config: { eventType: 'contact.created' } },
-        { id: 'task', type: 'delete_contact', config: { contactRef } },
+        { id: 'task', type: 'delete_contact', config: { contactRef: stepRef } },
         { id: 'stop', type: 'stop' }
       ],
       edges: [
