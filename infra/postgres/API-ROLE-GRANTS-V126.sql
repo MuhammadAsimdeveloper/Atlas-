@@ -1,4 +1,5 @@
 BEGIN;
+DO $ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='atlas_worker') THEN CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS; END IF; END $;
 REVOKE ALL ON FUNCTION atlas_v126_create_outbound_message(uuid,uuid,uuid,text,uuid,text,text,text,text,text,uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v126_resolve_webhook_endpoint(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v126_ingest_inbound(uuid,uuid,text,text,text,text,text,text,text,text,text,text,text) FROM PUBLIC;
