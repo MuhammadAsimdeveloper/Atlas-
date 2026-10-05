@@ -148,7 +148,7 @@ try {
   const workflowUi = await read('apps/command-center/workflow-studio.mjs');
   const workflowRoutes = await read('apps/api/growth-routes.mjs');
   const workflowStore = await read('apps/api/growth-store.mjs');
-  check('V116 visual workflow editor and honest runtime disclosure', workflowUi.includes('createWorkflowStudio') && workflowUi.includes('Workflow jobs are not connected') && growthUi.includes('detailStudio.read()') && growthUi.includes('createStudio.read()'), 'The workspace edits saved graph definitions visually and does not claim that publishing starts workflow runs');
+  check('V116 visual workflow editor and honest runtime disclosure', workflowUi.includes('createWorkflowStudio') && (workflowUi.includes('Workflow jobs are not connected') || workflowUi.includes('publishing still does not start production runs')) && growthUi.includes('detailStudio.read()') && growthUi.includes('createStudio.read()'), 'The workspace edits saved graph definitions visually and does not claim that publishing starts workflow runs');
   check('V116 workflow trigger persists from workspace settings', workflowUi.includes("host.querySelector('[data-workflow-trigger]')") && workflowUi.includes('trigger.dataset.workflowTrigger'), 'The selected start event is serialized into the persisted trigger node');
   const previewRuntime = await read('packages/atlas-target/workflow-simulator.mjs');
   const previewTests = await read('packages/atlas-target/workflow-simulator.test.mjs');
