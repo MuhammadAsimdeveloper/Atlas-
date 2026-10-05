@@ -4,6 +4,7 @@ import {
 import { resolveAtlasAuthority } from '../../packages/atlas-core/authority.mjs';
 import { paddlePlanCatalog, verifyPaddleFreeTrialPrice, createPaddleCheckout, createPaddlePortalSession, normalizePaddleBillingEvent, paddleBodySha256, verifyPaddleSignature } from './paddle-billing.mjs';
 import { simulateWorkflow } from '../../packages/atlas-target/workflow-simulator.mjs';
+import { enforceRateLimit, securityHeaders } from './security.mjs';
 
 const MAX_BODY_BYTES = 110_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -14,12 +15,7 @@ const PLAN_DETAILS = Object.freeze({
 });
 
 function send(res, status, body, env, extraHeaders = {}) {
-  res.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff',
-    'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer', 'permissions-policy': 'camera=(), microphone=(), geolocation=()',
-    'content-security-policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
-    ...(env.NODE_ENV === 'production' ? { 'strict-transport-security': 'max-age=31536000; includeSubDomains' } : {}), ...extraHeaders
-  });
+  res.writeHead(status, { ...securityHeaders(env), ...extraHeaders, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(body));
   return true;
 }
@@ -95,8 +91,14 @@ export function createGrowthApi({ store, authStore, executionStore = null, env =
     const path = url.pathname;
     if (path !== '/api/v1/webhooks/paddle' && !path.startsWith('/api/v1/growth/') && !path.startsWith('/api/v1/billing/')) return false;
     try {
-      if (path === '/api/v1/webhooks/paddle' && req.method === 'POST') return await handleWebhook(req, res);
+      if (path === '/api/v1/webhooks/paddle' && req.method === 'POST') {
+        await enforceRateLimit({ req, store: authStore, secret: env.ATLAS_SESSION_SECRET, env, route: 'billing.webhook', limit: 120, windowSeconds: 60 });
+        return await handleWebhook(req, res);
+      }
       const who = await identity(req);
+      if (['POST', 'PATCH', 'DELETE'].includes(req.method)) {
+        await enforceRateLimit({ req, store: authStore, secret: env.ATLAS_SESSION_SECRET, env, route: 'growth.mutation', limit: 120, windowSeconds: 60 });
+      }
       if (path === '/api/v1/growth/overview' && req.method === 'GET') return send(res, 200, await store.overview(who), env);
       if (path === '/api/v1/billing/plans' && req.method === 'GET') {
         const configured = new Map(paddlePlanCatalog(env).map(plan => [plan.key, plan]));
