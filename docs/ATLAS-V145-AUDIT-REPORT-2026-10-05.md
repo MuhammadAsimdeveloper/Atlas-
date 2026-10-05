@@ -2,9 +2,9 @@
 
 ## Executive result
 
-The V144 production-runtime foundation is now on `main`. The next missing high-value connection is no longer another feature catalog; it is the end-to-end business path from acquisition to booked revenue.
+The V144 production-runtime foundation is on `main`, with V145 now integrated and verified. The next missing high-value connection is no longer another feature catalog; it is the end-to-end business path from acquisition to booked revenue.
 
-V145 implements that path as a deterministic, side-effect-free orchestration contract:
+V145 implements that path as a deterministic, side-effect-free orchestration contract, and the verified main branch passes the complete release gate:
 
 **Funnel/website form → CRM contact/lead → qualification → follow-up plan → calendar availability/hold/booking → pipeline update → redacted reporting**
 
@@ -45,7 +45,7 @@ The first V145 commit added the integration tests before the implementation. The
 
 The implementation then exposed fixture incompatibilities with the existing UUID record-reference contract and one incomplete qualification guard call. Those were corrected rather than weakening the existing domain contracts.
 
-The current branch is being re-tested on Node 20 and Node 22 through the repository CI pipeline. Final acceptance is only after the complete CI chain is green.
+Final acceptance is verified on main commit `a80147d2305e2bebeb4c724928817ab9d605775a`: Node 20 and Node 22 completed the full CI chain successfully. The release gate passed 293 tests, syntax/check, doctor, deterministic MiroFish regression, docs, SEO, site build, smoke E2E, launch, production and activation checks, production container build, dependency audit and preview artifact publication.
 
 ## Production-truth rules
 
