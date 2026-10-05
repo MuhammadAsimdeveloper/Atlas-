@@ -10,6 +10,8 @@ services:
       ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
       ATLAS_WORKER_DATABASE_URL: null
       ATLAS_WORKER_HANDLERS_MODULE: null
+      ATLAS_INBOX_CONTENT_MODULE: null
+      ATLAS_WEBHOOK_SECRET_RESOLVER_MODULE: null
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -54,12 +56,16 @@ services:
       ATLAS_DATABASE_SSL_CA_FILE: "${ATLAS_DATABASE_SSL_CA_FILE:-}"
       ATLAS_WORKER_HANDLERS_MODULE: v125-production.mjs
       ATLAS_WORKER_SECRET_RESOLVER_MODULE: "${ATLAS_WORKER_SECRET_RESOLVER_MODULE:?Set the reviewed secret resolver module}"
+      ATLAS_INBOX_CONTENT_MODULE: "${ATLAS_INBOX_CONTENT_MODULE:?Set the reviewed inbox content module}"
+      ATLAS_WEBHOOK_SECRET_RESOLVER_MODULE: "${ATLAS_WEBHOOK_SECRET_RESOLVER_MODULE:?Set the reviewed webhook secret resolver module}"
       ATLAS_WORKER_CONCURRENCY: "${ATLAS_WORKER_CONCURRENCY:-4}"
       ATLAS_WORKER_LEASE_SECONDS: "${ATLAS_WORKER_LEASE_SECONDS:-60}"
       ATLAS_WORKER_POLL_MS: "${ATLAS_WORKER_POLL_MS:-1000}"
       ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
     volumes:
       - "${ATLAS_WORKER_SECRETS_PATH:?Mount a reviewed local secret resolver directory}:/app/apps/worker/secrets:ro"
+      - "${ATLAS_INBOX_CONTENT_PATH:?Mount the reviewed inbox content module directory}:/app/apps/inbox-content:ro"
+      - "${ATLAS_WEBHOOK_SECRETS_PATH:?Mount the reviewed webhook secret module directory}:/app/apps/webhook-secrets:ro"
     depends_on:
       postgres:
         condition: service_healthy
