@@ -1,4 +1,4 @@
-# P129–P137 — Production engineering frontier
+# P129–P138 — Production engineering frontier
 
 ## P129 Execution Inspector + Debug/Replay
 - Durable diagnostics reference records are tenant-isolated and do not store customer payloads.
@@ -48,6 +48,13 @@
 - Added a restricted security-definer evaluator callable by the API/worker runtime roles.
 - Workers emit job-duration, success-rate and error-rate samples and periodically evaluate enabled policies.
 - Telemetry remains reference/metric-only; customer payloads, credentials and message bodies are not persisted in the observability tables.
+
+## P138 Distributed Runtime Capacity + Backpressure
+- Added durable runtime-pool capacity leases.
+- Capacity arbitration locks the runtime-pool row, preventing concurrent workers from exceeding configured global concurrency.
+- Worker slots expire with leases and are released explicitly after job completion.
+- Workers reserve capacity before claiming jobs and release unused reservations.
+- Capacity exhaustion remains bounded and retryable; the runtime never silently exceeds configured pool capacity.
 
 ## Production-readiness rule
 
