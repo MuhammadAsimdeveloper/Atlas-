@@ -57,7 +57,7 @@ CREATE OR REPLACE FUNCTION atlas_v126_create_outbound_message(
  p_tenant_id uuid,p_actor_id uuid,p_conversation_id uuid,p_channel text,p_connection_id uuid,
  p_content_ref text,p_sender_ref text,p_recipient_ref text,p_subject text,p_idempotency_key text,p_job_id uuid
 ) RETURNS TABLE(message_id uuid,conversation_id uuid,created boolean)
-LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,public AS $
+LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,public AS $v126$
 DECLARE v_id uuid; v_created boolean:=false;
 BEGIN
  IF session_user <> 'atlas_app' THEN RAISE EXCEPTION 'api_role_required'; END IF;
@@ -75,7 +75,7 @@ $;
 
 CREATE OR REPLACE FUNCTION atlas_v126_get_message_for_worker(p_tenant_id uuid,p_job_id uuid,p_worker_id text,p_message_id uuid)
 RETURNS TABLE(tenant_id uuid,message_id uuid,conversation_id uuid,channel text,provider_connection_id uuid,recipient_ref text,sender_ref text,subject text,content_ref text,delivery_status text,idempotency_key text)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $v126$
 BEGIN
  IF session_user <> 'atlas_worker' THEN RAISE EXCEPTION 'worker_role_required'; END IF;
  IF NOT EXISTS(SELECT 1 FROM atlas_runtime_jobs j WHERE j.tenant_id=p_tenant_id AND j.job_id=p_job_id AND j.status='leased' AND j.lease_owner=p_worker_id AND j.lease_until>now()) THEN RAISE EXCEPTION 'worker_job_lease_invalid'; END IF;
@@ -87,7 +87,7 @@ $;
 
 CREATE OR REPLACE FUNCTION atlas_v126_resolve_webhook_endpoint(p_path_token_hash text)
 RETURNS TABLE(tenant_id uuid,endpoint_id uuid,provider_key text,signing_secret_ref text,accepted_events jsonb,enabled boolean)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $v126$
 BEGIN
  IF session_user <> 'atlas_app' THEN RAISE EXCEPTION 'api_role_required'; END IF;
  RETURN QUERY SELECT e.tenant_id,e.endpoint_id,e.provider_key,e.signing_secret_ref,e.accepted_events,e.enabled
@@ -99,7 +99,7 @@ CREATE OR REPLACE FUNCTION atlas_v126_ingest_inbound(
  p_tenant_id uuid,p_endpoint_id uuid,p_provider_key text,p_event_ref text,p_payload_hash text,p_event_type text,
  p_channel text,p_external_thread_ref text,p_sender_ref text,p_recipient_ref text,p_provider_message_ref text,p_content_ref text,p_subject text
 ) RETURNS TABLE(status text,conversation_id uuid,message_id uuid)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $v126$
 DECLARE v_event uuid; v_conversation uuid; v_message uuid; v_inserted boolean:=false;
 BEGIN
  IF session_user <> 'atlas_app' THEN RAISE EXCEPTION 'api_role_required'; END IF;
@@ -132,7 +132,7 @@ END;
 $;
 
 CREATE OR REPLACE FUNCTION atlas_v126_apply_receipt(p_tenant_id uuid,p_provider_key text,p_event_ref text,p_provider_message_ref text,p_status text,p_metadata jsonb)
-RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $v126$
 DECLARE v_message uuid;
 BEGIN
  IF session_user <> 'atlas_app' THEN RAISE EXCEPTION 'api_role_required'; END IF;
@@ -146,7 +146,7 @@ END;
 $;
 
 CREATE OR REPLACE FUNCTION atlas_v126_mark_message_for_worker(p_tenant_id uuid,p_job_id uuid,p_worker_id text,p_message_id uuid,p_status text,p_provider_ref text,p_error_code text DEFAULT NULL)
-RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $v126$
 DECLARE changed boolean:=false;
 BEGIN
  IF session_user <> 'atlas_worker' THEN RAISE EXCEPTION 'worker_role_required'; END IF;
