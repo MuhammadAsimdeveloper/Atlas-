@@ -13,7 +13,14 @@ CREATE POLICY atlas_workflow_execution_events_tenant ON atlas_workflow_execution
   USING (tenant_id = nullif(current_setting('app.tenant_id', true), ''))
   WITH CHECK (tenant_id = nullif(current_setting('app.tenant_id', true), ''));
 
-REVOKE ALL ON atlas_workflow_executions, atlas_workflow_execution_events FROM PUBLIC, atlas_worker;
+REVOKE ALL ON atlas_workflow_executions, atlas_workflow_execution_events FROM PUBLIC;
+DO $
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='atlas_worker') THEN
+    EXECUTE 'REVOKE ALL ON atlas_workflow_executions, atlas_workflow_execution_events FROM atlas_worker';
+  END IF;
+END;
+$;
 
 CREATE OR REPLACE FUNCTION atlas_v120_get_execution_for_job(
   p_tenant_id UUID,
