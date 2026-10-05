@@ -20,3 +20,18 @@ export const eventHandlers = {
 ```
 
 The sample above documents the contract; it is not an executable provider integration. Atlas V115 ships no default business handlers, so the worker refuses to start without an operator-supplied module. Handler functions receive resource references, a stable idempotency key or event ID, and an abort signal. They do not receive raw customer data from the queue.
+
+
+## V119 workflow execution handler boundary
+
+V119 introduces the canonical job type `workflow.execute`.
+
+A reviewed deployment handler may register that job type and use the queue payload reference:
+
+```json
+{ "kind": "workflow_execution", "id": "<execution-id>", "version": 1 }
+```
+
+The handler must load the durable execution through an approved execution adapter, verify the stored graph checksum/version and current execution version before advancing a step, then use the supplied job idempotency key for any external side effect.
+
+The handler must not read CRM/auth/customer tables using the `atlas_worker` connection. Provider/API access belongs in separately reviewed least-privilege adapters. Atlas V119 does not ship a default `workflow.execute` handler, so production execution remains explicitly disabled until a reviewed module is mounted.

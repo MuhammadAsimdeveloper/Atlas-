@@ -1,10 +1,12 @@
-## Unreleased — V117 Workflow Preview
-
-- Added a tenant-authenticated workflow simulation endpoint for safe test-mode rehearsal of saved workflow graphs.
-- Added bounded preview execution for native data/control-flow nodes, deterministic condition routing, approval pauses and honest adapter/model simulation.
-- Preview mode performs zero external side effects and rejects cross-tenant execution and trigger mismatches.
-- Added workflow preview unit/API tests and documented the flagship Lead-to-Booking validation path.
-- Normalized the V118 provider integration documentation final newline so the repository documentation gate remains green.
+## 119.0.0 — Durable Workflow Execution Engine
+- Added a version-pinned workflow execution state machine with durable queued/running/waiting/approval/retry/cancel/completed/dead-letter transitions.
+- Added PostgreSQL workflow execution state and append-only execution timeline tables with forced tenant RLS and reference-only event/result storage.
+- Added an atomic `workflow.execute` queue handoff for published workflows. Starting a run never claims provider execution has already happened.
+- Added authenticated execution listing, inspection, cancellation, approval and replay endpoints with optimistic version checks and tenant scope.
+- Added replay pinning to the original workflow version and graph checksum.
+- Added explicit production feature gates requiring both a workflow execution enable flag and a reviewed worker-handler-ready flag.
+- Added integration/unit coverage for execution state, retry/dead-letter behavior, approval/cancel/replay, queue atomicity, RLS, worker-role separation and API controls.
+- V118 provider connections remain separate and are still not represented as live without verified credentials, callbacks and sandbox delivery.
 
 ## 116.0.0 — Visual workflow authoring
 - Added a laptop-first visual workflow editor inside the authenticated workspace for triggers, node settings, connection paths and ports, backed by the existing checksummed/versioned graph contract.

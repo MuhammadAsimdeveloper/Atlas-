@@ -8,11 +8,12 @@ The roadmap deliberately favors **depth of one complete customer outcome** over 
 
 ## Baseline
 
-The repository README and master roadmap identify V116 as the current documented release baseline.
+The repository README and master roadmap identify V119 as the current documented release baseline.
 
 Important repository truth:
 
-- V116: authenticated visual Workflow Studio and validated graph persistence
+- V119: durable workflow execution state/control plane, version pinning, replay/cancel/approval and atomic queue handoff
+- V117: authenticated visual Workflow Studio and safe workflow preview
 - V115: durable queue/outbox/scheduler primitives
 - V114: tenant-scoped Growth Center modules
 - V113: agent evaluation gates
@@ -94,16 +95,16 @@ Make published workflows actually execute.
 - node dispatch
 - context/data mapping
 - deterministic run identity
-- durable step state
+- durable step state ✅
 - delayed waits
-- approval pauses and resume
-- bounded retries
-- dead-letter handling
-- cancellation
-- replay with version pinning
-- execution timeline
-- per-node status and failure reason
-- tenant-safe execution isolation
+- approval pauses and resume ✅ (control-plane state)
+- bounded retries ✅ (state-machine policy)
+- dead-letter handling ✅ (state-machine policy)
+- cancellation ✅
+- replay with version pinning ✅
+- execution timeline ✅
+- per-node status and failure reason ✅ (durable state)
+- tenant-safe execution isolation ✅
 - concurrency controls
 - worker health and queue metrics
 

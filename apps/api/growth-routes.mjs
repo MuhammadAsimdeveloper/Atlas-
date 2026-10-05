@@ -53,7 +53,7 @@ function exact(body, fields) {
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !fields.includes(key))) throw createAuthError(400, 'unsupported_request_fields');
 }
 
-export function createGrowthApi({ store, authStore, env = process.env, fetchImpl = fetch } = {}) {
+export function createGrowthApi({ store, authStore, executionStore = null, env = process.env, fetchImpl = fetch } = {}) {
   if (!store || !authStore) throw new TypeError('Growth API requires the growth and authentication stores.');
 
   async function identity(req) {
@@ -135,6 +135,47 @@ export function createGrowthApi({ store, authStore, env = process.env, fetchImpl
         if (req.method !== 'GET') return send(res, 405, { error: 'method_not_allowed' }, env, { allow: 'GET' });
         if (typeof store.getWorkflowCatalog !== 'function') throw createAuthError(503, 'workflow_catalog_unavailable');
         return send(res, 200, await store.getWorkflowCatalog(who), env);
+      }
+      const executionMatch = path.match(/^\/api\/v1\/growth\/workflows\/([0-9a-f-]{36})\/executions(?:\/([0-9a-f-]{36})(?:\/(cancel|approve|replay))?)?$/i);
+      if (executionMatch) {
+        if (typeof executionStore?.get !== 'function') throw createAuthError(503, 'workflow_execution_unavailable');
+        const workflowId = executionMatch[1];
+        const executionId = executionMatch[2] || null;
+        const executionAction = executionMatch[3] || null;
+        if (req.method === 'GET' && !executionId) return send(res, 200, await executionStore.list({ ...who, workflowId, limit: Number(url.searchParams.get('limit') || 50) }), env);
+        if (req.method === 'GET' && executionId && !executionAction) return send(res, 200, { execution: await executionStore.get({ ...who, workflowId, executionId }) }, env);
+        if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' }, env, { allow: 'GET, POST' });
+        await requireMutation(req, who.session);
+        const body = await readJson(req);
+        if (!executionId) {
+          if (env.ATLAS_WORKFLOW_EXECUTION_ENABLED !== 'true' || env.ATLAS_WORKFLOW_EXECUTION_HANDLER_READY !== 'true') {
+            return send(res, 503, { error: 'workflow_execution_not_enabled', message: 'Production workflow execution is not enabled until a reviewed worker handler is installed.' }, env);
+          }
+          exact(body, ['triggerEventType', 'triggerEventRef', 'executionId']);
+          const workflow = await store.get({ ...who, module: 'workflows', id: workflowId });
+          if (workflow?.state !== 'published') throw createAuthError(409, 'workflow_not_published', 'Publish the workflow before starting a live execution.');
+          if (workflow.payload?.graph?.nodes?.find(node => node.type === 'trigger')?.config?.eventType !== body.triggerEventType) throw createAuthError(400, 'workflow_trigger_mismatch', 'The execution trigger does not match the published workflow.');
+          const execution = await executionStore.create({ ...who, workflow, triggerEventRef: body.triggerEventRef, executionId: body.executionId || null });
+          return send(res, 202, { execution }, env);
+        }
+        if (!executionAction) return send(res, 405, { error: 'method_not_allowed' }, env, { allow: 'POST' });
+        if (executionAction === 'cancel') {
+          exact(body, ['expectedVersion']);
+          if (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1) throw createAuthError(400, 'invalid_expected_version');
+          return send(res, 200, { execution: await executionStore.cancel({ ...who, workflowId, executionId, expectedVersion: body.expectedVersion }) }, env);
+        }
+        if (executionAction === 'approve') {
+          exact(body, ['expectedVersion', 'approvalId', 'evidenceRef']);
+          if (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1) throw createAuthError(400, 'invalid_expected_version');
+          if (typeof body.approvalId !== 'string' || body.approvalId.length < 8 || body.approvalId.length > 180) throw createAuthError(400, 'invalid_approval_id');
+          return send(res, 200, { execution: await executionStore.approve({ ...who, workflowId, executionId, expectedVersion: body.expectedVersion, approvalId: body.approvalId, evidenceRef: body.evidenceRef }) }, env);
+        }
+        if (executionAction === 'replay') {
+          exact(body, ['expectedVersion', 'executionId']);
+          if (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1) throw createAuthError(400, 'invalid_expected_version');
+          if (!UUID.test(body.executionId)) throw createAuthError(400, 'invalid_replay_execution_id');
+          return send(res, 202, { execution: await executionStore.replay({ ...who, workflowId, executionId, replayExecutionId: body.executionId, expectedVersion: body.expectedVersion }) }, env);
+        }
       }
       const match = path.match(/^\/api\/v1\/growth\/([a-z-]+)(?:\/([0-9a-f-]+)(?:\/([a-z-]+))?)?$/i);
       if (!match) return send(res, 404, { error: 'not_found' }, env);
