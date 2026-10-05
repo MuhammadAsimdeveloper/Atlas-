@@ -12,6 +12,7 @@ test('security headers include browser isolation and production HSTS', () => {
   assert.equal(html['x-dns-prefetch-control'], 'off');
   assert.equal(html['x-permitted-cross-domain-policies'], 'none');
   assert.match(html['content-security-policy'], /frame-ancestors 'none'/);
+  assert.match(html['content-security-policy'], /object-src 'none'/);
   assert.equal(html['strict-transport-security'], 'max-age=31536000; includeSubDomains');
   const api = securityHeaders({ NODE_ENV: 'development' });
   assert.equal(Object.hasOwn(api, 'strict-transport-security'), false);
