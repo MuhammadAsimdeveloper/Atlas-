@@ -20,6 +20,7 @@ async function sendInboxMessage(payloadRef,context){
  const {messageId}=payloadRef||{};
  if(typeof messageId!=='string')throw Object.assign(new Error('Inbox message reference is required.'),{code:'inbox_message_invalid'});
  const store=context.workerStore; const job={tenant_id:context.tenantId,job_id:context.jobId};
+ const providerRuntime=createProviderRuntime({connectionStore:store,secretResolver});
  const message=await store.getInboxMessageForWorker(job,context.workerId,messageId); if(!message)throw Object.assign(new Error('Inbox message is unavailable.'),{code:'inbox_message_not_found'});
  if(message.delivery_status!=='queued') return {status:'already_processed',messageId};
  const content=await inboxContent.getMessageContent({tenantId:context.tenantId,messageId:message.message_id,contentRef:message.content_ref});
