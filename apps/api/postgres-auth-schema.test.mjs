@@ -26,6 +26,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     const trialMarker = await db.query("SELECT column_name FROM information_schema.columns WHERE table_name='atlas_paddle_subscriptions' AND column_name='trial_started_at'");
     assert.equal(trialMarker.rowCount,1,'V115 permanently records whether a workspace has used its free trial');
     await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
+  await db.exec('CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;');
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V112.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V114.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V115.sql'), 'utf8'));
