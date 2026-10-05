@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
 import {
   createWorkflowExecution,
@@ -168,7 +168,7 @@ export class PostgresWorkflowExecutionStore{
       if(kind==='approve' && next.status==='queued'){
         const idempotencyKey=digest({tenantId,executionId:next.executionId,graphChecksum:next.graphChecksum,version:next.version,reason:'approval'});
         await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7)',[
-          tenantId,crypto.randomUUID(),'workflow.execute',JSON.stringify({kind:'workflow_execution',id:next.executionId,version:next.version}),idempotencyKey,null,8
+          tenantId,randomUUID(),'workflow.execute',JSON.stringify({kind:'workflow_execution',id:next.executionId,version:next.version}),idempotencyKey,null,8
         ]);
       }
       const updated=await client.query(`UPDATE atlas_workflow_executions SET status=$4,current_node_id=$5,state=$6::jsonb,state_checksum=$7,checksum=$7,last_error_code=$8,retry_at=$9,version=$10,finished_at=$11,canceled_by=$12,updated_at=$13
