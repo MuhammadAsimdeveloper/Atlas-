@@ -193,3 +193,27 @@ test('replay creates a new execution pinned to the original graph version', () =
   assert.equal(replay.status, 'queued');
   assert.equal(replay.currentNodeId, 'start');
 });
+
+
+test('workflow result references reject direct email or URL destinations', () => {
+  const workflow = graph();
+  const execution = createWorkflowExecution({
+    tenantId,
+    executionId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    workflow,
+    triggerEventRef: 'event_2026_0007',
+    createdByActorId: '99999999-9999-4999-8999-999999999999'
+  });
+  assert.throws(() => completeWorkflowStep({
+    execution,
+    nodeId: 'start',
+    resultRef: { kind: 'provider', id: 'person@example.com' },
+    now: '2026-10-05T10:00:00Z'
+  }), /opaque reference/i);
+  assert.throws(() => completeWorkflowStep({
+    execution,
+    nodeId: 'start',
+    resultRef: { kind: 'provider', id: 'https://example.com' },
+    now: '2026-10-05T10:00:00Z'
+  }), /opaque reference/i);
+});
