@@ -16,6 +16,7 @@ const tenantId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const workflowId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const executionId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const stepRef = '11111111-1111-4111-8111-111111111111';
+const actorId = '22222222-2222-4222-8222-222222222222';
 
 function graph() {
   return createWorkflowGraph({
@@ -290,7 +291,7 @@ test('wait-until nodes reject unbounded or past resume times', () => {
     name: 'Wait until test',
     nodes: [
       { id: 'trigger', type: 'trigger', name: 'Lead created', config: { eventType: 'contact.created' } },
-      { id: 'wait', type: 'wait_until', name: 'Wait', config: { resumeAt: '2026-10-05T10:05:00.000Z' } },
+      { id: 'wait', type: 'wait_until', name: 'Wait', config: { delayMs: 300_000, resumeAt: '2026-10-05T10:05:00.000Z' } },
       { id: 'stop', type: 'stop', name: 'Done', config: {} }
     ],
     edges: [{ id: 'e1', from: 'trigger', to: 'wait', port: 'next' }, { id: 'e2', from: 'wait', to: 'stop', port: 'next' }]
