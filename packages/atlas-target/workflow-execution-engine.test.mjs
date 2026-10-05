@@ -284,6 +284,10 @@ test('delay and wait nodes pause execution with a bounded resume time', () => {
 test('wait-until nodes reject unbounded or past resume times', () => {
   const now = Date.parse('2026-10-05T10:00:00.000Z');
   const graph = createWorkflowGraph({
+    tenantId,
+    id: crypto.randomUUID(),
+    version: 1,
+    name: 'Wait until test',
     nodes: [
       { id: 'trigger', type: 'trigger', name: 'Lead created', config: { eventType: 'contact.created' } },
       { id: 'wait', type: 'wait_until', name: 'Wait', config: { resumeAt: '2026-10-05T10:05:00.000Z' } },
