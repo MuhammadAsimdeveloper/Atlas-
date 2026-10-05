@@ -1,4 +1,5 @@
 const ERROR_CODE = /^[a-z][a-z0-9_.-]{0,79}$/;
+const SLO_TARGETS = Object.freeze({ job_duration_ms: 30_000, error_rate: 0.01, success_rate: 0.995 });
 
 function errorCode(error) {
   return typeof error?.code === 'string' && ERROR_CODE.test(error.code) ? error.code : 'handler_failed';
@@ -13,7 +14,7 @@ function handlerMap(value, label) {
 }
 
 export class AtlasQueueWorker {
-  constructor({ store, workerId, jobHandlers, eventHandlers = {}, concurrency = 4, leaseSeconds = 60, pollMs = 1000, runtimePoolId = null, logger = console } = {}) {
+  constructor({ store, workerId, jobHandlers, eventHandlers = {}, concurrency = 4, leaseSeconds = 60, pollMs = 1000, runtimePoolId = null, sloEvaluationIntervalMs = 30_000, logger = console } = {}) {
     if (!store || !/^[a-zA-Z0-9_.:-]{1,120}$/.test(workerId || '')) throw new TypeError('A queue store and bounded worker ID are required.');
     if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) throw new TypeError('Worker concurrency must be between 1 and 32.');
     if (!Number.isInteger(leaseSeconds) || leaseSeconds < 15 || leaseSeconds > 900) throw new TypeError('Worker lease must be between 15 and 900 seconds.');
@@ -26,6 +27,9 @@ export class AtlasQueueWorker {
     this.leaseSeconds = leaseSeconds;
     this.pollMs = pollMs;
     this.runtimePoolId = runtimePoolId;
+    if (!Number.isInteger(sloEvaluationIntervalMs) || sloEvaluationIntervalMs < 5_000 || sloEvaluationIntervalMs > 300_000) throw new TypeError('SLO evaluation interval must be between 5000 and 300000 milliseconds.');
+    this.sloEvaluationIntervalMs = sloEvaluationIntervalMs;
+    this.lastSloEvaluationAt = 0;
     this.logger = logger;
     this.stopping = false;
     this.wake = null;
@@ -64,6 +68,15 @@ export class AtlasQueueWorker {
       ...jobs.map(job => this.#track(this.#process(job, this.jobHandlers.get(job.job_type), 'job'))),
       ...events.map(event => this.#track(this.#process(event, this.eventHandlers.get(event.event_type), 'event')))
     ]);
+    if (this.runtimePoolId && typeof this.store.listRuntimeSloPolicies === 'function' && Date.now() - this.lastSloEvaluationAt >= this.sloEvaluationIntervalMs) {
+      this.lastSloEvaluationAt = Date.now();
+      try {
+        const policies = await this.store.listRuntimeSloPolicies();
+        for (const policy of policies) await this.store.evaluateRuntimeSlo({ poolId:this.runtimePoolId, policyId:policy.policy_id });
+      } catch (error) {
+        this.logger.warn?.(`Atlas runtime SLO evaluation failed (${error?.message || 'unknown'}).`);
+      }
+    }
     return { jobsClaimed: jobs.length, eventsClaimed: events.length, ...this.counts };
   }
 
@@ -79,6 +92,7 @@ export class AtlasQueueWorker {
       ? () => this.store.heartbeatJob(item, this.workerId, this.leaseSeconds)
       : () => this.store.heartbeatOutbox(item, this.workerId, this.leaseSeconds);
     const controller = new AbortController();
+    const startedAt = Date.now();
     let leaseLost = false;
     let renewalBusy = false;
     const timer = setInterval(() => {
@@ -112,6 +126,15 @@ export class AtlasQueueWorker {
       this.logger.warn?.(`Atlas worker ${kind} ${id} failed (${code}).`);
     } finally {
       clearInterval(timer);
+      if (isJob && this.runtimePoolId && typeof this.store.recordRuntimeSlo === 'function') {
+        const duration = Math.max(0, Date.now() - startedAt);
+        try {
+          await this.store.recordRuntimeSlo({ poolId:this.runtimePoolId, metric:'job_duration_ms', value:duration, target:SLO_TARGETS.job_duration_ms });
+          await this.store.recordRuntimeSlo({ poolId:this.runtimePoolId, metric:'success_rate', value:leaseLost ? 0 : (this.counts.jobsFailed > 0 && !this.counts.jobsSucceeded ? 0 : 1), target:SLO_TARGETS.success_rate });
+        } catch (error) {
+          this.logger.warn?.(`Atlas runtime SLO sample failed (${error?.message || 'unknown'}).`);
+        }
+      }
     }
   }
 
