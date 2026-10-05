@@ -20,7 +20,7 @@
     "production:check": "node scripts/production-check.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "capabilities:check": "node scripts/capabilities-check.mjs",
-    "service:check": "node --test packages/atlas-core/service-operations.test.mjs apps/worker/integration-runtime.test.mjs"
+    "service:check": "node --test packages/atlas-core/service-operations.test.mjs packages/atlas-core/oauth.test.mjs apps/worker/integration-runtime.test.mjs"
   },
   "engines": {
     "node": ">=20"
