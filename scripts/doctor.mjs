@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '116.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '119.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   const authority = await read('packages/atlas-core/authority.mjs');
@@ -165,6 +165,17 @@ try {
   check('V115 billing UI explains trial and plan management', ui.includes('Start 14-day free trial') && ui.includes('id="billing-manage"') && ui.includes('Paddle Checkout displays the price and billing cadence'), 'Payments UI discloses the verified trial and gives workspace billing users an authenticated manage/cancel entry point');
   const featureMatrix = await read('docs/COMPETITOR-FEATURE-MATRIX-2026-10.md');
   check('V114 competitor coverage is explicit', featureMatrix.includes('V114') && featureMatrix.includes('13 requested') && featureMatrix.includes('External email, AI, social and page providers are not connected'), 'HighLevel and n8n coverage states distinguish authenticated database features from provider-dependent execution');
+
+  const workflowEngine = await read('packages/atlas-target/workflow-execution-engine.mjs');
+  const workflowEngineTests = await read('packages/atlas-target/workflow-execution-engine.test.mjs');
+  const executionStore = await read('apps/api/workflow-execution-store.mjs');
+  const executionApiTests = await read('apps/api/workflow-execution-routes.test.mjs');
+  const executionStoreTests = await read('apps/api/workflow-execution-store.test.mjs');
+  const executionSql = await read('infra/postgres/FINAL-MIGRATION-V119.sql');
+  const executionGrants = await read('infra/postgres/API-ROLE-GRANTS-V119.sql');
+  check('V119 durable workflow state machine', workflowEngine.includes('createWorkflowExecution') && workflowEngine.includes('completeWorkflowStep') && workflowEngine.includes('requestWorkflowApproval') && workflowEngine.includes('approveWorkflowExecution') && workflowEngine.includes('cancelWorkflowExecution') && workflowEngine.includes('replayWorkflowExecution') && workflowEngineTests.includes('replay creates a new execution'), 'Workflow runs pin graph version/checksum and support durable step, approval, retry, cancel and replay transitions');
+  check('V119 execution persistence and tenant RLS', executionSql.includes('atlas_workflow_executions') && executionSql.includes('atlas_workflow_execution_events') && executionSql.includes('FORCE ROW LEVEL SECURITY') && executionSql.includes("NOT state ? 'rawEvent'") && executionGrants.includes('atlas_worker') && executionGrants.includes('atlas_app'), 'Durable execution state is reference-only, tenant-RLS protected and available to the restricted execution roles');
+  check('V119 authenticated execution control plane', executionStore.includes('atlas_v115_enqueue_job') && executionStore.includes('workflow.execute') && executionStore.includes('workflow_execution_version_conflict') && executionStoreTests.includes('atomically queues its execution job') && executionApiTests.includes('starting a published workflow'), 'Published workflows can create queue-backed durable executions and operators can inspect/control them under tenant and optimistic-version checks');
 
   const runtimeSql = await read('infra/postgres/FINAL-MIGRATION-V115.sql');
   const runtimeGrants = await read('infra/postgres/API-ROLE-GRANTS-V115.sql');
