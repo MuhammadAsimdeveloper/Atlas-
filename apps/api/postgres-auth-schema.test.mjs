@@ -17,7 +17,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     const migrationDirectory = path.join(root, 'infra/postgres');
     await db.exec('CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;');
   const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
-    assert.equal(files.at(-1), 'FINAL-MIGRATION-V137.sql');
+    assert.equal(files.at(-1), 'FINAL-MIGRATION-V138.sql');
     for (const file of files) { try { await db.exec(await readFile(path.join(migrationDirectory,file),'utf8')); } catch (error) { throw new Error(`${file}: ${error.message}`); } }
     const automationTable = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_v127_automation_events'::regclass");
     assert.equal(automationTable.rows[0].relrowsecurity,true);
@@ -51,6 +51,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V135.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V136.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V137.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V138.sql'), 'utf8'));
 
     const sloPolicies = await db.query("SELECT count(*)::integer AS count FROM atlas_runtime_slo_policies WHERE enabled=true");
     assert.equal(sloPolicies.rows[0].count, 5, 'V137 seeds bounded runtime SLO policies');
