@@ -1,12 +1,12 @@
 # Atlas master roadmap and verified implementation status
 
-This branch advances the verified status to V138. V122 implements the internal capability fabric for all 60 requested capabilities while keeping external-provider and infrastructure claims fail-closed.
+This branch advances the verified status to V145. Atlas prioritizes connected business outcomes while keeping external-provider and infrastructure claims fail-closed.
 
-This status describes repository behavior at V121. `DONE` means the listed bounded capability is implemented and tested in this source release. `PARTIAL` means real implementation exists but the requested feature family is incomplete. `BLOCKED BY EXTERNAL DEPENDENCY` means source contracts may exist, but end-to-end operation requires deployment, provider credentials, or missing product services.
+This status describes verified repository behavior at V145. `DONE` means the listed bounded capability is implemented and tested in this source release. `PARTIAL` means real implementation exists but the requested feature family is incomplete. `BLOCKED BY EXTERNAL DEPENDENCY` means source contracts may exist, but end-to-end operation requires deployment, provider credentials, or missing product services.
 
 | Phase | Status | Verified scope and outstanding work |
 |---|---|---|
-| V138. Distributed runtime capacity + backpressure | **IMPLEMENTED / EXTERNALLY GATED** | Durable worker-pool capacity leases, bounded global concurrency and crash-recoverable backpressure are implemented; Redis acceleration, autoscaling and measured multi-node load/failover evidence remain deployment gates. |
+| V145. Cross-product lead-to-booking integration | **IMPLEMENTED / EXTERNALLY GATED** | Funnel/website lead-form capture composes CRM contacts/leads, qualification, follow-up planning, timezone-aware calendar booking, pipeline movement and redacted reporting. Voice remains provider-gated; external delivery/hosting/credentials are not claimed live. |\n| V138. Distributed runtime capacity + backpressure | **IMPLEMENTED / EXTERNALLY GATED** | Durable worker-pool capacity leases, bounded global concurrency and crash-recoverable backpressure are implemented; Redis acceleration, autoscaling and measured multi-node load/failover evidence remain deployment gates. |
 | V137. Durable observability + SLO control plane | **IMPLEMENTED / EXTERNALLY GATED** | Runtime SLO policies, evaluation windows, alerts and critical incident state are durable and worker-wired; external OTel export, paging, managed infrastructure and measured SLO evidence remain deployment gates. |
 | V123. Production integration + service operations | **IMPLEMENTED / EXTERNALLY GATED** |
 | V122. Complete capability fabric | **IMPLEMENTED / EXTERNALLY GATED** | All 60 requested capabilities have registered policy, tenant-scoped persistence and runtime/API boundaries. Communication adapters, signed webhooks, durable workflow execution and enterprise controls are implemented; real provider/KMS/WAF/IdP/DR evidence still requires deployment. |
