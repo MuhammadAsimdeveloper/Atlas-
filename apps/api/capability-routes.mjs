@@ -1,4 +1,4 @@
-import {createAuthError,parseCookies,sessionCookieName,hashOpaqueToken,verifyCsrf} from './auth-contracts.mjs';import {securityHeaders} from './security.mjs';import {capabilityMatrix} from '../../packages/atlas-core/capability-fabric.mjs';import {UUID} from './capability-store.mjs';
+import {createAuthError,parseCookies,sessionCookieName,hashOpaqueToken,verifyCsrf} from './auth-contracts.mjs';import {securityHeaders} from './security.mjs';import {capabilityMatrix} from '../../packages/atlas-core/capability-fabric.mjs';
 function send(res,status,body,env){res.writeHead(status,{...securityHeaders(env),'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(body));return true;}
 async function json(req){const chunks=[];let n=0;for await(const c of req){n+=c.length;if(n>100000)throw createAuthError(413,'request_too_large');chunks.push(c)}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{throw createAuthError(400,'invalid_json')}}
 export function createCapabilityApi({store,authStore,env=process.env}={}){
