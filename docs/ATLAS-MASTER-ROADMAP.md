@@ -1,9 +1,12 @@
 # Atlas master roadmap and verified implementation status
 
+This branch advances the verified status to V122. V122 implements the internal capability fabric for all 60 requested capabilities while keeping external-provider and infrastructure claims fail-closed.
+
 This status describes repository behavior at V121. `DONE` means the listed bounded capability is implemented and tested in this source release. `PARTIAL` means real implementation exists but the requested feature family is incomplete. `BLOCKED BY EXTERNAL DEPENDENCY` means source contracts may exist, but end-to-end operation requires deployment, provider credentials, or missing product services.
 
 | Phase | Status | Verified scope and outstanding work |
 |---|---|---|
+| V122. Complete capability fabric | **IMPLEMENTED / EXTERNALLY GATED** | All 60 requested capabilities have registered policy, tenant-scoped persistence and runtime/API boundaries. Communication adapters, signed webhooks, durable workflow execution and enterprise controls are implemented; real provider/KMS/WAF/IdP/DR evidence still requires deployment. |
 | 0. Foundation | **PARTIAL** | V115 adds a tenant-scoped PostgreSQL queue, atomic Growth Center outbox writes, interval scheduler, bounded retry/lease recovery, restricted worker role and graceful handler loop. Redis broker, object storage, KMS, OTel export, production handlers and capacity tests remain absent. |
 | 1. Core SaaS | **PARTIAL** | Authenticated accounts, sessions, tenant memberships, invitations and custom tenant roles exist. 2FA, SSO/OAuth, API keys, full team lifecycle and tenant entitlements are incomplete. |
 | 2. CRM | **PARTIAL** | Tenant-backed contacts, leads, pipelines and tasks include bounded validation, relationship checks, search, revisions, audit events and lead-stage policy. Imports/exports, custom objects, dedupe/merge and full CRM timeline are incomplete. |
@@ -17,6 +20,12 @@ This status describes repository behavior at V121. `DONE` means the listed bound
 | 10. Advanced GHL surface | **BLOCKED BY EXTERNAL DEPENDENCY** | Affiliate rules and selected course/social/voice contracts exist; ads, ecommerce, courses, memberships, community and advanced attribution/reporting are not operational products. |
 | 11. Agency/SaaS | **BLOCKED BY EXTERNAL DEPENDENCY** | Tenant identity and Khan-only platform authority are implemented. Sub-account provisioning, reseller billing, snapshots, marketplace, white-label and global control-plane operations are absent. |
 | 12. Production hardening | **PARTIAL** | Security checks, RLS tests, migration hashes, deploy references and restricted-role startup gates exist. Managed production deployment, backups/PITR restore drills, WAF/CDN, load/failover tests, compliance evidence and SLOs are external and unverified. |
+
+## V122 implementation — complete capability fabric
+
+V122 is the first release that treats the user's full 60-item gap list as one governed capability surface. It adds communication threading/handoff, provider adapters, production workflow execution, signed inbound event normalization, OAuth/credential references, advanced CRM/marketing definitions, agency controls and enterprise security/DR metadata. The capability registry contains exactly 60 entries and CI checks that every requested domain is represented.
+
+The phrase **implemented** means the Atlas source can represent, validate, authorize and persist the capability. It does not mean an external provider account, identity provider, KMS/HSM, WAF or production infrastructure is connected. Those systems remain explicitly gated and cannot be faked by configuration rows.
 
 ## V119 current implementation — durable execution
 
