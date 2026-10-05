@@ -33,3 +33,27 @@ Deployment evidence covers managed PostgreSQL, Redis HA, KMS/secrets, WAF/CDN, b
 8. Backup restore drill with measured RPO/RTO.
 9. OTLP collector and alert routing.
 10. Only after evidence is current should the deployment gate report ready.
+
+
+## V144–V150 operational integration
+
+### V144
+Durable dispatch state and bounded runtime control events provide the operational decision ledger. Optional OTLP HTTP export is best-effort and never blocks customer execution.
+
+### V145
+A native bounded Redis RESP2 client provides `LPUSH` dispatch and blocking `BRPOP` wakeups. Redis is a wake/acceleration path only; durable job state remains in PostgreSQL.
+
+### V146
+The autoscaler uses a per-pool scaler lease so only one worker may actuate at a time. Decisions are persisted before actuation, bounded by policy and recorded as actuated/failed/advisory evidence.
+
+### V147
+Open SLO alerts fan out to enabled destinations through durable per-alert/per-destination delivery records. HTTPS webhooks use an Atlas HMAC signature and retries are bounded.
+
+### V148
+Provider actions use a durable tenant/action idempotency identity. Ambiguous delivery outcomes enter reconciliation and cannot be blindly retried.
+
+### V149
+Recovery drills execute bounded deterministic simulations for worker, Redis, PostgreSQL, duplicate-execution and split-brain scenarios. Live infrastructure drills remain deployment adapters.
+
+### V150
+Production evidence is a separate machine-verifiable control set. Repository code cannot mark live infrastructure as verified; only time-bounded deployment evidence can satisfy the final gate.
