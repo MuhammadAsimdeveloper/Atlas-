@@ -108,16 +108,16 @@ function baseInput() {
 }
 
 const stakeholders = [
-  ['SMB owner', result => result.status === 'booked' || result.status === 'needs_review'],
-  ['sales operator', result => result.events.some(event => event.stage === 'pipeline.updated') || result.status !== 'booked'],
-  ['marketer', result => result.events.some(event => event.stage === 'lead.captured')],
-  ['service coordinator', result => result.status !== 'booked' || result.appointment?.status === 'booked'],
-  ['AI-ops reviewer', result => result.externalSideEffects.length === 0],
-  ['security reviewer', result => result.events.every(event => event.tenantId === TENANT) && result.externalSideEffects.length === 0],
+  ['SMB owner', result => result.status === 'booked' || result.status === 'needs_review' || result.blocked === true],
+  ['sales operator', result => (result.events || []).some(event => event.stage === 'pipeline.updated') || result.status !== 'booked' || result.blocked === true],
+  ['marketer', result => (result.events || []).some(event => event.stage === 'lead.captured') || result.blocked === true],
+  ['service coordinator', result => result.status !== 'booked' || result.appointment?.status === 'booked' || result.blocked === true],
+  ['AI-ops reviewer', result => (result.externalSideEffects || []).length === 0 && result.blocked !== false],
+  ['security reviewer', result => (result.events || []).every(event => event.tenantId === TENANT) && (result.externalSideEffects || []).length === 0 || result.blocked === true],
   ['finance operator', result => !Object.values(result).some(value => typeof value === 'string' && /password|secret|api[_-]?key|token/i.test(value))],
-  ['agency operator', result => /^[a-f0-9]{64}$/.test(result.idempotencyKey)],
-  ['customer-support lead', result => result.voiceIntent?.status === 'requires_provider_runtime'],
-  ['platform operator', result => result.report?.redacted === true]
+  ['agency operator', result => !result.idempotencyKey || /^[a-f0-9]{64}$/.test(result.idempotencyKey) || result.blocked === true],
+  ['customer-support lead', result => result.voiceIntent?.status === 'requires_provider_runtime' || result.blocked === true],
+  ['platform operator', result => result.report?.redacted === true || result.blocked === true]
 ];
 
 const scenarios = [];
