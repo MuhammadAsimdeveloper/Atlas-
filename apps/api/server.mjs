@@ -14,6 +14,7 @@ import { PostgresRuntimeStore } from './runtime-store.mjs';
 import { createCapabilityApi } from './capability-routes.mjs';
 import { loadInboxContentStore } from './inbox-content.mjs';
 import { loadWebhookSecretResolver } from './webhook-secrets.mjs';
+import { runWorkflowScheduler } from './workflow-scheduler.mjs';
 
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
@@ -81,6 +82,7 @@ let capabilityApi = null;
 let runtimeStore = null;
 let inboxContentStore = null;
 let webhookSecretResolver = null;
+let schedulerTimer = null;
 if (env.ATLAS_DATABASE_URL) {
   const { Pool } = await import('pg');
   pool = new Pool(await createPostgresPoolConfig(env, { application_name: `atlas-api-${release.toLowerCase()}` }));
@@ -96,6 +98,11 @@ if (env.ATLAS_DATABASE_URL) {
   inboxContentStore = await loadInboxContentStore(env);
   webhookSecretResolver = await loadWebhookSecretResolver(env);
   capabilityApi = createCapabilityApi({ store: capabilityStore, authStore, env, inboxContentStore, webhookSecretResolver });
+  if (env.ATLAS_WORKFLOW_SCHEDULER_ENABLED === 'true') {
+    const intervalMs=Math.max(1000,Math.min(60000,Number(env.ATLAS_WORKFLOW_SCHEDULER_INTERVAL_MS||5000)));
+    const tick=()=>void runWorkflowScheduler({runtimeStore,growthStore,executionStore,limit:100}).catch(error=>process.stderr.write(`Atlas workflow scheduler failed: ${error?.message||'unknown'}\\n`));
+    schedulerTimer=setInterval(tick,intervalMs); schedulerTimer.unref?.(); tick();
+  }
 }
 
 const server = createServer(async (req, res) => {
@@ -151,6 +158,7 @@ server.listen(port, '0.0.0.0', () => process.stdout.write(`Atlas API ${release} 
 async function shutdown(signal) {
   process.stdout.write(`Atlas API received ${signal}; closing gracefully.\n`);
   server.close(async () => {
+    if(schedulerTimer) clearInterval(schedulerTimer);
     try { await authStore?.close(); } finally { process.exit(0); }
   });
   const timeout = setTimeout(() => process.exit(1), 15_000);
