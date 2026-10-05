@@ -10,6 +10,7 @@ import { PostgresGrowthStore } from './growth-store.mjs';
 import { PostgresWorkflowExecutionStore } from './workflow-execution-store.mjs';
 import { securityHeaders, validateHealthToken } from './security.mjs';
 import { PostgresCapabilityStore } from './capability-store.mjs';
+import { PostgresRuntimeStore } from './runtime-store.mjs';
 import { createCapabilityApi } from './capability-routes.mjs';
 import { loadInboxContentStore } from './inbox-content.mjs';
 import { loadWebhookSecretResolver } from './webhook-secrets.mjs';
@@ -77,6 +78,7 @@ let workflowExecutionStore = null;
 let growthApi = null;
 let capabilityStore = null;
 let capabilityApi = null;
+let runtimeStore = null;
 let inboxContentStore = null;
 let webhookSecretResolver = null;
 if (env.ATLAS_DATABASE_URL) {
@@ -87,8 +89,9 @@ if (env.ATLAS_DATABASE_URL) {
   if (runtime === 'production') await authStore.assertSafeRuntimeRole();
   growthStore = new PostgresGrowthStore(pool);
   workflowExecutionStore = new PostgresWorkflowExecutionStore(pool);
+  runtimeStore = new PostgresRuntimeStore(pool);
   authApi = createAuthApi({ store: authStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
-  growthApi = createGrowthApi({ store: growthStore, executionStore: workflowExecutionStore, authStore, env });
+  growthApi = createGrowthApi({ store: growthStore, executionStore: workflowExecutionStore, runtimeStore, authStore, env });
   capabilityStore = new PostgresCapabilityStore(pool);
   inboxContentStore = await loadInboxContentStore(env);
   webhookSecretResolver = await loadWebhookSecretResolver(env);
