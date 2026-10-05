@@ -5,7 +5,7 @@ const EXECUTION_STATUSES = Object.freeze(['queued','running','waiting','waiting_
 const TERMINAL_STATUSES = new Set(['completed','failed','canceled','dead_letter']);
 const STEP_STATUSES = Object.freeze(['running','completed','failed','needs_approval']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const REF_KEY = /^[A-Za-z][A-Za-z0-9_.:-]{0,79}$/;
+const REF_KEY = /^[A-Za-z][A-Za-z0-9_.:_-]{0,79}$/;
 const ERROR_CODE = /^[a-z][a-z0-9_.-]{0,79}$/;
 
 function canonical(value) {
