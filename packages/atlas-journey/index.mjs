@@ -14,7 +14,7 @@ import {
 } from '../atlas-target/index.mjs';
 
 const REF = /^[A-Za-z0-9][A-Za-z0-9_.:-]{2,119}$/;
-const EMAIL = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const HASH = /^[a-f0-9]{64}$/;
 
 const STAGES = Object.freeze([
@@ -32,7 +32,7 @@ function ref(value, label) {
 }
 
 function text(value, label, max = 500, { empty = false } = {}) {
-  if (typeof value !== 'string' || (!empty && !value.trim()) || value.length > max || /[\\r\\n\\u0000]/.test(value)) throw new TypeError(label + ' must be bounded text');
+  if (typeof value !== 'string' || (!empty && !value.trim()) || value.length > max || /[\r\n\u0000]/.test(value)) throw new TypeError(label + ' must be bounded text');
   return value.trim();
 }
 
@@ -74,7 +74,7 @@ function normalizeSubmission(submission) {
   const email = submission.email == null ? null : text(submission.email, 'email', 254).toLowerCase();
   const phone = submission.phone == null ? null : text(submission.phone, 'phone', 18);
   if (email && !EMAIL.test(email)) throw new TypeError('email is invalid');
-  if (phone && !/^\\+[1-9]\\d{7,14}$/.test(phone)) throw new TypeError('phone must be E.164');
+  if (phone && !/^\+[1-9]\d{7,14}$/.test(phone)) throw new TypeError('phone must be E.164');
   if (!email && !phone) throw new TypeError('form submission needs an email or phone');
   const sourceRef = text(submission.sourceRef, 'sourceRef', 180);
   const source = submission.source == null ? 'website' : text(submission.source, 'source', 120);
