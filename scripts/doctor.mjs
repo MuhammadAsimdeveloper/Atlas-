@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '119.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '120.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   const authority = await read('packages/atlas-core/authority.mjs');
@@ -19,12 +19,13 @@ try {
 
   const authContracts = await read('apps/api/auth-contracts.mjs');
   const authRoutes = await read('apps/api/auth-routes.mjs');
+  const security = await read('apps/api/security.mjs');
   const authStore = await read('apps/api/postgres-auth-store.mjs');
   const authMigration = await read('infra/postgres/FINAL-MIGRATION-V112.sql');
   const roleGrants = await read('infra/postgres/API-ROLE-GRANTS-V112.sql');
   const authSchemaTest = await read('apps/api/postgres-auth-schema.test.mjs');
   check('V112 secure authentication', authContracts.includes('scrypt$16384$8$1$') && authContracts.includes("'SameSite=Strict'") && authContracts.includes('function verifyCsrf') && authContracts.includes('function isAllowedOrigin') && authRoutes.includes("'/api/v1/auth/signup'") && authRoutes.includes("'/api/v1/auth/password/reset'"), 'Password hashes, one-use opaque tokens, same-origin/CSRF checks, bounded account endpoints and session cookies are explicit');
-  check('V112 trusted edge rate limits', authRoutes.includes('isIP(candidate) !== 0') && authRoutes.includes('trusted_client_ip_unavailable'), 'Production requires valid client IPs from a trusted edge for distributed authentication limits');
+  check('V112 trusted edge rate limits', security.includes('isIP(value) !== 0') && security.includes('trusted_client_ip_unavailable') && authRoutes.includes('clientIdentity'), 'Production requires valid client IPs from a trusted edge for distributed authentication limits');
   check('V112 tenant database foundation', authMigration.includes('atlas_auth_users') && authMigration.includes('atlas_organizations') && authMigration.includes('atlas_organization_memberships') && authMigration.includes('atlas_organization_roles') && authMigration.includes('atlas_auth_audit_events') && (authMigration.match(/FORCE ROW LEVEL SECURITY/g) || []).length >= 8 && authStore.includes("set_config($1, $2, true)"), 'Identity, tenant memberships, custom roles, sessions, tokens, rate limits and audit events use transaction-local scope and forced RLS');
   check('V112 runtime privileges and RLS integration', roleGrants.includes('atlas_app') && roleGrants.includes('rolbypassrls') && roleGrants.includes('pg_auth_members') && roleGrants.includes('REVOKE UPDATE, DELETE, TRUNCATE ON atlas_auth_audit_events') && authSchemaTest.includes('all PostgreSQL migrations apply in order') && authSchemaTest.includes('NOBYPASSRLS'), 'Migration owner and unprivileged API role are split and all shipped SQL is exercised against ephemeral PostgreSQL');
   check('V112 platform-owner separation', !/platform_owner|platformOwner/i.test(authMigration) && !/platform_owner|platformOwner/i.test(roleGrants) && authRoutes.includes('ownerEmail: env.ATLAS_PLATFORM_OWNER_EMAIL') && authRoutes.includes('authority.globalRole === \'platform_owner\''), 'No tenant DB or runtime grant can mint global authority; only the verified configured owner resolver can');
@@ -176,6 +177,13 @@ try {
   check('V119 durable workflow state machine', workflowEngine.includes('createWorkflowExecution') && workflowEngine.includes('completeWorkflowStep') && workflowEngine.includes('requestWorkflowApproval') && workflowEngine.includes('approveWorkflowExecution') && workflowEngine.includes('cancelWorkflowExecution') && workflowEngine.includes('replayWorkflowExecution') && workflowEngineTests.includes('replay creates a new execution'), 'Workflow runs pin graph version/checksum and support durable step, approval, retry, cancel and replay transitions');
   check('V119 execution persistence and tenant RLS', executionSql.includes('atlas_workflow_executions') && executionSql.includes('atlas_workflow_execution_events') && executionSql.includes('FORCE ROW LEVEL SECURITY') && executionSql.includes("NOT state ? 'rawEvent'") && executionGrants.includes('atlas_worker') && executionGrants.includes('atlas_app'), 'Durable execution state is reference-only, tenant-RLS protected and available to the restricted execution roles');
   check('V119 authenticated execution control plane', executionStore.includes('atlas_v115_enqueue_job') && executionStore.includes('workflow.execute') && executionStore.includes('workflow_execution_version_conflict') && executionStoreTests.includes('atomically queues its execution job') && executionApiTests.includes('starting a published workflow'), 'Published workflows can create queue-backed durable executions and operators can inspect/control them under tenant and optimistic-version checks');
+
+  const v120Sql = await read('infra/postgres/FINAL-MIGRATION-V120.sql');
+  const v120Grants = await read('infra/postgres/API-ROLE-GRANTS-V120.sql');
+  const securityTests = await read('apps/api/security-hardening.test.mjs');
+  check('V120 worker execution isolation', v120Sql.includes('atlas_v120_get_execution_for_job') && v120Sql.includes('SECURITY DEFINER') && v120Sql.includes("lease_owner=p_worker_id") && v120Sql.includes("REVOKE ALL ON atlas_workflow_executions") && v120Grants.includes('GRANT EXECUTE ON FUNCTION atlas_v120_get_execution_for_job') && v120Grants.includes('atlas_worker'), 'The worker cannot directly access workflow execution rows; access is lease-bound through narrow security-definer RPCs');
+  check('V120 centralized web security', security.includes('cross-origin-opener-policy') && security.includes('cross-origin-resource-policy') && security.includes('origin-agent-cluster') && security.includes('validateHealthToken') && securityTests.includes('security headers'), 'Browser isolation headers, production HSTS and readiness-token requirements are centralized and regression-tested');
+  check('V120 growth abuse controls', security.includes('enforceRateLimit') && growthRoutes.includes('growth.mutation') && growthRoutes.includes('billing.webhook'), 'Authenticated mutations and billing webhook ingress have distributed hashed rate limits');
 
   const runtimeSql = await read('infra/postgres/FINAL-MIGRATION-V115.sql');
   const runtimeGrants = await read('infra/postgres/API-ROLE-GRANTS-V115.sql');
