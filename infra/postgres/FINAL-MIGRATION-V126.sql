@@ -1,5 +1,30 @@
 -- Atlas V126: durable unified communications/inbox layer on the V125 provider runtime.
 BEGIN;
+DO $
+DECLARE app_role_oid OID; worker_role_oid OID;
+BEGIN
+  SELECT oid INTO app_role_oid FROM pg_roles WHERE rolname='atlas_app';
+  IF app_role_oid IS NULL THEN RAISE EXCEPTION 'Create atlas_app before applying V115 grants'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='atlas_worker') THEN
+    CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+  END IF;
+  SELECT oid INTO worker_role_oid FROM pg_roles WHERE rolname='atlas_worker';
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE oid=app_role_oid AND (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole)) THEN
+    RAISE EXCEPTION 'atlas_app must remain a restricted, non-bypass runtime role';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE oid=worker_role_oid AND (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolinherit)) THEN
+    RAISE EXCEPTION 'atlas_worker must remain restricted, non-bypass and non-inheriting';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_auth_members WHERE member IN (app_role_oid,worker_role_oid)) THEN
+    RAISE EXCEPTION 'atlas_app and atlas_worker must not be members of other database roles';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='public' AND c.relowner IN (app_role_oid,worker_role_oid)
+      AND c.relname = ANY(ARRAY['atlas_runtime_jobs','atlas_event_outbox','atlas_runtime_schedules'])
+  ) THEN RAISE EXCEPTION 'runtime roles must not own V115 queue relations'; END IF;
+END;
+$;
 CREATE TABLE IF NOT EXISTS atlas_v126_inbox_events(
  tenant_id uuid NOT NULL REFERENCES atlas_organizations(tenant_id) ON DELETE CASCADE,
  event_id uuid NOT NULL DEFAULT gen_random_uuid(),
