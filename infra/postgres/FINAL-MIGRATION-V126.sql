@@ -85,6 +85,68 @@ END;$;
 REVOKE ALL ON FUNCTION atlas_v126_get_message_for_worker(uuid,uuid,text,uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION atlas_v126_get_message_for_worker(uuid,uuid,text,uuid) TO atlas_worker;
 
+CREATE OR REPLACE FUNCTION atlas_v126_resolve_webhook_endpoint(p_path_token_hash text)
+RETURNS TABLE(tenant_id uuid,endpoint_id uuid,provider_key text,signing_secret_ref text,accepted_events jsonb,enabled boolean)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+BEGIN
+ IF session_user <> 'atlas_app' THEN RAISE EXCEPTION 'api_role_required'; END IF;
+ RETURN QUERY SELECT e.tenant_id,e.endpoint_id,e.provider_key,e.signing_secret_ref,e.accepted_events,e.enabled
+ FROM atlas_v122_webhook_endpoints e WHERE e.path_token_hash=p_path_token_hash AND e.enabled=true;
+END;$;
+REVOKE ALL ON FUNCTION atlas_v126_resolve_webhook_endpoint(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION atlas_v126_resolve_webhook_endpoint(text) TO atlas_app;
+
+CREATE OR REPLACE FUNCTION atlas_v126_ingest_inbound(
+ p_tenant_id uuid,p_endpoint_id uuid,p_provider_key text,p_event_ref text,p_payload_hash text,p_event_type text,
+ p_channel text,p_external_thread_ref text,p_sender_ref text,p_recipient_ref text,p_provider_message_ref text,p_content_ref text,p_subject text
+) RETURNS TABLE(status text,conversation_id uuid,message_id uuid)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+DECLARE v_event uuid; v_conversation uuid; v_message uuid; v_inserted boolean:=false;
+BEGIN
+ IF session_user <> 'atlas_app' THEN RAISE EXCEPTION 'api_role_required'; END IF;
+ INSERT INTO atlas_v126_inbox_events(tenant_id,provider_key,event_ref,payload_hash,event_type,status)
+ VALUES(p_tenant_id,p_provider_key,p_event_ref,p_payload_hash,p_event_type,'received')
+ ON CONFLICT(tenant_id,provider_key,event_ref,payload_hash) DO NOTHING
+ RETURNING event_id INTO v_event;
+ IF v_event IS NULL THEN
+   SELECT e.conversation_id,e.message_id INTO v_conversation,v_message FROM atlas_v126_inbox_events e WHERE e.tenant_id=p_tenant_id AND e.provider_key=p_provider_key AND e.event_ref=p_event_ref AND e.payload_hash=p_payload_hash;
+   RETURN QUERY SELECT 'duplicate',v_conversation,v_message; RETURN;
+ END IF;
+ INSERT INTO atlas_v122_conversations(tenant_id,conversation_id,channel,provider_connection_id,external_thread_ref,status,subject,last_message_at,last_inbound_at,unread_count,version,updated_at)
+ SELECT p_tenant_id,gen_random_uuid(),p_channel,c.connection_id,p_external_thread_ref,'open',p_subject,now(),now(),1,1,now()
+ FROM atlas_v122_provider_connections c WHERE c.tenant_id=p_tenant_id AND c.provider_key=p_provider_key AND c.channel=p_channel AND c.status='verified'
+ AND p_external_thread_ref IS NOT NULL
+ ON CONFLICT(tenant_id,channel,external_thread_ref) DO UPDATE SET last_message_at=now(),last_inbound_at=now(),unread_count=atlas_v122_conversations.unread_count+1,updated_at=now(),version=atlas_v122_conversations.version+1
+ RETURNING conversation_id INTO v_conversation;
+ IF v_conversation IS NULL THEN
+   RAISE EXCEPTION 'verified_provider_connection_not_found';
+ END IF;
+ INSERT INTO atlas_v122_messages(tenant_id,conversation_id,direction,sender_ref,recipient_ref,provider_message_ref,body_ref,delivery_status,idempotency_key,content_ref,subject,provider_status,created_at,updated_at)
+ VALUES(p_tenant_id,v_conversation,'inbound',p_sender_ref,p_recipient_ref,p_provider_message_ref,'{}','delivered',
+        encode(digest(p_provider_key||E'\\0'||p_event_ref||E'\\0'||p_payload_hash,'sha256'),'hex'),p_content_ref,p_subject,'delivered',now(),now())
+ ON CONFLICT(tenant_id,idempotency_key) DO NOTHING
+ RETURNING message_id INTO v_message;
+ UPDATE atlas_v126_inbox_events SET status=CASE WHEN v_message IS NULL THEN 'duplicate' ELSE 'processed' END,conversation_id=v_conversation,message_id=v_message,processed_at=now() WHERE tenant_id=p_tenant_id AND event_id=v_event;
+ RETURN QUERY SELECT CASE WHEN v_message IS NULL THEN 'duplicate' ELSE 'processed' END,v_conversation,v_message;
+END;$;
+REVOKE ALL ON FUNCTION atlas_v126_ingest_inbound(uuid,uuid,text,text,text,text,text,text,text,text,text,text,text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION atlas_v126_ingest_inbound(uuid,uuid,text,text,text,text,text,text,text,text,text,text,text) TO atlas_app;
+
+CREATE OR REPLACE FUNCTION atlas_v126_apply_receipt(p_tenant_id uuid,p_provider_key text,p_event_ref text,p_provider_message_ref text,p_status text,p_metadata jsonb)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+DECLARE v_message uuid;
+BEGIN
+ IF session_user <> 'atlas_app' THEN RAISE EXCEPTION 'api_role_required'; END IF;
+ SELECT m.message_id INTO v_message FROM atlas_v122_messages m WHERE m.tenant_id=p_tenant_id AND m.provider_message_ref=p_provider_message_ref FOR UPDATE;
+ IF v_message IS NULL THEN RETURN false; END IF;
+ INSERT INTO atlas_v126_message_receipts(tenant_id,message_id,provider_key,provider_event_ref,status,metadata)
+ VALUES(p_tenant_id,v_message,p_provider_key,p_event_ref,p_status,coalesce(p_metadata,'{}'::jsonb)) ON CONFLICT DO NOTHING;
+ UPDATE atlas_v122_messages SET delivery_status=p_status,provider_status=p_status,delivered_at=CASE WHEN p_status='delivered' THEN coalesce(delivered_at,now()) ELSE delivered_at END,updated_at=now() WHERE tenant_id=p_tenant_id AND message_id=v_message;
+ RETURN true;
+END;$;
+REVOKE ALL ON FUNCTION atlas_v126_apply_receipt(uuid,text,text,text,text,jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION atlas_v126_apply_receipt(uuid,text,text,text,text,jsonb) TO atlas_app;
+
 CREATE OR REPLACE FUNCTION atlas_v126_mark_message_for_worker(p_tenant_id uuid,p_job_id uuid,p_worker_id text,p_message_id uuid,p_status text,p_provider_ref text,p_error_code text DEFAULT NULL)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
 DECLARE changed boolean:=false;
