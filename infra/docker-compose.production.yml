@@ -12,6 +12,9 @@ services:
       ATLAS_WORKER_HANDLERS_MODULE: null
     ports:
       - "127.0.0.1:8080:8080"
+    volumes:
+      - "${ATLAS_INBOX_CONTENT_PATH:?Mount the reviewed inbox content module directory}:/app/apps/inbox-content:ro"
+      - "${ATLAS_WEBHOOK_SECRETS_PATH:?Mount the reviewed webhook secret module directory}:/app/apps/webhook-secrets:ro"
     depends_on:
       postgres:
         condition: service_healthy
