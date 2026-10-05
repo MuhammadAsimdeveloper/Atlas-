@@ -1,4 +1,4 @@
-# P129–P136 — Production engineering frontier
+# P129–P137 — Production engineering frontier
 
 ## P129 Execution Inspector + Debug/Replay
 - Durable diagnostics reference records are tenant-isolated and do not store customer payloads.
@@ -40,6 +40,14 @@
 - Added runtime pool configuration, worker heartbeats and SLO samples.
 - PostgreSQL remains the authoritative durable state boundary.
 - Redis/horizontal worker deployment, load testing, failover and measured SLO evidence remain infrastructure gates.
+
+## P137 Durable Observability + SLO Control Plane
+- Added versioned runtime SLO policies and seeded bounded defaults for core worker metrics.
+- Added durable evaluation windows with sample counts, observed values, bad ratios and error-budget remaining.
+- Added deterministic runtime alerts and critical incident state transitions.
+- Added a restricted security-definer evaluator callable by the API/worker runtime roles.
+- Workers emit job-duration, success-rate and error-rate samples and periodically evaluate enabled policies.
+- Telemetry remains reference/metric-only; customer payloads, credentials and message bodies are not persisted in the observability tables.
 
 ## Production-readiness rule
 
