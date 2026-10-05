@@ -49,7 +49,7 @@ function exact(body, fields) {
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !fields.includes(key))) throw createAuthError(400, 'unsupported_request_fields');
 }
 
-export function createGrowthApi({ store, authStore, executionStore = null, env = process.env, fetchImpl = fetch } = {}) {
+export function createGrowthApi({ store, authStore, executionStore = null, runtimeStore = null, env = process.env, fetchImpl = fetch } = {}) {
   if (!store || !authStore) throw new TypeError('Growth API requires the growth and authentication stores.');
 
   async function identity(req) {
@@ -133,6 +133,39 @@ export function createGrowthApi({ store, authStore, executionStore = null, env =
         const portal = await createPaddlePortalSession({ customerId: current.customerId, subscriptionId: current.subscriptionId, env, fetchImpl });
         return send(res, 201, { portal }, env);
       }
+      if (path === '/api/v1/automation/events' && req.method === 'POST') {
+        await requireMutation(req, who.session);
+        if (env.ATLAS_WORKFLOW_EXECUTION_ENABLED !== 'true' || env.ATLAS_WORKFLOW_EXECUTION_HANDLER_READY !== 'true') {
+          return send(res, 503, { error: 'workflow_execution_not_enabled', message: 'Live automation events require a reviewed production workflow handler.' }, env);
+        }
+        if (!runtimeStore?.recordAutomationEvent || !runtimeStore?.finalizeAutomationEvent || !executionStore?.create || !store.listPublishedWorkflowsForEvent) {
+          throw createAuthError(503, 'automation_event_runtime_unavailable');
+        }
+        const body = await readJson(req);
+        exact(body, ['eventRef', 'eventType', 'resourceRef']);
+        if (typeof body.eventRef !== 'string' || !/^[A-Za-z0-9_.:/@+-]{1,240}$/.test(body.eventRef)) throw createAuthError(400, 'invalid_event_ref');
+        if (typeof body.eventType !== 'string' || !/^[a-z][a-z0-9_.:-]{0,119}$/.test(body.eventType)) throw createAuthError(400, 'invalid_event_type');
+        if (!body.resourceRef || typeof body.resourceRef !== 'object' || Array.isArray(body.resourceRef)) throw createAuthError(400, 'invalid_resource_ref');
+        const resourceRef = { kind: body.resourceRef.kind, id: body.resourceRef.id, ...(body.resourceRef.version === undefined ? {} : { version: body.resourceRef.version }) };
+        const payloadHash = createHash('sha256').update(JSON.stringify({ eventType: body.eventType, resourceRef })).digest('hex');
+        const ledger = await runtimeStore.recordAutomationEvent({ ...who, eventRef: body.eventRef, eventType: body.eventType, resourceRef, payloadHash });
+        if (!ledger.inserted) return send(res, 202, { status: 'duplicate', eventId: ledger.eventId, matchedWorkflows: 0 }, env);
+        const workflows = await store.listPublishedWorkflowsForEvent({ ...who, eventType: body.eventType, limit: 100 });
+        const executions = [];
+        let failed = 0;
+        for (const workflow of workflows.items) {
+          try {
+            const execution = await executionStore.create({ ...who, workflow, triggerEventRef: body.eventRef, executionId: randomUUID() });
+            executions.push({ workflowId: workflow.id, executionId: execution.executionId, status: execution.status });
+          } catch (error) {
+            failed++;
+            process.stderr.write(`Atlas automation trigger ${body.eventRef} workflow ${workflow.id} failed: ${error?.code || 'execution_failed'}\n`);
+          }
+        }
+        await runtimeStore.finalizeAutomationEvent({ ...who, eventId: ledger.eventId, matchedWorkflows: workflows.items.length, failedWorkflows: failed });
+        return send(res, failed ? 207 : 202, { status: failed ? 'partial' : 'accepted', eventId: ledger.eventId, matchedWorkflows: workflows.items.length, failedWorkflows: failed, executions }, env);
+      }
+
       if (path === '/api/v1/growth/activation') {
         if (req.method !== 'GET') return send(res, 405, { error: 'method_not_allowed' }, env, { allow: 'GET' });
         if (typeof store.getActivationChecklist !== 'function') throw createAuthError(503, 'activation_unavailable');
