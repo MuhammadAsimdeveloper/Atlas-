@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const required = ['README.md', 'RELEASE-MANIFEST.txt', 'docs/LAUNCH-READINESS.md', 'docs/14-DAY-FREE-TRIAL.md', 'docs/ATLAS-MASTER-ROADMAP.md', 'docs/EXECUTION-ENGINE.md', 'docs/V116-WORKFLOW-STUDIO.md', 'docs/PRODUCTION-ARCHITECTURE.md', 'apps/marketing-site/index.html', 'apps/marketing-site/styles.css', 'apps/command-center/index.html', 'apps/command-center/app.mjs', 'apps/command-center/workflow-studio.mjs', 'scripts/build-site.mjs', 'scripts/seo-check.mjs', '.github/workflows/ci.yml'];
+const required = ['README.md', 'RELEASE-MANIFEST.txt', 'docs/LAUNCH-READINESS.md', 'docs/14-DAY-FREE-TRIAL.md', 'docs/ATLAS-MASTER-ROADMAP.md', 'docs/EXECUTION-ENGINE.md', 'docs/V116-WORKFLOW-STUDIO.md', 'docs/PRODUCTION-ARCHITECTURE.md', 'apps/marketing-site/index.html', 'apps/marketing-site/styles.css', 'apps/command-center/index.html', 'apps/command-center/app.mjs', 'apps/command-center/workflow-studio.mjs', 'scripts/build-site.mjs', 'scripts/seo-check.mjs', 'scripts/production-evidence.mjs', 'scripts/recovery-drill.mjs', 'docs/V146-V150-OPERATIONAL-COMPLETION-PLAN.md', 'docs/PRODUCTION-LAUNCH-RUNBOOK.md', 'infra/production/atlas-production.manifest.json', '.github/workflows/ci.yml', '.github/workflows/production-evidence.yml'];
 for (const file of required) await access(path.join(root, file));
 const marketing = await readFile(path.join(root, 'apps/marketing-site/index.html'), 'utf8');
 const release = await readFile(path.join(root, 'RELEASE-MANIFEST.txt'), 'utf8');
@@ -15,7 +15,8 @@ const checks = [
   ['release boundary states external production work', release.includes('Not verified / external work')],
   ['trial guide covers provider setup and cancellation', trialGuide.includes('14-day') && trialGuide.includes('cancel') && trialGuide.includes('do not create a real Paddle customer')],
   ['workspace shows trial and cancellation controls', billingUi.includes('Start 14-day free trial') && billingUi.includes('Manage or cancel plan')],
-  ['launch guide exists', true]
+  ['launch guide exists', true],
+  ['operational completion plan exists', true]
 ];
 const failed = checks.filter(([, ok]) => !ok);
 for (const [name, ok] of checks) process.stdout.write((ok ? 'PASS ' : 'FAIL ') + name + '\n');
