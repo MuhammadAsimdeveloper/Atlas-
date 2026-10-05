@@ -1,6 +1,5 @@
 import { isIP } from 'node:net';
-import { hashRateKey } from './auth-contracts.mjs';
-import { createAuthError } from './auth-contracts.mjs';
+import { createAuthError, hashRateKey } from './auth-contracts.mjs';
 
 const DEFAULT_SECRET = 'atlas-development-only-secret-not-for-production';
 const IP = value => typeof value === 'string' && value.length <= 64 && isIP(value) !== 0;
@@ -42,8 +41,8 @@ export function securityHeaders(env = process.env, { html = false } = {}) {
     'x-permitted-cross-domain-policies': 'none',
     'cache-control': html ? 'no-store' : 'no-store',
     'content-security-policy': html
-      ? "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
-      : "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+      ? "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+      : "default-src 'none'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
   };
   if (env.NODE_ENV === 'production') headers['strict-transport-security'] = 'max-age=31536000; includeSubDomains';
   return Object.freeze(headers);
