@@ -87,7 +87,21 @@ test('approval requests pause execution and approval resumes the exact node', ()
   const first = createWorkflowExecution({
     tenantId,
     executionId,
-    workflow: graph(),
+    workflow: createWorkflowGraph({
+      tenantId,
+      id: workflowId,
+      version: 7,
+      name: 'Lead journey',
+      nodes: [
+        { id: 'start', type: 'trigger', config: { eventType: 'contact.created' } },
+        { id: 'task', type: 'delete_contact', config: { contactRef } },
+        { id: 'stop', type: 'stop' }
+      ],
+      edges: [
+        { id: 'e1', from: 'start', to: 'task', port: 'next' },
+        { id: 'e2', from: 'task', to: 'stop', port: 'next' }
+      ]
+    }),
     triggerEventRef: 'event_2026_0003',
     createdByActorId: '99999999-9999-4999-8999-999999999999'
   });
