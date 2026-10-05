@@ -6,6 +6,7 @@ This status describes repository behavior at V121. `DONE` means the listed bound
 
 | Phase | Status | Verified scope and outstanding work |
 |---|---|---|
+| V123. Production integration + service operations | **IMPLEMENTED / EXTERNALLY GATED** |
 | V122. Complete capability fabric | **IMPLEMENTED / EXTERNALLY GATED** | All 60 requested capabilities have registered policy, tenant-scoped persistence and runtime/API boundaries. Communication adapters, signed webhooks, durable workflow execution and enterprise controls are implemented; real provider/KMS/WAF/IdP/DR evidence still requires deployment. |
 | 0. Foundation | **PARTIAL** | V115 adds a tenant-scoped PostgreSQL queue, atomic Growth Center outbox writes, interval scheduler, bounded retry/lease recovery, restricted worker role and graceful handler loop. Redis broker, object storage, KMS, OTel export, production handlers and capacity tests remain absent. |
 | 1. Core SaaS | **PARTIAL** | Authenticated accounts, sessions, tenant memberships, invitations and custom tenant roles exist. 2FA, SSO/OAuth, API keys, full team lifecycle and tenant entitlements are incomplete. |
@@ -20,6 +21,10 @@ This status describes repository behavior at V121. `DONE` means the listed bound
 | 10. Advanced GHL surface | **BLOCKED BY EXTERNAL DEPENDENCY** | Affiliate rules and selected course/social/voice contracts exist; ads, ecommerce, courses, memberships, community and advanced attribution/reporting are not operational products. |
 | 11. Agency/SaaS | **BLOCKED BY EXTERNAL DEPENDENCY** | Tenant identity and Khan-only platform authority are implemented. Sub-account provisioning, reseller billing, snapshots, marketplace, white-label and global control-plane operations are absent. |
 | 12. Production hardening | **PARTIAL** | Security checks, RLS tests, migration hashes, deploy references and restricted-role startup gates exist. Managed production deployment, backups/PITR restore drills, WAF/CDN, load/failover tests, compliance evidence and SLOs are external and unverified. |
+
+## V123 implementation — production integration + service operations
+
+V123 adds a production integration runtime, OAuth state/code exchange, tenant-isolated service operations, Jobber GraphQL boundary, Zapier webhook actions, retries/timeouts and webhook deduplication. It incorporates current Zapier and Jobber product lessons: governed app/action execution, reusable data/interfaces, field-service requests, scheduling, routing, crews, checklists, quotes, invoices and client-service workflows.
 
 ## V122 implementation — complete capability fabric
 
