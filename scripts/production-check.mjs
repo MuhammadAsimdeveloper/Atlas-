@@ -14,6 +14,19 @@ check('V115 execution runtime services', await exists('apps/api/runtime-store.mj
 check('environment template', await exists('.env.example'), 'Required configuration is documented');
 check('V114 tenant Growth Center and billing service', await exists('apps/api/growth-store.mjs') && await exists('apps/api/growth-routes.mjs') && await exists('apps/api/paddle-billing.mjs'), 'Authenticated CRM, builder and Paddle billing services exist');
 check('V116 visual workflow authoring surface', await exists('apps/command-center/workflow-studio.mjs') && await exists('docs/V116-WORKFLOW-STUDIO.md'), 'Workflow Studio assets and honest runtime boundary documentation exist');
+check('V146-V150 operational assets',
+  await exists('packages/atlas-runtime/autoscaler.mjs') &&
+  await exists('packages/atlas-runtime/alert-router.mjs') &&
+  await exists('packages/atlas-runtime/provider-reconciliation.mjs') &&
+  await exists('packages/atlas-runtime/recovery-drills.mjs') &&
+  await exists('packages/atlas-runtime/deployment-evidence.mjs') &&
+  await exists('infra/postgres/FINAL-MIGRATION-V146.sql') &&
+  await exists('infra/postgres/FINAL-MIGRATION-V147.sql') &&
+  await exists('infra/postgres/FINAL-MIGRATION-V148.sql') &&
+  await exists('infra/postgres/FINAL-MIGRATION-V149.sql') &&
+  await exists('infra/postgres/FINAL-MIGRATION-V150.sql'),
+  'V146-V150 runtime engines, migrations and evidence tooling exist.');
+
 const growthRoutes = await readFile(path.join(root,'apps/api/growth-routes.mjs'),'utf8');
 const growthStore = await readFile(path.join(root,'apps/api/growth-store.mjs'),'utf8');
 check('V116 tenant-authorized workflow capability catalog', growthRoutes.includes("path === '/api/v1/growth/workflows/catalog'") && growthStore.includes('getWorkflowCatalog') && growthStore.includes("{ module: 'workflows' }"), 'Workflow catalog reads require a current authenticated workspace membership and module permission');
