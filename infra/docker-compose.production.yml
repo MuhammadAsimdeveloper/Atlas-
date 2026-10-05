@@ -43,6 +43,37 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - atlas-redis:/data
+  control-plane:
+    profiles: ["workers"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: ["node", "apps/worker/control-plane.mjs"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      ATLAS_DATABASE_URL: "${ATLAS_WORKER_DATABASE_URL:?Set a restricted atlas_worker database URL}"
+      ATLAS_WORKER_DATABASE_URL: "${ATLAS_WORKER_DATABASE_URL:?Set a restricted atlas_worker database URL}"
+      ATLAS_DATABASE_SSL_CA_FILE: "${ATLAS_DATABASE_SSL_CA_FILE:-}"
+      ATLAS_WORKER_SECRET_RESOLVER_MODULE: "${ATLAS_WORKER_SECRET_RESOLVER_MODULE:?Set the reviewed secret resolver module}"
+      ATLAS_RUNTIME_POOL_ID: "${ATLAS_RUNTIME_POOL_ID:?Set ATLAS_RUNTIME_POOL_ID}"
+      ATLAS_WORKER_ID: "${ATLAS_WORKER_ID:-control}"
+      ATLAS_AUTOSCALER_ENABLED: "${ATLAS_AUTOSCALER_ENABLED:-false}"
+      ATLAS_AUTOSCALER_ACTUATOR_URL: "${ATLAS_AUTOSCALER_ACTUATOR_URL:-}"
+      ATLAS_AUTOSCALER_ACTUATOR_SECRET_REF: "${ATLAS_AUTOSCALER_ACTUATOR_SECRET_REF:-}"
+      ATLAS_AUTOSCALER_LEASE_SECONDS: "${ATLAS_AUTOSCALER_LEASE_SECONDS:-60}"
+      ATLAS_AUTOSCALER_INTERVAL_MS: "${ATLAS_AUTOSCALER_INTERVAL_MS:-30000}"
+      ATLAS_AUTOSCALER_TIMEOUT_MS: "${ATLAS_AUTOSCALER_TIMEOUT_MS:-5000}"
+      ATLAS_ALERT_ROUTER_ENABLED: "${ATLAS_ALERT_ROUTER_ENABLED:-false}"
+      ATLAS_OTLP_ENDPOINT: "${ATLAS_OTLP_ENDPOINT:-}"
+      ATLAS_OTLP_AUTH_SECRET_REF: "${ATLAS_OTLP_AUTH_SECRET_REF:-}"
+      ATLAS_OTLP_TIMEOUT_MS: "${ATLAS_OTLP_TIMEOUT_MS:-3000}"
+      ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
+    volumes:
+      - "${ATLAS_WORKER_SECRETS_PATH:?Mount a reviewed secret resolver directory}:/app/apps/worker/secrets:ro"
+    depends_on:
+      postgres:
+        condition: service_healthy
   worker:
     profiles: ["workers"]
     build:
@@ -64,6 +95,13 @@ services:
       ATLAS_WORKER_POLL_MS: "${ATLAS_WORKER_POLL_MS:-1000}"
       ATLAS_RUNTIME_POOL_ID: "${ATLAS_RUNTIME_POOL_ID:-}"
       ATLAS_SLO_EVALUATION_INTERVAL_MS: "${ATLAS_SLO_EVALUATION_INTERVAL_MS:-30000}"
+      ATLAS_REDIS_URL: "${ATLAS_REDIS_URL:-}"
+      ATLAS_REDIS_NAMESPACE: "${ATLAS_REDIS_NAMESPACE:-atlas}"
+      ATLAS_REDIS_CONNECT_TIMEOUT_MS: "${ATLAS_REDIS_CONNECT_TIMEOUT_MS:-3000}"
+      ATLAS_RUNTIME_CONTROL_EVENTS_ENABLED: "${ATLAS_RUNTIME_CONTROL_EVENTS_ENABLED:-false}"
+      ATLAS_OTLP_ENDPOINT: "${ATLAS_OTLP_ENDPOINT:-}"
+      ATLAS_OTLP_AUTH_SECRET_REF: "${ATLAS_OTLP_AUTH_SECRET_REF:-}"
+      ATLAS_OTLP_TIMEOUT_MS: "${ATLAS_OTLP_TIMEOUT_MS:-3000}"
       ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
     volumes:
       - "${ATLAS_WORKER_SECRETS_PATH:?Mount a reviewed local secret resolver directory}:/app/apps/worker/secrets:ro"
