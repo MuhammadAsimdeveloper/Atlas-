@@ -95,10 +95,10 @@ export function createGrowthApi({ store, authStore, executionStore = null, env =
         await enforceRateLimit({ req, store: authStore, secret: env.ATLAS_SESSION_SECRET, env, route: 'billing.webhook', limit: 120, windowSeconds: 60 });
         return await handleWebhook(req, res);
       }
-      const who = await identity(req);
       if (['POST', 'PATCH', 'DELETE'].includes(req.method)) {
         await enforceRateLimit({ req, store: authStore, secret: env.ATLAS_SESSION_SECRET, env, route: 'growth.mutation', limit: 120, windowSeconds: 60 });
       }
+      const who = await identity(req);
       if (path === '/api/v1/growth/overview' && req.method === 'GET') return send(res, 200, await store.overview(who), env);
       if (path === '/api/v1/billing/plans' && req.method === 'GET') {
         const configured = new Map(paddlePlanCatalog(env).map(plan => [plan.key, plan]));
@@ -249,7 +249,7 @@ export function createGrowthApi({ store, authStore, executionStore = null, env =
     } catch (error) {
       const status = Number.isInteger(error?.status) && error.status >= 400 && error.status <= 599 ? error.status : 500;
       const code = status === 500 ? 'growth_service_unavailable' : (typeof error.code === 'string' ? error.code : 'request_failed');
-      return send(res, status, { error: code, message: status === 500 ? 'Atlas could not complete this request. Try again later.' : error.message }, env);
+      return send(res, status, { error: code, message: status === 500 ? 'Atlas could not complete this request. Try again later.' : error.message }, env, status === 429 ? { 'retry-after': String(error.retryAfter || 60) } : {});
     }
   }
 
