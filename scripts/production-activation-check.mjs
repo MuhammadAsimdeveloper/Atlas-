@@ -1,0 +1,25 @@
+import { readFile } from 'node:fs/promises';
+const root = new URL('../', import.meta.url);
+const read = p => readFile(new URL(p, root), 'utf8');
+const checks=[];
+function check(name,ok,detail){checks.push({name,ok,detail});}
+const env=await read('.env.example');
+const pkg=JSON.parse(await read('package.json'));
+const api=await read('apps/api/server.mjs');
+const worker=await read('apps/worker/main.mjs');
+const adapters=await read('apps/worker/provider-adapters.mjs');
+const integration=await read('apps/worker/integration-runtime.mjs');
+const security=await read('apps/api/security.mjs');
+const compose=await read('infra/docker-compose.production.yml');
+const ci=await read('.github/workflows/ci.yml');
+check('release metadata is aligned',pkg.version==='124.0.0'&&env.includes('ATLAS_RELEASE=V124'),'Package and environment release identifiers agree.');
+check('production secrets are explicit',['ATLAS_DATABASE_URL','ATLAS_SESSION_SECRET','ATLAS_PLATFORM_OWNER_EMAIL','ATLAS_HEALTH_TOKEN'].every(k=>env.includes(k)),'Critical production configuration keys are declared.');
+check('provider runtime is fail-closed',adapters.includes('assertSafeProviderUrl')&&adapters.includes('validateProviderAdapter')&&integration.includes('executeWithRetry'),'Provider calls require validated destinations and bounded retries.');
+check('API security boundary is wired',api.includes('securityHeaders')&&api.includes('enforceRateLimit')&&security.includes('trustProxy'),'API security controls are wired.');
+check('worker is independently deployable',worker.includes('ATLAS_WORKER_HANDLERS_MODULE')&&worker.includes('ATLAS_WORKER_CONCURRENCY'),'Worker identity, handler module and concurrency are configurable.');
+check('production compose is non-root',compose.includes('user: "node"')||compose.includes('USER node'),'Production containers run without root privileges.');
+check('CI has bounded permissions',ci.includes('permissions:')&&ci.includes('contents: read'),'CI uses explicit least-privilege permissions.');
+const failed=checks.filter(x=>!x.ok);
+for(const c of checks)console.log((c.ok?'PASS':'FAIL')+' '+c.name+' — '+c.detail);
+if(failed.length)process.exit(1);
+console.log('Production activation gate: '+checks.length+'/'+checks.length+' passed.');
