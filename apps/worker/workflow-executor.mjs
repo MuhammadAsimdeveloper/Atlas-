@@ -18,10 +18,19 @@ export async function executeWorkflowJob({store,job,workerId,resolveAction=async
  if(!execution)throw Object.assign(new Error('Execution is unavailable for the leased job.'),{code:'execution_unavailable'});
  if(execution.status==='waiting'){
    const resumed=resumeWorkflowExecution({execution,now});
-   if(resumed===execution)return {status:'waiting',execution};
+   if(resumed===execution){
+     if(typeof execution.resumeAt==='string' && typeof store.scheduleWorkflowResumeForWorker==='function'){
+       await store.scheduleWorkflowResumeForWorker(job,workerId,execution.executionId,execution.resumeAt,'wait',execution.version);
+     }
+     return {status:'waiting',execution};
+   }
    const updated=await store.updateWorkflowExecutionForJob(job,workerId,{expectedVersion:execution.version,status:resumed.status,currentNodeId:resumed.currentNodeId,state:resumed,stateChecksum:resumed.checksum,lastErrorCode:resumed.lastErrorCode,retryAt:resumed.retryAt,finishedAt:resumed.endedAt});
    if(!updated)throw Object.assign(new Error('Execution changed during resume.'),{code:'execution_version_conflict'});
    execution=resumed;
+ }
+ if(execution.status==='retryable' && execution.retryAt && Date.parse(execution.retryAt)>now){
+   if(typeof store.scheduleWorkflowResumeForWorker==='function') await store.scheduleWorkflowResumeForWorker(job,workerId,execution.executionId,execution.retryAt,'retry',execution.version);
+   return {status:'retryable',execution};
  }
  if(['completed','canceled','dead_letter'].includes(execution.status))return {status:execution.status,execution};
  const nodeId=execution.currentNodeId;
@@ -52,6 +61,10 @@ export async function executeWorkflowJob({store,job,workerId,resolveAction=async
  }
  const ok=await store.updateWorkflowExecutionForJob(job,workerId,{expectedVersion:execution.version,status:next.status,currentNodeId:next.currentNodeId,state:next,stateChecksum:next.checksum,lastErrorCode:next.lastErrorCode,retryAt:next.retryAt,finishedAt:next.endedAt});
  if(!ok)throw Object.assign(new Error('Execution changed while completing step.'),{code:'execution_version_conflict'});
+ if((next.status==='waiting'||next.status==='retryable') && typeof store.scheduleWorkflowResumeForWorker==='function'){
+   const resumeAt=next.status==='waiting'?next.resumeAt:next.retryAt;
+   if(resumeAt) await store.scheduleWorkflowResumeForWorker(job,workerId,execution.executionId,resumeAt,next.status==='waiting'?'wait':'retry',next.version);
+ }
  if(typeof store.appendWorkflowExecutionEventForJob==='function'){
    await store.appendWorkflowExecutionEventForJob(job,workerId,{eventType:'workflow.step.completed',nodeId,attempt,status:next.status,detailsRef:safeEventDetails({resultRef:next.steps.at(-1)?.resultRef||null,errorCode:next.lastErrorCode})});
  }
