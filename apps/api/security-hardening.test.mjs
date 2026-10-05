@@ -14,7 +14,7 @@ test('security headers include browser isolation and production HSTS', () => {
   assert.match(html['content-security-policy'], /frame-ancestors 'none'/);
   assert.equal(html['strict-transport-security'], 'max-age=31536000; includeSubDomains');
   const api = securityHeaders({ NODE_ENV: 'development' });
-  assert.doesNotHaveOwnProperty(api, 'strict-transport-security');
+  assert.equal(Object.hasOwn(api, 'strict-transport-security'), false);
   assert.match(api['cache-control'], /no-store/);
 });
 
