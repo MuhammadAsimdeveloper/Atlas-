@@ -1,7 +1,7 @@
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 function equal(a,b){const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&timingSafeEqual(x,y);}
 function basicOk(header,secret){if(typeof header!=='string'||!header.startsWith('Basic ')||typeof secret!=='string')return false;return equal(Buffer.from(header.slice(6),'base64').toString('utf8'),secret);}
-function twilioOk({url,params,signature,secret}){if(typeof signature!=='string'||typeof secret!=='string')return false;const base=url+Object.keys(params||{}).sort().map(k=>k+k===''?'':k+String(params[k]??'')).join('');const digest=createHmac('sha1',secret).update(base).digest('base64');return equal(digest,signature);}
+function twilioOk({url,params,signature,secret}){if(typeof signature!=='string'||typeof secret!=='string')return false;const base=url+Object.keys(params||{}).sort().map(k=>k+String(params[k]??'')).join('');const digest=createHmac('sha1',secret).update(base).digest('base64');return equal(digest,signature);}
 function metaOk(body,signature,secret){if(typeof signature!=='string'||!signature.startsWith('sha256=')||typeof secret!=='string')return false;const digest=createHmac('sha256',secret).update(body).digest('hex');return equal('sha256='+digest,signature);}
 function headerValue(headers,name){return headers[String(name).toLowerCase()]||headers[name]||'';}
 function safeRef(value,max=240){if(typeof value!=='string'||!value||value.length>max||/[\r\n]/.test(value))throw Object.assign(new Error('Webhook reference is invalid.'),{code:'webhook_payload_invalid'});return value;}
