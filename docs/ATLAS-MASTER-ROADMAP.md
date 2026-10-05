@@ -18,6 +18,14 @@ This status describes repository behavior at V116. `DONE` means the listed bound
 | 11. Agency/SaaS | **BLOCKED BY EXTERNAL DEPENDENCY** | Tenant identity and Khan-only platform authority are implemented. Sub-account provisioning, reseller billing, snapshots, marketplace, white-label and global control-plane operations are absent. |
 | 12. Production hardening | **PARTIAL** | Security checks, RLS tests, migration hashes, deploy references and restricted-role startup gates exist. Managed production deployment, backups/PITR restore drills, WAF/CDN, load/failover tests, compliance evidence and SLOs are external and unverified. |
 
+## V117 candidate — activation and safe preview
+
+V117 is the first post-MiroFish implementation slice. It adds a tenant-authenticated workflow preview runtime that reuses the existing checksummed graph and approval contracts. Preview mode can traverse native nodes, branch conditions, pause on approvals, and represent adapter/model work as simulated steps without performing external side effects.
+
+The production workflow engine remains **PARTIAL**: live event ingress, durable graph execution, waits/resume, execution history, replay, provider delivery and operator execution inspection are still future work.
+
+See [V117 Workflow Preview](V117-WORKFLOW-PREVIEW.md), [post-MiroFish roadmap](ATLAS-POST-MIROFISH-ROADMAP-2026-10.md) and [flagship workflow plan](ATLAS-KILLER-WORKFLOW-PLAN.md).
+
 ## Authority and provider truth
 
 Only the configured, verified Atlas platform-owner identity receives global authority. Company owners/admins remain within their own tenant; V115 adds a separate worker role without customer-table grants. Provider names and configuration fields do not count as connected integrations. No real model, channel, calendar, social, telephony or payment side-effect worker is claimed unless credentials, callbacks, sandbox delivery, deduplication, retries and monitoring are verified.
