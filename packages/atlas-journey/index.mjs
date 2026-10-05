@@ -289,12 +289,12 @@ export function runLeadToBookingJourney({
     pickStage(pipeline, qualifyingStage.id, 'qualification');
     const move = planLeadStageMove({ lead, pipeline, stageId: qualifyingStage.id });
     if (move.changed) lead = updateGrowthRecord({
-      record: move.lead,
+      record: lead,
       tenantId,
       actorId,
-      expectedVersion: move.lead.version,
+      expectedVersion: lead.version,
       now,
-      payload: move.lead.payload
+      payload: { ...lead.payload, stageId: move.stageId, status: move.status }
     });
   }
 
@@ -358,12 +358,12 @@ export function runLeadToBookingJourney({
   if (bookedStage && bookedStage.id !== lead.payload.stageId) {
     const move = planLeadStageMove({ lead, pipeline, stageId: bookedStage.id });
     if (move.changed) lead = updateGrowthRecord({
-      record: move.lead,
+      record: lead,
       tenantId,
       actorId,
-      expectedVersion: move.lead.version,
+      expectedVersion: lead.version,
       now,
-      payload: move.lead.payload
+      payload: { ...lead.payload, stageId: move.stageId, status: move.status }
     });
   }
 
