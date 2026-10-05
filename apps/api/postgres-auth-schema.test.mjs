@@ -16,7 +16,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
   try {
     const migrationDirectory = path.join(root, 'infra/postgres');
     const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
-    assert.equal(files.at(-1), 'FINAL-MIGRATION-V115.sql');
+    assert.equal(files.at(-1), 'FINAL-MIGRATION-V119.sql');
     for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
     const trialMarker = await db.query("SELECT column_name FROM information_schema.columns WHERE table_name='atlas_paddle_subscriptions' AND column_name='trial_started_at'");
     assert.equal(trialMarker.rowCount,1,'V115 permanently records whether a workspace has used its free trial');
@@ -24,6 +24,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V112.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V114.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V115.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V119.sql'), 'utf8'));
     await db.exec('SET ROLE atlas_app;');
     assert.equal(await new PostgresAuthStore(db).assertSafeRuntimeRole(), true, 'restricted atlas_app passes the production startup check');
 
@@ -71,6 +72,13 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     const jobPolicy = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_runtime_jobs'::regclass");
     assert.equal(jobPolicy.rows[0].relrowsecurity, true);
     assert.equal(jobPolicy.rows[0].relforcerowsecurity, true);
+    const executionPolicy = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_workflow_executions'::regclass");
+    assert.equal(executionPolicy.rows[0].relrowsecurity, true);
+    assert.equal(executionPolicy.rows[0].relforcerowsecurity, true);
+    const executionGrants = await db.query("SELECT has_table_privilege('atlas_app','atlas_workflow_executions','SELECT,INSERT,UPDATE') AS app_can_write,has_table_privilege('atlas_worker','atlas_workflow_executions','SELECT,UPDATE') AS worker_can_process,has_table_privilege('atlas_worker','atlas_growth_items','SELECT') AS worker_customer_data");
+    assert.equal(executionGrants.rows[0].app_can_write, true);
+    assert.equal(executionGrants.rows[0].worker_can_process, true);
+    assert.equal(executionGrants.rows[0].worker_customer_data, false);
     const apiWorkerGrants = await db.query("SELECT has_function_privilege('atlas_app','atlas_v115_claim_jobs(text,integer,integer,text[])','EXECUTE') AS can_claim,has_table_privilege('atlas_app','atlas_runtime_jobs','UPDATE') AS can_update");
     assert.equal(apiWorkerGrants.rows[0].can_claim, false);
     assert.equal(apiWorkerGrants.rows[0].can_update, false);
@@ -94,6 +102,7 @@ test('V114 Growth Center CRUD, revisions, Paddle webhook state and tenant isolat
     await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V112.sql'),'utf8'));
     await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V114.sql'),'utf8'));
     await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V115.sql'),'utf8'));
+    await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V119.sql'),'utf8'));
     await db.exec('SET ROLE atlas_app;');
     const actorA='11111111-1111-4111-8111-111111111111', tenantA='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     const actorB='22222222-2222-4222-8222-222222222222', tenantB='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
