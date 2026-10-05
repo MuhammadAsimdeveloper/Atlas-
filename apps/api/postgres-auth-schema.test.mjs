@@ -18,6 +18,11 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
     assert.equal(files.at(-1), 'FINAL-MIGRATION-V126.sql');
     for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
+    const inboxTables = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid IN ('atlas_v126_inbox_events'::regclass,'atlas_v126_message_receipts'::regclass) ORDER BY oid::text");
+    assert.equal(inboxTables.rows.length,2);
+    assert.ok(inboxTables.rows.every(row => row.relrowsecurity && row.relforcerowsecurity),'V126 inbox event/receipt tables use forced RLS');
+    const inboxFunctions = await db.query("SELECT proname FROM pg_proc WHERE proname IN ('atlas_v126_get_message_for_worker','atlas_v126_mark_message_for_worker','atlas_v126_ingest_inbound','atlas_v126_apply_receipt')");
+    assert.equal(inboxFunctions.rows.length,4,'V126 lease-bound inbox and webhook RPCs are present');
     const trialMarker = await db.query("SELECT column_name FROM information_schema.columns WHERE table_name='atlas_paddle_subscriptions' AND column_name='trial_started_at'");
     assert.equal(trialMarker.rowCount,1,'V115 permanently records whether a workspace has used its free trial');
     await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
