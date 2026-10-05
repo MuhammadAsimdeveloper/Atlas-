@@ -104,7 +104,11 @@ async function loadDashboard() {
   }
 }
 
-function renderMembers() {
+const inboxState={items:[],active:null};
+function renderInboxList(){const list=$('#inbox-list');list.replaceChildren();const items=inboxState.items;$('#inbox-count').textContent=String(items.length);$('#inbox-empty').hidden=items.length>0;for(const item of items){const row=document.createElement('button');row.type='button';row.className='list-row';row.dataset.id=item.conversation_id;row.append(element('strong',item.subject||item.channel_address||item.external_thread_ref||'Conversation'),element('small',`${item.channel} · ${item.unread_count||0} unread · ${item.status}`));row.addEventListener('click',()=>openInboxConversation(item));list.append(row);}}
+async function loadInbox(){try{const p=new URLSearchParams();const status=$('#inbox-status-filter').value;const channel=$('#inbox-channel-filter').value;if(status)p.set('status',status);if(channel)p.set('channel',channel);p.set('limit','100');const result=await request('/platform/inbox/conversations?'+p.toString());inboxState.items=result.items||[];renderInboxList();if(inboxState.active){const fresh=inboxState.items.find(x=>x.conversation_id===inboxState.active.conversation_id);if(fresh)await openInboxConversation(fresh);}setWorkspaceNotice('Unified inbox updated.','success');setTimeout(()=>setWorkspaceNotice(''),1600);}catch(error){setWorkspaceNotice(error.message,'error');}}
+async function openInboxConversation(item){inboxState.active=item;$('#inbox-detail-title').textContent=item.subject||item.channel_address||'Conversation';$('#inbox-detail-channel').textContent=item.channel;$('#inbox-unread').textContent=item.unread_count?String(item.unread_count)+' unread':'';$('#inbox-reply-form').hidden=!['email','sms','whatsapp'].includes(item.channel);$('#inbox-handoff').hidden=false;$('#inbox-recipient').value=item.channel_address||'';const thread=$('#inbox-thread');thread.replaceChildren();$('#inbox-thread-empty').hidden=true;try{const result=await request(`/platform/inbox/conversations/${item.conversation_id}/messages?limit=100`);const messages=[...(result.items||[])].reverse();if(!messages.length)$('#inbox-thread-empty').hidden=false;for(const message of messages){const row=document.createElement('div');row.className='list-row';const head=element('strong',`${message.direction} · ${message.delivery_status}`);const meta=element('small',new Date(message.created_at).toLocaleString());const text=element('p','Loading message…');row.append(head,meta,text);thread.append(row);if(message.content_ref){try{const content=await request(`/platform/inbox/conversations/${item.conversation_id}/messages/${message.message_id}/content`);text.textContent=content.item?.text||'[Rich content or attachment]';}catch{text.textContent='Message content unavailable.';}}else{text.textContent='System event';}}await request(`/platform/inbox/conversations/${item.conversation_id}/read`,{method:'POST',body:{expectedVersion:item.version},csrf:true}).catch(()=>{});}catch(error){$('#inbox-thread-empty').hidden=false;$('#inbox-thread-empty').textContent=error.message;}}
+\nfunction renderMembers() {
   const rows = $('#member-rows');
   rows.replaceChildren();
   for (const member of state.members) {
@@ -188,12 +192,12 @@ const unavailableReasons = {
 function openPanel(panel, module = null, title = null, navKey = null, search = null) {
   state.activePanel = panel;
   if (!navKey) navKey = ({overview:'overview',team:'team',settings:'settings',payments:'payments'})[panel] || null;
-  const views = ['overview','growth','team','settings','unavailable','payments'];
+  const views = ['overview','conversations','growth','team','settings','unavailable','payments'];
   for (const view of views) $(`#${view}-panel`).hidden = view !== panel;
   const defaults = {
     overview: ['Dashboard','Workspace overview','Your workspace at a glance.'],
     growth: [title || 'Customer operations','Manage · workspace records','Versioned customer and growth records for this location.'],
-    team: ['Team & access','Settings · workspace access','Invite teammates and manage tenant-scoped roles.'],
+    conversations: ['Conversations','Manage · unified inbox','Review and respond to tenant-scoped customer threads.'],\n    team: ['Team & access','Settings · workspace access','Invite teammates and manage tenant-scoped roles.'],
     settings: ['Settings','Settings · account and location','Manage your account and review what is connected.'],
     unavailable: [title || 'Unavailable','Workspace · service status','This module is not connected to a live workspace service.'],
     payments: ['Payments','Grow · workspace billing','Review your workspace plan and Paddle subscription setup.']
@@ -206,7 +210,7 @@ function openPanel(panel, module = null, title = null, navKey = null, search = n
   document.querySelectorAll('[data-nav-page]').forEach(item => { if (item.classList.contains('side-owner')) item.classList.toggle('side-owner-active', panel === 'settings'); });
   $('#workspace-nav').classList.remove('nav-expanded');
   $('#mobile-nav-toggle').setAttribute('aria-expanded','false');
-  if (panel === 'team') loadTeam();
+  if (panel === 'conversations') loadInbox();\n  else if (panel === 'team') loadTeam();
   else if (panel === 'growth') {
     if (search !== null) $('#growth-search').value = search;
     window.AtlasGrowth?.activate(module);
@@ -225,7 +229,7 @@ function openNavButton(button) {
   const page = button.dataset.navPage;
   const title = button.dataset.pageTitle || null;
   const key = button.dataset.navKey || null;
-  if (page === 'growth') openPanel('growth',button.dataset.module || 'contacts',title,key);
+  if (page === 'growth') openPanel('growth',button.dataset.module || 'contacts',title,key);\n  else if (page === 'conversations') openPanel('conversations',null,title,key);
   else if (page === 'payments') openPanel('payments',null,'Payments',key);
   else openPanel(page || 'overview',null,title,key);
 }
@@ -275,7 +279,12 @@ $('#global-search').addEventListener('keydown', event => {
   openPanel('growth','contacts','Contacts','contacts',query);
 });
 
-$('#profile-form').addEventListener('submit', async event => {
+$('#inbox-refresh').addEventListener('click',loadInbox);
+$('#inbox-status-filter').addEventListener('change',loadInbox);
+$('#inbox-channel-filter').addEventListener('change',loadInbox);
+$('#inbox-reply-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget;if(!inboxState.active)return;setBusy(form,true);try{const data=formData(form);await request(`/platform/inbox/conversations/${inboxState.active.conversation_id}`,{method:'POST',body:{channel:inboxState.active.channel,connectionId:inboxState.active.provider_connection_id,to:data.recipient,from:null,subject:inboxState.active.subject||'Re: Atlas conversation',content:{text:data.text},clientKey:`ui-${Date.now()}-${Math.random().toString(36).slice(2,10)}`,consent:true,approved:$('#inbox-approved').checked},csrf:true});form.reset();$('#inbox-recipient').value=inboxState.active.channel_address||data.recipient;await loadInbox();}catch(error){setWorkspaceNotice(error.message,'error');}finally{setBusy(form,false);}});
+$('#inbox-handoff-button').addEventListener('click',async()=>{if(!inboxState.active)return;try{await request(`/platform/inbox/conversations/${inboxState.active.conversation_id}/handoff`,{method:'POST',body:{agentId:$('#inbox-agent').value.trim(),reason:$('#inbox-handoff-reason').value.trim(),expectedVersion:inboxState.active.version},csrf:true});await loadInbox();}catch(error){setWorkspaceNotice(error.message,'error');}});
+\n$('#profile-form').addEventListener('submit', async event => {
   event.preventDefault(); const form=event.currentTarget; setBusy(form,true);
   try {
     const result=await request('/me',{method:'PATCH',body:{displayName:formData(form).displayName},csrf:true});
