@@ -2,7 +2,6 @@
 -- Queue rows contain resource references only. API code can enqueue only for the
 -- current transaction tenant; a separate worker role uses narrow SECURITY DEFINER RPCs.
 BEGIN;
-DO $worker_role$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='atlas_worker') THEN CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS; END IF; END $worker_role$;
 
 -- A canceled trial must remain marked as used so the workspace cannot restart it.
 ALTER TABLE atlas_paddle_subscriptions ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMPTZ;
