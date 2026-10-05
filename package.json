@@ -8,6 +8,7 @@
     "check": "node scripts/check.mjs",
     "doctor": "node scripts/doctor.mjs",
     "security:check": "node scripts/doctor.mjs",
+    "mirofish:check": "node scripts/mirofish-check.mjs",
     "docs:check": "node scripts/docs-check.mjs",
     "smoke:e2e": "node scripts/smoke-http.mjs && node scripts/smoke-api-http.mjs",
     "preview": "node scripts/preview.mjs",
