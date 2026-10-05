@@ -119,7 +119,7 @@ BEGIN
  SELECT p_tenant_id,gen_random_uuid(),p_channel,c.connection_id,p_external_thread_ref,'open',p_subject,now(),now(),1,1,now()
  FROM atlas_v122_provider_connections c WHERE c.tenant_id=p_tenant_id AND c.provider_key=p_provider_key AND c.channel=p_channel AND c.status='verified'
  AND p_external_thread_ref IS NOT NULL
- ON CONFLICT(tenant_id,channel,external_thread_ref) DO UPDATE SET last_message_at=now(),last_inbound_at=now(),unread_count=atlas_v122_conversations.unread_count+1,updated_at=now(),version=atlas_v122_conversations.version+1
+ ON CONFLICT(tenant_id,channel,external_thread_ref) WHERE external_thread_ref IS NOT NULL DO UPDATE SET last_message_at=now(),last_inbound_at=now(),unread_count=atlas_v122_conversations.unread_count+1,updated_at=now(),version=atlas_v122_conversations.version+1
  RETURNING conversation_id INTO v_conversation;
  IF v_conversation IS NULL THEN
    RAISE EXCEPTION 'verified_provider_connection_not_found';
