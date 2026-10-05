@@ -15,6 +15,8 @@ export function createCapabilityApi({store,authStore,env=process.env,inboxConten
  return {async handle(req,res){const url=new URL(req.url||'/','http://localhost');try{if(url.pathname.startsWith('/api/v1/inbox/webhooks/'))return await webhook(req,res,url);if(!url.pathname.startsWith('/api/v1/platform/'))return false;const w=await who(req);
  if(req.method==='GET'&&url.pathname==='/api/v1/platform/capabilities')return send(res,200,{items:capabilityMatrix()},env);
  if(req.method==='GET'&&url.pathname==='/api/v1/platform/integrations')return send(res,200,{items:await store.listConnections(w)},env);
+ if(req.method==='GET'&&url.pathname==='/api/v1/platform/inbox/webhooks')return send(res,200,{items:await store.listWebhookEndpoints(w)},env);
+ if(req.method==='POST'&&url.pathname==='/api/v1/platform/inbox/webhooks'){await mutation(req,w.session);const b=await json(req);return send(res,201,{item:await store.createWebhookEndpoint(w,b)},env);}
  if(req.method==='POST'&&url.pathname==='/api/v1/platform/integrations'){await mutation(req,w.session);return send(res,201,{item:await store.createConnection(w,await json(req))},env);}
  if(req.method==='GET'&&url.pathname==='/api/v1/platform/inbox/conversations')return send(res,200,{items:await store.listConversations(w,{status:url.searchParams.get('status'),channel:url.searchParams.get('channel'),assignedAgentId:url.searchParams.get('assignedAgentId'),unreadOnly:url.searchParams.get('unreadOnly')==='true',limit:url.searchParams.get('limit')})},env);
  const conv=url.pathname.match(/^\/api\/v1\/platform\/inbox\/conversations\/([0-9a-f-]+)$/i);
