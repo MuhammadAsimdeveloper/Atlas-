@@ -18,7 +18,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     await db.exec('CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;');
   const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
     assert.equal(files.at(-1), 'FINAL-MIGRATION-V126.sql');
-    for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
+    for (const file of files) { try { await db.exec(await readFile(path.join(migrationDirectory,file),'utf8')); } catch (error) { throw new Error(`${file}: ${error.message}`); } }
     const inboxTables = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid IN ('atlas_v126_inbox_events'::regclass,'atlas_v126_message_receipts'::regclass) ORDER BY oid::text");
     assert.equal(inboxTables.rows.length,2);
     assert.ok(inboxTables.rows.every(row => row.relrowsecurity && row.relforcerowsecurity),'V126 inbox event/receipt tables use forced RLS');
