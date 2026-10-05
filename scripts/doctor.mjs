@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '145.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '150.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143','144']) {
@@ -24,7 +24,7 @@ try {
   check('V137 durable observability control plane', v137.includes('atlas_runtime_slo_policies') && v137.includes('atlas_runtime_slo_evaluations') && v137.includes('atlas_runtime_alerts') && v137.includes('atlas_runtime_incidents') && v137.includes('atlas_v137_evaluate_runtime_slo') && v137Grants.includes('atlas_worker') && v137RuntimeStore.includes('evaluateRuntimeSlo'), 'Runtime samples now feed durable SLO evaluations, alerts and incidents through a restricted evaluation function.');
   const distributedFabric = await read('packages/atlas-runtime/distributed-fabric.mjs');
   const fabricTest = await read('packages/atlas-runtime/distributed-fabric.test.mjs');
-  for (const version of ['139','140','141','142','143','144']) {
+  for (const version of ['139','140','141','142','143','144','146','147','148','149','150']) {
     const migration = await read(`infra/postgres/FINAL-MIGRATION-V${version}.sql`);
     check(`V${version} distributed production fabric`, migration.includes('BEGIN;') && migration.includes('COMMIT;'), `V${version} migration is transaction-wrapped.`);
   }
@@ -36,6 +36,18 @@ try {
   const redisClient=await read('packages/atlas-runtime/redis-client.mjs'); const redisClientTest=await read('packages/atlas-runtime/redis-client.test.mjs');
   const workerRuntimeRedis=await read('apps/worker/runtime.mjs');
   check('V145 real Redis wakeup', redisClient.includes('class RedisRespClient') && redisClient.includes('BRPOP') && workerRuntimeRedis.includes('redisWakeup') && redisClientTest.includes('rediss://'), 'Native bounded Redis RESP2 client and worker wakeup integration are present; PostgreSQL remains authoritative.');
+  const autoscaler=await read('packages/atlas-runtime/autoscaler.mjs'); const autoscalerTest=await read('packages/atlas-runtime/autoscaler.test.mjs');
+  const alertRouter=await read('packages/atlas-runtime/alert-router.mjs'); const alertRouterTest=await read('packages/atlas-runtime/alert-router.test.mjs');
+  const providerReconciliation=await read('packages/atlas-runtime/provider-reconciliation.mjs'); const providerReconciliationTest=await read('packages/atlas-runtime/provider-reconciliation.test.mjs');
+  const recoveryDrills=await read('packages/atlas-runtime/recovery-drills.mjs'); const recoveryDrillsTest=await read('packages/atlas-runtime/recovery-drills.test.mjs');
+  const evidence=await read('packages/atlas-runtime/deployment-evidence.mjs'); const evidenceTest=await read('packages/atlas-runtime/deployment-evidence.test.mjs');
+  const controlPlaneProcess=await read('apps/worker/control-plane.mjs'); const drillScript=await read('scripts/recovery-drill.mjs');
+  check('V146 autoscaler actuator/control loop',autoscaler.includes('AutoscalerController')&&autoscaler.includes('HttpAutoscalerActuator')&&autoscaler.includes('computeScaleDecision')&&autoscalerTest.includes('persists decision before actuating'),'Bounded single-leader autoscaling and an optional HTTPS actuator are implemented and tested.');
+  check('V147 alert delivery pipeline',alertRouter.includes('AlertRouter')&&alertRouter.includes('WebhookAlertSender')&&alertRouter.includes('x-atlas-alert-signature')&&alertRouterTest.includes('delivers once per destination'),'Durable SLO alerts can be delivered with deterministic signatures, retries and deduplication.');
+  check('V148 provider reconciliation',providerReconciliation.includes('ProviderReconciler')&&providerReconciliation.includes('provider_reconciliation_required')&&providerReconciliationTest.includes('ambiguous provider outcome blocks resend')&&await read('apps/worker/provider-runtime.mjs').then(v=>v.includes('ProviderReconciler')),'Provider actions persist outcomes and never automatically resend ambiguous side effects.');
+  check('V149 recovery drills',recoveryDrills.includes('RecoveryDrillRunner')&&recoveryDrillsTest.includes('all recovery simulations')&&drillScript.includes('RecoveryDrillRunner'),'Worker, Redis, PostgreSQL, duplicate and split-brain recovery scenarios have executable simulation and evidence.');
+  check('V150 production evidence automation',evidence.includes('DEPLOYMENT_CONTROLS')&&evidence.includes('buildEvidenceReport')&&evidenceTest.includes('complete verified evidence')&&controlPlaneProcess.includes('AutoscalerController'),'Deployment controls are machine-validated and the runtime control-plane process is separately deployable.');
+
   const v144=await read('infra/postgres/FINAL-MIGRATION-V144.sql'); const v144Grants=await read('infra/postgres/API-ROLE-GRANTS-V144.sql'); const controlPlane=await read('packages/atlas-runtime/control-plane.mjs'); const controlPlaneTest=await read('packages/atlas-runtime/control-plane.test.mjs');
   check('V144 runtime control-plane integration',v144.includes('atlas_runtime_control_events')&&v144.includes('atlas_runtime_dispatch_records')&&v144Grants.includes('atlas_worker')&&controlPlane.includes('createOtlpHttpExporter')&&controlPlane.includes('buildControlEvent')&&controlPlaneTest.includes('OTLP exporter'),'Durable dispatch state, bounded control events and optional OTLP export are implemented and tested.');
   const v138 = await read('infra/postgres/FINAL-MIGRATION-V138.sql');
