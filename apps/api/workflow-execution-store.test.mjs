@@ -58,7 +58,7 @@ test('V119 persists a pinned workflow execution and atomically queues its execut
     const job=await db.query("SELECT job_type,payload_ref::text AS payload,status FROM atlas_runtime_jobs WHERE tenant_id=$1 AND job_id=$2",[tenantA,execution.executionId]);
     assert.equal(job.rows[0].job_type,'workflow.execute');
     assert.equal(job.rows[0].status,'queued');
-    assert.match(job.rows[0].payload,'workflow_execution');
+    assert.match(job.rows[0].payload,/workflow_execution/);
     const loaded=await store.get({actorId:actorA,tenantId:tenantA,workflowId,executionId:execution.executionId});
     assert.equal(loaded.graphChecksum,execution.graphChecksum);
   }finally{await db.close();}
