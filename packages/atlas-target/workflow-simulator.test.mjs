@@ -123,3 +123,21 @@ test('preview rejects cross-tenant execution before traversing the graph', () =>
     /tenant|checksum/i
   );
 });
+
+
+test('preview rejects an event that does not match the workflow trigger', () => {
+  const graph = graphFor(
+    { id: 'start', type: 'trigger', config: { eventType: 'contact.created' } },
+    { id: 'stop', type: 'stop' }
+  );
+
+  assert.throws(
+    () => simulateWorkflow({
+      graph,
+      tenantId,
+      executionId: 'exec-preview-trigger-mismatch',
+      event: { type: 'payment.failed' }
+    }),
+    /trigger|event/i
+  );
+});
