@@ -1,4 +1,4 @@
-## Unreleased — V117 Workflow Preview
+## 119.0.0 — Durable Workflow Execution Engine
 
 - Added a tenant-authenticated workflow simulation endpoint for safe test-mode rehearsal of saved workflow graphs.
 - Added bounded preview execution for native data/control-flow nodes, deterministic condition routing, approval pauses and honest adapter/model simulation.
