@@ -71,7 +71,6 @@ BEGIN
  v_created:=true;
  RETURN QUERY SELECT v_id,p_conversation_id,v_created;
 END;$;
-REVOKE ALL ON FUNCTION atlas_v126_create_outbound_message(uuid,uuid,uuid,text,uuid,text,text,text,text,text,uuid) FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION atlas_v126_get_message_for_worker(p_tenant_id uuid,p_job_id uuid,p_worker_id text,p_message_id uuid)
 RETURNS TABLE(tenant_id uuid,message_id uuid,conversation_id uuid,channel text,provider_connection_id uuid,recipient_ref text,sender_ref text,subject text,content_ref text,delivery_status text,idempotency_key text)
@@ -83,7 +82,6 @@ BEGIN
  FROM atlas_v122_messages m JOIN atlas_v122_conversations c ON c.tenant_id=m.tenant_id AND c.conversation_id=m.conversation_id
  WHERE m.tenant_id=p_tenant_id AND m.message_id=p_message_id;
 END;$;
-REVOKE ALL ON FUNCTION atlas_v126_get_message_for_worker(uuid,uuid,text,uuid) FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION atlas_v126_resolve_webhook_endpoint(p_path_token_hash text)
 RETURNS TABLE(tenant_id uuid,endpoint_id uuid,provider_key text,signing_secret_ref text,accepted_events jsonb,enabled boolean)
@@ -93,7 +91,6 @@ BEGIN
  RETURN QUERY SELECT e.tenant_id,e.endpoint_id,e.provider_key,e.signing_secret_ref,e.accepted_events,e.enabled
  FROM atlas_v122_webhook_endpoints e WHERE e.path_token_hash=p_path_token_hash AND e.enabled=true;
 END;$;
-REVOKE ALL ON FUNCTION atlas_v126_resolve_webhook_endpoint(text) FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION atlas_v126_ingest_inbound(
  p_tenant_id uuid,p_endpoint_id uuid,p_provider_key text,p_event_ref text,p_payload_hash text,p_event_type text,
@@ -129,7 +126,6 @@ BEGIN
  UPDATE atlas_v126_inbox_events SET status=CASE WHEN v_message IS NULL THEN 'duplicate' ELSE 'processed' END,conversation_id=v_conversation,message_id=v_message,processed_at=now() WHERE tenant_id=p_tenant_id AND event_id=v_event;
  RETURN QUERY SELECT CASE WHEN v_message IS NULL THEN 'duplicate' ELSE 'processed' END,v_conversation,v_message;
 END;$;
-REVOKE ALL ON FUNCTION atlas_v126_ingest_inbound(uuid,uuid,text,text,text,text,text,text,text,text,text,text,text) FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION atlas_v126_apply_receipt(p_tenant_id uuid,p_provider_key text,p_event_ref text,p_provider_message_ref text,p_status text,p_metadata jsonb)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
@@ -143,7 +139,6 @@ BEGIN
  UPDATE atlas_v122_messages SET delivery_status=p_status,provider_status=p_status,delivered_at=CASE WHEN p_status='delivered' THEN coalesce(delivered_at,now()) ELSE delivered_at END,updated_at=now() WHERE tenant_id=p_tenant_id AND message_id=v_message;
  RETURN true;
 END;$;
-REVOKE ALL ON FUNCTION atlas_v126_apply_receipt(uuid,text,text,text,text,jsonb) FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION atlas_v126_mark_message_for_worker(p_tenant_id uuid,p_job_id uuid,p_worker_id text,p_message_id uuid,p_status text,p_provider_ref text,p_error_code text DEFAULT NULL)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
@@ -154,5 +149,4 @@ BEGIN
  UPDATE atlas_v122_messages SET delivery_status=p_status,provider_status=p_status,provider_message_ref=coalesce(p_provider_ref,provider_message_ref),error_code=p_error_code,updated_at=now(),sent_at=CASE WHEN p_status='sent' THEN coalesce(sent_at,now()) ELSE sent_at END,failed_at=CASE WHEN p_status='failed' THEN now() ELSE failed_at END WHERE tenant_id=p_tenant_id AND message_id=p_message_id;
  changed:=found; RETURN changed;
 END;$;
-REVOKE ALL ON FUNCTION atlas_v126_mark_message_for_worker(uuid,uuid,text,uuid,text,text,text) FROM PUBLIC;
 COMMIT;
