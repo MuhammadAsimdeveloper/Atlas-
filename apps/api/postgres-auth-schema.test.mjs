@@ -16,7 +16,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
   try {
     const migrationDirectory = path.join(root, 'infra/postgres');
     const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
-    assert.equal(files.at(-1), 'FINAL-MIGRATION-V119.sql');
+    assert.equal(files.at(-1), 'FINAL-MIGRATION-V120.sql');
     for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
     const trialMarker = await db.query("SELECT column_name FROM information_schema.columns WHERE table_name='atlas_paddle_subscriptions' AND column_name='trial_started_at'");
     assert.equal(trialMarker.rowCount,1,'V115 permanently records whether a workspace has used its free trial');
@@ -25,6 +25,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V114.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V115.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V119.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V120.sql'), 'utf8'));
     await db.exec('SET ROLE atlas_app;');
     assert.equal(await new PostgresAuthStore(db).assertSafeRuntimeRole(), true, 'restricted atlas_app passes the production startup check');
 
@@ -75,9 +76,12 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     const executionPolicy = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_workflow_executions'::regclass");
     assert.equal(executionPolicy.rows[0].relrowsecurity, true);
     assert.equal(executionPolicy.rows[0].relforcerowsecurity, true);
-    const executionGrants = await db.query("SELECT has_table_privilege('atlas_app','atlas_workflow_executions','SELECT,INSERT,UPDATE') AS app_can_write,has_table_privilege('atlas_worker','atlas_workflow_executions','SELECT,UPDATE') AS worker_can_process,has_table_privilege('atlas_worker','atlas_growth_items','SELECT') AS worker_customer_data");
+    const executionGrants = await db.query("SELECT has_table_privilege('atlas_app','atlas_workflow_executions','SELECT,INSERT,UPDATE') AS app_can_write,has_table_privilege('atlas_worker','atlas_workflow_executions','SELECT,INSERT,UPDATE') AS worker_direct_access,has_function_privilege('atlas_worker','atlas_v120_get_execution_for_job(uuid,uuid,text)','EXECUTE') AS worker_get_execution,has_function_privilege('atlas_worker','atlas_v120_update_execution_for_job(uuid,uuid,text,integer,text,text,jsonb,text,text,timestamptz,timestamptz,uuid,timestamptz)','EXECUTE') AS worker_update_execution,has_function_privilege('atlas_worker','atlas_v120_append_execution_event_for_job(uuid,uuid,text,uuid,text,text,smallint,text,jsonb,timestamptz)','EXECUTE') AS worker_append_event,has_table_privilege('atlas_worker','atlas_growth_items','SELECT') AS worker_customer_data");
     assert.equal(executionGrants.rows[0].app_can_write, true);
-    assert.equal(executionGrants.rows[0].worker_can_process, true);
+    assert.equal(executionGrants.rows[0].worker_direct_access, false);
+    assert.equal(executionGrants.rows[0].worker_get_execution, true);
+    assert.equal(executionGrants.rows[0].worker_update_execution, true);
+    assert.equal(executionGrants.rows[0].worker_append_event, true);
     assert.equal(executionGrants.rows[0].worker_customer_data, false);
     const apiWorkerGrants = await db.query("SELECT has_function_privilege('atlas_app','atlas_v115_claim_jobs(text,integer,integer,text[])','EXECUTE') AS can_claim,has_table_privilege('atlas_app','atlas_runtime_jobs','UPDATE') AS can_update");
     assert.equal(apiWorkerGrants.rows[0].can_claim, false);
@@ -87,6 +91,8 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     assert.equal(workerGrants.rows[0].can_read_customer_data, false);
     await db.exec('RESET ROLE; SET ROLE atlas_worker;');
     assert.equal(await new PostgresRuntimeStore(db).assertSafeWorkerRole(), true);
+    await assert.rejects(db.query('SELECT * FROM atlas_workflow_executions'), /permission denied|not have permission/i);
+    await assert.rejects(db.query('UPDATE atlas_workflow_executions SET status=\'tampered\''), /permission denied|not have permission/i);
   } finally {
     await db.close();
   }
