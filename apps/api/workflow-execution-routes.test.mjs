@@ -23,7 +23,7 @@ function workflowRecord(state='published') {
   return { id:workflowId,tenantId,module:'workflows',state,payload:{name:'Lead journey',graph} };
 }
 
-async function fixture() {
+async function fixture({workflowState='published'}={}) {
   const sessionToken='workflow-execution-session-token';
   const csrf='workflow-execution-csrf-token';
   const session={tokenHash:hashOpaqueToken(sessionToken),csrfHash:hashOpaqueToken(csrf),expiresAt:new Date(Date.now()+60_000),tenantId,user:{id:actorId,email:'khan@example.net',displayName:'Khan',emailVerified:true,status:'active'},memberships:[{tenant_id:tenantId,role_key:'owner',status:'active'}]};
@@ -38,7 +38,7 @@ async function fixture() {
     async approve(data){calls.push(['approve',data]);return {...executions.get(data.executionId),status:'queued',version:2};},
     async replay(data){calls.push(['replay',data]);return {executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',status:'queued',workflowVersion:3};}
   };
-  const growthStore={async get(data){calls.push(['workflowGet',data]);return workflowRecord();}};
+  const growthStore={async get(data){calls.push(['workflowGet',data]);return workflowRecord(workflowState);}};
   const env={NODE_ENV:'development',ATLAS_PLATFORM_OWNER_EMAIL:'khan@example.net',ATLAS_WORKFLOW_EXECUTION_ENABLED:'true',ATLAS_WORKFLOW_EXECUTION_HANDLER_READY:'true'};
   const api=createGrowthApi({store:growthStore,executionStore,authStore,env});
   const server=createServer(async(req,res)=>{if(!(await api.handle(req,res))){res.writeHead(404);res.end();}});
@@ -61,10 +61,16 @@ test('starting a published workflow creates a durable queued execution',async()=
 });
 
 test('execution route refuses drafts and validates trigger identity before creating work',async()=>{
+  const draftApi=await fixture({workflowState:'draft'});
+  try{
+    const response=await fetch(draftApi.base+'/api/v1/growth/workflows/'+workflowId+'/executions',{method:'POST',headers:draftApi.headers,body:JSON.stringify({triggerEventType:'contact.created',triggerEventRef:'evt_002',executionId})});
+    assert.equal(response.status,409);
+    assert.equal(draftApi.calls.some(([kind])=>kind==='create'),false);
+  } finally { await draftApi.close(); }
   const api=await fixture();
   try{
     api.calls.length=0;
-    const response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions',{method:'POST',headers:api.headers,body:JSON.stringify({triggerEventType:'payment.failed',triggerEventRef:'evt_002'})});
+    const response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions',{method:'POST',headers:api.headers,body:JSON.stringify({triggerEventType:'payment.failed',triggerEventRef:'evt_002',executionId})});
     assert.equal(response.status,400);
     assert.equal(api.calls.some(([kind])=>kind==='create'),false);
     const response2=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions',{method:'POST',headers:api.headers,body:JSON.stringify({triggerEventType:'contact.created',triggerEventRef:'evt_003',executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'})});
