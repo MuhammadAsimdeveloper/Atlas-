@@ -305,6 +305,15 @@ export class PostgresRuntimeStore {
     });
   }
 
+  async transitionAgentSession({ actorId, tenantId, sessionId, status }) {
+    if(!UUID.test(sessionId||'')||!['active','waiting_approval','handoff','completed','failed','canceled'].includes(status)) throw createAuthError(400,'agent_session_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query('UPDATE atlas_agent_sessions SET status=$3,updated_at=now() WHERE tenant_id=$1 AND session_id=$2 RETURNING session_id,status,updated_at',[tenantId,sessionId,status]);
+      if(!rows.length) throw createAuthError(404,'agent_session_not_found');
+      return rows[0];
+    });
+  }
+
   async listWorkflowEnvironments({ actorId, tenantId }) {
     return this.#tenantTransaction({actorId,tenantId},async client=>{
       const {rows}=await client.query('SELECT environment_id,name,stage,created_at FROM atlas_workflow_environments WHERE tenant_id=$1 ORDER BY stage,name',[tenantId]); return rows;
