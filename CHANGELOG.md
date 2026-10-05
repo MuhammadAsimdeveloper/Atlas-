@@ -1,3 +1,11 @@
+## 123.0.0 — Production integration + service operations
+- Added service-business primitives: requests, jobs, visits, crews/assignees, checklists/notes, quotes and invoices.
+- Added production-safe OAuth state/code exchange and token-reference persistence.
+- Added retrying Zapier webhook and Jobber GraphQL runtime adapters with host pinning, timeout and fail-closed credentials.
+- Added webhook delivery deduplication persistence and tenant RLS.
+- Added V123 API endpoints and grants for service operations.
+- Added Zapier/Jobber capability analysis and production deployment gates.
+
 ## 122.0.0 — Complete capability fabric
 - Registered all 60 requested communication, automation, CRM, marketing, AI, SaaS/agency and enterprise capabilities with explicit risk policy.
 - Added tenant-scoped provider connections, credential references, conversations/messages, webhook endpoints, OAuth state, CRM definitions, marketing definitions, agency relationships and enterprise controls.
