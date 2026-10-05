@@ -106,6 +106,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
 DECLARE v_event uuid; v_conversation uuid; v_message uuid; v_inserted boolean:=false;
 BEGIN
  IF session_user <> 'atlas_app' THEN RAISE EXCEPTION 'api_role_required'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM atlas_v122_webhook_endpoints e WHERE e.tenant_id=p_tenant_id AND e.endpoint_id=p_endpoint_id AND e.provider_key=p_provider_key AND e.enabled=true) THEN RAISE EXCEPTION 'webhook_endpoint_invalid'; END IF;
  INSERT INTO atlas_v126_inbox_events(tenant_id,provider_key,event_ref,payload_hash,event_type,status)
  VALUES(p_tenant_id,p_provider_key,p_event_ref,p_payload_hash,p_event_type,'received')
  ON CONFLICT(tenant_id,provider_key,event_ref,payload_hash) DO NOTHING
