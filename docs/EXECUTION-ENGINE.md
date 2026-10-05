@@ -1,4 +1,4 @@
-# Atlas execution engine — V119
+# Atlas execution engine — V120
 
 ## Implemented
 
@@ -10,13 +10,13 @@ The queue supports idempotent enqueue, delayed execution, `FOR UPDATE SKIP LOCKE
 
 ## V119 durable workflow execution
 
-The V117 authenticated workspace provides a visual editor and safe preview over Atlas's versioned workflow graph contract. V119 adds `packages/atlas-target/workflow-execution-engine.mjs`, a version-pinned state machine for queued/running steps, bounded retries, approval pauses, cancellation and replay. Durable executions persist to `atlas_workflow_executions` with append-only execution events and are atomically handed to the existing `workflow.execute` queue job. The control plane does not fabricate provider completion: a queued execution remains queued until a reviewed worker handler actually processes it.
+The V117 authenticated workspace provides a visual editor and safe preview over Atlas's versioned workflow graph contract. V119 adds `packages/atlas-target/workflow-execution-engine.mjs`, a version-pinned state machine for queued/running steps, bounded retries, approval pauses, cancellation and replay. Durable executions persist to `atlas_workflow_executions` with append-only execution events and are atomically handed to the existing `workflow.execute` queue job. V120 removes direct worker access to execution tables and exposes only lease-bound execution RPCs through the worker adapter. The control plane does not fabricate provider completion: a queued execution remains queued until a reviewed worker handler actually processes it.
 
 ## Database boundary
 
-`atlas_app` can submit tenant-scoped jobs/outbox events/schedules through RLS and narrow operations. It cannot claim, complete or fail work. `atlas_worker` is non-superuser, non-inheriting and `NOBYPASSRLS`; its RLS policy exposes queue/execution metadata needed for orchestration, but it has no grants on CRM, auth, billing, or other customer tables. Both roles must remain separate and must not own Atlas relations.
+`atlas_app` can submit tenant-scoped jobs/outbox events/schedules through RLS and narrow operations. It cannot claim, complete or fail work. `atlas_worker` is non-superuser, non-inheriting and `NOBYPASSRLS`; it can claim queue work through narrow RPCs, but V120 removes direct grants on workflow execution tables as well. Durable execution reads, updates and timeline writes require proof of the current `workflow.execute` lease. Both roles must remain separate and must not own Atlas relations.
 
-Apply all forward migrations, then run `infra/postgres/API-ROLE-GRANTS-V115.sql` and `infra/postgres/API-ROLE-GRANTS-V119.sql` as the database migration owner. Provision a credential for `atlas_worker` through the deployment secret manager. Never put that connection string in the API container. Production readiness requires V115 tables, while the worker additionally checks its exact role at startup.
+Apply all forward migrations, then run `infra/postgres/API-ROLE-GRANTS-V115.sql`, `infra/postgres/API-ROLE-GRANTS-V119.sql` and `infra/postgres/API-ROLE-GRANTS-V120.sql` as the database migration owner. Provision a credential for `atlas_worker` through the deployment secret manager. Never put that connection string in the API container. Production readiness requires V115 tables, while the worker additionally checks its exact role at startup.
 
 ## V119 API control plane
 
