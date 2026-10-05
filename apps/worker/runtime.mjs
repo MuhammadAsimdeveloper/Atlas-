@@ -94,6 +94,7 @@ export class AtlasQueueWorker {
     const controller = new AbortController();
     const startedAt = Date.now();
     let leaseLost = false;
+    let succeeded = false;
     let renewalBusy = false;
     const timer = setInterval(() => {
       if (renewalBusy) return;
@@ -111,7 +112,7 @@ export class AtlasQueueWorker {
       await handler(Object.freeze(item.payload_ref), Object.freeze(context));
       if (leaseLost) { this.counts.leaseLost++; return; }
       const acknowledged = isJob ? await this.store.completeJob(item, this.workerId) : await this.store.ackOutbox(item, this.workerId);
-      if (acknowledged) this.counts[isJob ? 'jobsSucceeded' : 'eventsAcknowledged']++;
+      if (acknowledged) { succeeded = true; this.counts[isJob ? 'jobsSucceeded' : 'eventsAcknowledged']++; }
       else { this.counts.leaseLost++; controller.abort(); }
     } catch (error) {
       if (leaseLost) { this.counts.leaseLost++; return; }
@@ -130,7 +131,8 @@ export class AtlasQueueWorker {
         const duration = Math.max(0, Date.now() - startedAt);
         try {
           await this.store.recordRuntimeSlo({ poolId:this.runtimePoolId, metric:'job_duration_ms', value:duration, target:SLO_TARGETS.job_duration_ms });
-          await this.store.recordRuntimeSlo({ poolId:this.runtimePoolId, metric:'success_rate', value:leaseLost ? 0 : (this.counts.jobsFailed > 0 && !this.counts.jobsSucceeded ? 0 : 1), target:SLO_TARGETS.success_rate });
+          await this.store.recordRuntimeSlo({ poolId:this.runtimePoolId, metric:'success_rate', value:succeeded ? 1 : 0, target:SLO_TARGETS.success_rate });
+          await this.store.recordRuntimeSlo({ poolId:this.runtimePoolId, metric:'error_rate', value:succeeded ? 0 : 1, target:SLO_TARGETS.error_rate });
         } catch (error) {
           this.logger.warn?.(`Atlas runtime SLO sample failed (${error?.message || 'unknown'}).`);
         }
