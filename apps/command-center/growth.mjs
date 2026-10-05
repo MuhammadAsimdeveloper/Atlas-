@@ -249,6 +249,29 @@ async function loadBilling() {
   } catch (error) { $('#billing-current').textContent = 'Billing unavailable'; $('#billing-status').textContent = error.message; $('#billing-checkout').disabled = true; }
 }
 
+async function loadActivationChecklist() {
+  try {
+    const result = await api('/growth/activation');
+    const steps = $('#growth-activation-steps');
+    if (!steps) return;
+    steps.replaceChildren(...result.steps.map(step => {
+      const row = document.createElement('div');
+      row.className = 'growth-activation-step';
+      const title = node('strong', step.title);
+      const status = node('span', step.status.replaceAll('_', ' '), 'growth-state');
+      row.append(title, status);
+      if (step.reason) row.append(node('small', step.reason, 'field-help'));
+      return row;
+    }));
+    const next = result.nextAction ? result.steps.find(step => step.id === result.nextAction)?.title || result.nextAction : 'Ready';
+    $('#growth-activation-next').textContent = result.nextAction ? 'Next: ' + next : 'Ready';
+  } catch (error) {
+    const steps = $('#growth-activation-steps');
+    if (steps) steps.replaceChildren(node('p', 'Activation status unavailable: ' + error.message, 'field-help'));
+    const next = $('#growth-activation-next'); if (next) next.textContent = 'Unavailable';
+  }
+}
+
 async function loadRecords({ keepSelection = false } = {}) {
   const query = $('#growth-search').value.trim();
   try {
@@ -261,7 +284,7 @@ async function loadRecords({ keepSelection = false } = {}) {
   } catch (error) { state.items = []; state.canWrite = false; renderItems(); notice(error.message, 'error'); }
 }
 
-async function refresh() { await Promise.all([loadOverview(), loadBilling(), loadRecords({ keepSelection: true })]); }
+async function refresh() { await Promise.all([loadOverview(), loadBilling(), loadRecords({ keepSelection: true }), loadActivationChecklist()]); }
 
 async function createRecord() {
   try {
@@ -294,7 +317,7 @@ async function transition(action) {
 }
 
 function activate(module = null) {
-  setupCreatePanel(); renderModules(); state.activated = true;
+  setupCreatePanel(); renderModules(); state.activated = true; void loadActivationChecklist();
   if (module && MODULES.some(([key]) => key === module)) {
     state.module = module; state.current = null; $('#growth-module').value = module;
     $('#growth-list-title').textContent = moduleLabel(module); $('#growth-detail-form').hidden = true; $('#growth-detail-empty').hidden = false;
