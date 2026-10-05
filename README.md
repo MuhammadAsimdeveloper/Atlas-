@@ -1,3 +1,9 @@
+## V127 — Durable workflow resume runtime
+
+V127 closes a critical execution gap: workflow waits and retry states are now durably scheduled back into the production worker through a lease-bound, idempotent resume RPC. Approval decisions also requeue the exact execution release for continued processing. This makes `delay`, `wait_until`, retry backoff and approval pauses real durable runtime behavior instead of state-only contracts.
+
+See [P127 Durable Workflow Runtime](docs/P127-DURABLE-WORKFLOW-RUNTIME.md).
+
 ## V126 — Unified communications and production inbox
 
 V126 finishes the first real unified communications layer on top of V125: tenant-scoped conversation queues, message timelines, human handoff/read state, atomic outbound queueing, provider-worker delivery, inbound webhook threading and delivery receipts. Message bodies and attachments remain behind a deployment-reviewed encrypted content-store module; PostgreSQL and queue payloads contain only opaque references. Provider callbacks are deduplicated and reconciled into durable message state.
