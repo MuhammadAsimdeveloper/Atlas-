@@ -175,9 +175,13 @@ scenarios.push(['public SEO refuses insecure origin', () => {
     return { blocked: Array.isArray(result.issues) && result.issues.some(issue => /HTTPS/i.test(issue)) };
 }, result => result.blocked === true]);
 
-scenarios.push(['agent destructive action needs approval', () => ({
-  allowed: actionAllowed({ riskClass: 'destructive', approved: false, capabilityVerified: true })
-}), result => result.allowed === false]);
+scenarios.push(['agent destructive action needs approval', () => {
+  const journey = runLeadToBookingJourney(baseInput());
+  return {
+    ...journey,
+    toolAuthorization: actionAllowed({ riskClass: 'destructive', approved: false, capabilityVerified: true })
+  };
+}, result => result.toolAuthorization === false]);
 
 let passed = 0;
 for (const [scenarioName, runner, expectation] of scenarios) {
