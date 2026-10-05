@@ -43,4 +43,11 @@
 
 ## Production-readiness rule
 
-These phases are implemented as durable control-plane foundations and tenant/RLS contracts. They must not be represented as externally Live until the corresponding provider, scheduler, KMS, Redis, monitoring and deployment evidence exists.
+These phases are implemented as durable production control-plane and runtime services and tenant/RLS contracts. They must not be represented as externally Live until the corresponding provider, scheduler, KMS, Redis, monitoring and deployment evidence exists.
+
+## Runtime wiring added
+
+- `apps/api/workflow-scheduler.mjs` claims due schedules with the V130 security-definer RPC and creates pinned scheduled executions.
+- `packages/atlas-core/production-frontier.mjs` contains deterministic timezone/cron, predicate routing, risk and promotion primitives.
+- Growth APIs expose execution inspection/replay, schedules, event routes, connectors, action bindings, agent sessions/approvals, promotion manifests and rollback controls.
+- Worker pool heartbeats are emitted when `ATLAS_RUNTIME_POOL_ID` is configured.
