@@ -176,6 +176,36 @@ export class PostgresRuntimeStore {
     return rows[0]?.event_id || null;
   }
 
+  async getExecutionInspector({ actorId, tenantId, executionId, limit = 200 } = {}) {
+    if (!UUID.test(executionId || '') || !Number.isInteger(limit) || limit < 1 || limit > 500) throw createAuthError(400, 'execution_inspector_invalid');
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      const execution = await client.query('SELECT execution_id,workflow_id,workflow_version,status,started_at,finished_at,summary,checksum,graph_checksum,current_node_id,trigger_event_type,trigger_event_ref,last_error_code,retry_at,created_by,canceled_by,replay_of_execution_id,version,created_at,updated_at FROM atlas_workflow_executions WHERE tenant_id=$1 AND execution_id=$2', [tenantId, executionId]);
+      if (!execution.rowCount) throw createAuthError(404, 'execution_not_found');
+      const timeline = await client.query('SELECT event_id,event_type,node_id,attempt,status,details_ref,created_at FROM atlas_workflow_execution_events WHERE tenant_id=$1 AND execution_id=$2 ORDER BY created_at ASC,event_id ASC LIMIT $3', [tenantId, executionId, limit]);
+      const diagnostics = await client.query('SELECT diagnostic_id,event_id,severity,code,node_id,attempt,details_ref,created_at FROM atlas_workflow_execution_diagnostics WHERE tenant_id=$1 AND execution_id=$2 ORDER BY created_at ASC,diagnostic_id ASC LIMIT $3', [tenantId, executionId, limit]);
+      const replays = await client.query('SELECT replay_id,source_version,target_workflow_version,requested_by,status,reason,created_at,updated_at FROM atlas_workflow_execution_replays WHERE tenant_id=$1 AND source_execution_id=$2 ORDER BY created_at DESC LIMIT 50', [tenantId, executionId]);
+      return { execution: execution.rows[0], timeline: timeline.rows, diagnostics: diagnostics.rows, replays: replays.rows };
+    });
+  }
+
+  async requestExecutionReplay({ actorId, tenantId, replayId, sourceExecutionId, sourceVersion, targetWorkflowVersion, reason = null } = {}) {
+    if (!UUID.test(replayId || '') || !Number.isInteger(sourceVersion) || sourceVersion < 1 || !Number.isInteger(targetWorkflowVersion) || targetWorkflowVersion < 1 || !/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(sourceExecutionId || '')) throw createAuthError(400, 'execution_replay_invalid');
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      const source = await client.query('SELECT 1 FROM atlas_workflow_executions WHERE tenant_id=$1 AND execution_id=$2 AND version >= $3', [tenantId, sourceExecutionId, sourceVersion]);
+      if (!source.rowCount) throw createAuthError(404, 'execution_not_found');
+      await client.query('INSERT INTO atlas_workflow_execution_replays(tenant_id,replay_id,source_execution_id,source_version,target_workflow_version,requested_by,reason) VALUES($1,$2,$3,$4,$5,$6,$7)', [tenantId,replayId,sourceExecutionId,sourceVersion,targetWorkflowVersion,actorId,reason]);
+      return replayId;
+    });
+  }
+
+  async createWorkflowSchedule({ actorId, tenantId, scheduleId, workflowId, workflowVersion, scheduleKind, expression, timezone, dstPolicy = 'skip', nextRunAt } = {}) {
+    if (!UUID.test(scheduleId || '') || !/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(workflowId || '') || !Number.isInteger(workflowVersion) || workflowVersion < 1 || !['cron','interval','calendar'].includes(scheduleKind) || !/^[A-Za-z0-9_*,?\-/: ]{1,240}$/.test(expression || '') || !/^[A-Za-z0-9_+\-]{1,80}(?:\/[A-Za-z0-9_+\-]{1,40})*$/.test(timezone || '') || !['skip','shift_forward','run_once'].includes(dstPolicy) || !Number.isFinite(Date.parse(nextRunAt))) throw createAuthError(400, 'workflow_schedule_invalid');
+    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+      await client.query('INSERT INTO atlas_workflow_schedules(tenant_id,schedule_id,workflow_id,workflow_version,schedule_kind,expression,timezone,dst_policy,next_run_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)', [tenantId,scheduleId,workflowId,workflowVersion,scheduleKind,expression,timezone,dstPolicy,nextRunAt]);
+      return scheduleId;
+    });
+  }
+
   async completeJob(job, workerId) {
     const { rows } = await this.pool.query('SELECT atlas_v115_complete_job($1,$2,$3) AS completed', [job.tenant_id, job.job_id, workerId]);
     return rows[0].completed;
