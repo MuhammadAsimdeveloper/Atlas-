@@ -12,7 +12,7 @@ import { PostgresWorkflowExecutionStore } from './workflow-execution-store.mjs';
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
 const runtime = env.NODE_ENV || 'development';
-const release = env.ATLAS_RELEASE || 'V116';
+const release = env.ATLAS_RELEASE || 'V119';
 const webAssets = new Map([
   ['/', ['../command-center/auth.html', 'text/html; charset=utf-8']],
   ['/login', ['../command-center/auth.html', 'text/html; charset=utf-8']],
