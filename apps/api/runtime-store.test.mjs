@@ -19,7 +19,7 @@ async function database() {
   const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1])-Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
   for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
   await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
-  for (const grant of ['API-ROLE-GRANTS-V112.sql','API-ROLE-GRANTS-V114.sql','API-ROLE-GRANTS-V115.sql','API-ROLE-GRANTS-V119.sql']) await db.exec(await readFile(path.join(migrationDirectory,grant),'utf8'));
+  for (const grant of ['API-ROLE-GRANTS-V112.sql','API-ROLE-GRANTS-V114.sql','API-ROLE-GRANTS-V115.sql','API-ROLE-GRANTS-V119.sql','API-ROLE-GRANTS-V120.sql']) await db.exec(await readFile(path.join(migrationDirectory,grant),'utf8'));
   await db.exec(`INSERT INTO atlas_auth_users(user_id,email,display_name,password_hash,email_verified_at) VALUES
     ('${actorA}','owner-a@runtime.test','Owner A','scrypt$test',now()),
     ('${actorB}','owner-b@runtime.test','Owner B','scrypt$test',now()),
@@ -113,4 +113,66 @@ test('V115 tenant enqueue/schedule APIs and worker leases, retries, scheduler an
     assert.equal(await worker.ackOutbox(event,'wrong-worker'),false);
     assert.equal(await worker.ackOutbox(event,'worker-outbox'),true);
   } finally { await db.close(); }
+});
+
+
+test('V120 workflow execution access is lease-bound and mediated by the worker adapter', async () => {
+  const { db, pool } = await database();
+  const executionId = randomUUID();
+  const jobId = randomUUID();
+  const workflowId = randomUUID();
+  const graphChecksum = digest('workflow-graph');
+  const stateChecksum = digest('workflow-state-1');
+  try {
+    await db.exec('BEGIN');
+    await db.query("SELECT set_config('app.tenant_id',$1,true)", [tenantA]);
+    await db.query(
+      `INSERT INTO atlas_workflow_executions(
+        tenant_id,execution_id,workflow_id,workflow_version,status,started_at,summary,checksum,
+        graph_checksum,current_node_id,trigger_event_type,trigger_event_ref,state,state_checksum,
+        version,created_at,updated_at
+      ) VALUES($1,$2,$3,1,'queued',now(),'{}'::jsonb,$4,$5,'start','contact.created','event-ref',
+        $6::jsonb,$7,1,now(),now())`,
+      [tenantA, executionId, workflowId, stateChecksum, graphChecksum, JSON.stringify({ currentNodeId: 'start', steps: [] }), stateChecksum]
+    );
+    await db.query(
+      'SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7)',
+      [tenantA, jobId, 'workflow.execute', JSON.stringify({ kind: 'workflow_execution', id: executionId, version: 1 }), digest('workflow-job'), null, 8]
+    );
+    await db.exec('COMMIT');
+    await db.exec('SET ROLE atlas_worker;');
+    const worker = new PostgresRuntimeStore(pool);
+    const claimed = await worker.claimJobs('worker-v120', 10, 60, ['workflow.execute']);
+    const job = claimed.find(item => item.job_id === jobId);
+    assert.ok(job);
+    const loaded = await worker.getWorkflowExecutionForJob(job, 'worker-v120');
+    assert.equal(loaded.execution_id, executionId);
+    assert.equal(loaded.tenant_id, tenantA);
+    assert.equal(loaded.version, 1);
+
+    const updated = await worker.updateWorkflowExecutionForJob(job, 'worker-v120', {
+      expectedVersion: 1,
+      status: 'running',
+      currentNodeId: 'next',
+      state: { currentNodeId: 'next', steps: [{ nodeId: 'start', status: 'completed' }] },
+      stateChecksum: digest('workflow-state-2')
+    });
+    assert.equal(updated, true);
+    assert.equal((await worker.getWorkflowExecutionForJob(job, 'worker-v120')).status, 'running');
+
+    const eventId = await worker.appendWorkflowExecutionEventForJob(job, 'worker-v120', {
+      actorId: actorA,
+      eventType: 'execution.step_completed',
+      nodeId: 'start',
+      attempt: 1,
+      status: 'running',
+      detailsRef: { kind: 'workflow_execution', id: executionId, version: 2 }
+    });
+    assert.match(eventId, /^[0-9a-f-]{36}$/i);
+
+    assert.equal(await worker.getWorkflowExecutionForJob({ ...job, tenant_id: tenantB }, 'worker-v120'), null);
+  } finally {
+    try { await db.exec('RESET ROLE'); } catch {}
+    await db.close();
+  }
 });
