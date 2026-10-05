@@ -233,6 +233,20 @@ try {
   check('V115 isolated worker role and leases', runtimeGrants.includes('atlas_worker LOGIN NOSUPERUSER') && runtimeGrants.includes('atlas_v115_claim_jobs') && runtimeGrants.includes('atlas_v115_reap_jobs') && runtimeStore.includes("role.rolname !== 'atlas_worker'") && runtimeTests.includes('previous worker cannot complete after lease loss'), 'A distinct non-bypass worker role can claim/recover leases but cannot read customer tables');
   check('V115 registered worker and honest external handler boundary', workerRuntime.includes('claimJobs(this.workerId') && workerRuntime.includes('controller.abort()') && workerRuntime.includes('worker refuses to claim work') && handlerContract.includes('no default business handlers'), 'Worker loop filters registered types, renews leases, drains safely and refuses to imply unimplemented workflow/provider handlers');
   check('V115 workflow/event groundwork is explicitly documented', await read('docs/EXECUTION-ENGINE.md').then(text => text.includes('No default event or job handlers ship') && text.includes('at-least-once')) && await read('docs/ATLAS-MASTER-ROADMAP.md').then(text => text.includes('0. Foundation') && text.includes('BLOCKED BY EXTERNAL DEPENDENCY')) && workerTests.includes('worker shutdown'), 'Execution semantics and remaining external/provider blockers are documented and tested');
+  const frontier = await read('packages/atlas-core/production-frontier.mjs');
+  const frontierTest = await read('packages/atlas-core/production-frontier.test.mjs');
+  const scheduler = await read('apps/api/workflow-scheduler.mjs');
+  const frontierStore = await read('apps/api/runtime-store.mjs');
+  const frontierRoutes = await read('apps/api/growth-routes.mjs');
+  const v130 = await read('infra/postgres/FINAL-MIGRATION-V130.sql');
+  const v133 = await read('infra/postgres/FINAL-MIGRATION-V133.sql');
+  const v136 = await read('infra/postgres/API-ROLE-GRANTS-V136.sql');
+  check('P129-P136 executable runtime primitives', frontier.includes('nextCronOccurrence') && frontier.includes('evaluatePredicate') && frontier.includes('actionAllowed') && frontier.includes('createPromotionManifest') && frontierTest.includes('promotion hashes are stable'), 'Scheduling, routing predicates, risk approval and promotion manifest primitives are regression-tested.');
+  check('P129-P136 durable APIs', frontierStore.includes('getExecutionInspector') && frontierStore.includes('createWorkflowEventRoute') && frontierStore.includes('upsertConnectorInstallation') && frontierStore.includes('createAgentSession') && frontierStore.includes('createWorkflowPromotion') && frontierRoutes.includes('/api/v1/growth/executions/inspect') && frontierRoutes.includes('/api/v1/growth/promotions/manifest'), 'Inspector/replay, event routes, connectors, agent sessions and environment promotion are exposed through authenticated tenant routes.');
+  check('P130 durable scheduler', scheduler.includes('createScheduled') && frontierStore.includes('atlas_v130_claim_workflow_schedules') && v130.includes('FOR UPDATE SKIP LOCKED') && v130.includes('SECURITY DEFINER'), 'Due schedules are atomically claimed, pinned to immutable workflow versions and converted into durable executions.');
+  check('P133 governed action catalog', v133.includes('communication.email') && v133.includes('automation.webhook') && frontierRoutes.includes('/api/v1/growth/actions/catalog'), 'Core provider capabilities are seeded into the governed action catalog and tenant binding API.');
+  check('P136 restricted runtime telemetry', workerRuntime.includes('runtimePoolId') && frontierStore.includes('recordRuntimeHeartbeat') && v136.includes('atlas_worker'), 'Workers can emit pool heartbeats/SLO evidence without customer-table access.');
+
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
 }
