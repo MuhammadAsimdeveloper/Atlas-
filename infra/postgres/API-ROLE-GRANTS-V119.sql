@@ -13,5 +13,5 @@ $$;
 
 REVOKE ALL ON atlas_workflow_executions, atlas_workflow_execution_events FROM PUBLIC, atlas_app, atlas_worker;
 GRANT SELECT,INSERT,UPDATE ON atlas_workflow_executions TO atlas_app;
-GRANT INSERT ON atlas_workflow_execution_events TO atlas_app;
+GRANT SELECT,INSERT ON atlas_workflow_execution_events TO atlas_app;
 GRANT SELECT,INSERT,UPDATE ON atlas_workflow_executions,atlas_workflow_execution_events TO atlas_worker;
