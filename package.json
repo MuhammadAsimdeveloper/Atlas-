@@ -1,7 +1,7 @@
 {
   "name": "atlas-business-os",
   "private": true,
-  "version": "121.0.0",
+  "version": "122.0.0",
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1",
@@ -18,7 +18,8 @@
     "start:api": "node apps/api/server.mjs",
     "start:worker": "node apps/worker/main.mjs",
     "production:check": "node scripts/production-check.mjs",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "capabilities:check": "node scripts/capabilities-check.mjs"
   },
   "engines": {
     "node": ">=20"
