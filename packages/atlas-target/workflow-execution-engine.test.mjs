@@ -253,7 +253,7 @@ test('delay and wait nodes pause execution with a bounded resume time', () => {
   const now = Date.parse('2026-10-05T10:00:00.000Z');
   const graph = createWorkflowGraph({
     nodes: [
-      { id: 'trigger', type: 'trigger', name: 'Lead created', config: { eventType: 'lead.created' } },
+      { id: 'trigger', type: 'trigger', name: 'Lead created', config: { eventType: 'contact.created' } },
       { id: 'wait', type: 'delay', name: 'Wait one minute', config: { delayMs: 60_000 } },
       { id: 'stop', type: 'stop', name: 'Done', config: {} }
     ],
