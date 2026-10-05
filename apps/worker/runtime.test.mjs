@@ -85,3 +85,27 @@ test('worker emits per-job SLO samples and evaluates enabled runtime policies', 
   assert.ok(samples.some(call=>call[1].metric==='error_rate' && call[1].value===0));
   assert.ok(store.calls.some(call=>call[0]==='evaluateRuntimeSlo' && call[1].poolId==='pool-prod'));
 });
+
+
+test('worker reserves global runtime capacity before claiming and releases each completed slot', async () => {
+  const store=fakeStore({jobs:[job('capacity-1'),job('capacity-2'),job('capacity-3')]});
+  store.acquireRuntimeCapacity = async (poolId,workerId,requested) => {
+    store.calls.push(['acquireRuntimeCapacity',poolId,workerId,requested]);
+    return 2;
+  };
+  store.releaseRuntimeCapacity = async (poolId,workerId,slots) => {
+    store.calls.push(['releaseRuntimeCapacity',poolId,workerId,slots]);
+    return 0;
+  };
+  const worker=new AtlasQueueWorker({
+    store,workerId:'worker-capacity',runtimePoolId:'pool-prod',concurrency:3,
+    jobHandlers:{'test.ok':async()=>{}},logger:{warn:()=>{},error:()=>{}}
+  });
+  const result=await worker.runOnce();
+  assert.equal(result.jobsClaimed,2);
+  assert.equal(store.calls[0][0],'reapJobs');
+  const acquireIndex=store.calls.findIndex(call=>call[0]==='acquireRuntimeCapacity');
+  const claimIndex=store.calls.findIndex(call=>call[0]==='claimJobs');
+  assert.ok(acquireIndex > -1 && acquireIndex < claimIndex);
+  assert.equal(store.calls.filter(call=>call[0]==='releaseRuntimeCapacity').length,2);
+});
