@@ -1,3 +1,12 @@
+## 126.0.0 — Unified communications and production inbox
+- Added durable unified conversation/message APIs for filtered inbox queues, message timelines, optimistic read state and human handoff.
+- Added atomic outbound message creation plus communication.message.send queue jobs backed by the V125 production provider runtime.
+- Added tenant-bound reference-only content storage for encrypted message bodies and attachments; queue/database rows never carry customer message content or provider secrets.
+- Added provider-native webhook normalization for Postmark inbound/delivery events, Twilio messaging callbacks and WhatsApp Cloud events, with tenant endpoint resolution and replay-safe event identity.
+- Added provider delivery receipts and durable sent/delivered/read/failed state reconciliation.
+- Added lease-bound worker RPCs and fail-closed content/secret resolver boundaries.
+- Postmark webhook security follows its documented Basic Auth/allowlisting model because Postmark does not provide HMAC webhook signatures; Twilio signature validation follows its signed-request model.
+
 ## 125.0.0 — Production worker + provider action runtime
 - Added the deployment-reviewed V125 production workflow handler and hardened secret-manager boundary.
 - Added lease-bound provider connection lookup through a worker-only SECURITY DEFINER RPC.

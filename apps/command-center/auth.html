@@ -60,7 +60,7 @@
         <span class="nav-label">Workspace</span>
         <button class="nav-item active" type="button" data-nav-page="overview" data-nav-key="overview"><span aria-hidden="true">⌂</span><span>Dashboard</span></button>
         <span class="nav-label">Manage</span>
-        <button class="nav-item" type="button" data-nav-page="unavailable" data-page-title="Conversations" data-nav-key="conversations"><span aria-hidden="true">☷</span><span>Conversations</span></button>
+        <button class="nav-item" type="button" data-nav-page="conversations" data-page-title="Conversations" data-nav-key="conversations"><span aria-hidden="true">☷</span><span>Conversations</span></button>
         <button class="nav-item" type="button" data-nav-page="unavailable" data-page-title="Calendars" data-nav-key="calendars"><span aria-hidden="true">▦</span><span>Calendars</span></button>
         <button class="nav-item" type="button" data-nav-page="growth" data-module="contacts" data-page-title="Contacts" data-nav-key="contacts"><span aria-hidden="true">◎</span><span>Contacts</span></button>
         <button class="nav-item" type="button" data-nav-page="growth" data-module="leads" data-page-title="Opportunities" data-nav-key="leads"><span aria-hidden="true">◇</span><span>Opportunities</span></button>
@@ -108,6 +108,16 @@
           </div>
           <p class="truth-note">Records, immutable revisions and workspace access are database-backed. AI runs, message delivery, social publishing and public page hosting remain disabled until their service connections are configured.</p>
         </section>
+      </section>
+      <section id="conversations-panel" class="panel-section" hidden aria-labelledby="page-title">
+        <div class="growth-intro"><div><span class="eyebrow">Unified customer communications</span><h2>One inbox across email, SMS, WhatsApp and voice.</h2><p>Threads are tenant-scoped, provider-backed and safe to hand off. Message content is loaded only through the encrypted content boundary.</p></div><div class="growth-status"><span class="status-dot"></span><span id="inbox-status">Live inbox API</span></div></div>
+        <div class="content-card">
+          <div class="growth-toolbar"><label>Status<select id="inbox-status-filter"><option value="">All open work</option><option value="open">Open</option><option value="pending">Pending</option><option value="snoozed">Snoozed</option><option value="closed">Closed</option></select></label><label>Channel<select id="inbox-channel-filter"><option value="">All channels</option><option value="email">Email</option><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option><option value="voice">Voice</option></select></label><button id="inbox-refresh" class="button subtle" type="button">Refresh</button></div>
+          <div class="two-column">
+            <section class="growth-list-panel" aria-labelledby="inbox-list-title"><div class="section-heading"><div><span class="eyebrow">Queue</span><h2 id="inbox-list-title">Conversations</h2></div><span id="inbox-count" class="live-tag">0</span></div><div id="inbox-list" class="simple-list"></div><div id="inbox-empty" class="empty-state">No conversations match the current queue.</div></section>
+            <section class="growth-detail-panel" aria-labelledby="inbox-detail-title"><div class="section-heading"><div><span class="eyebrow" id="inbox-detail-channel">Conversation</span><h2 id="inbox-detail-title">Select a conversation</h2></div><span id="inbox-unread" class="live-tag"></span></div><div id="inbox-thread" class="simple-list"></div><div id="inbox-thread-empty" class="empty-state">Select a conversation to load its timeline.</div><form id="inbox-reply-form" class="form-stack compact" hidden><label>Recipient<input id="inbox-recipient" name="recipient" maxlength="240" required placeholder="Customer email or phone"></label><label>Reply<textarea id="inbox-reply" name="text" rows="5" maxlength="50000" required placeholder="Write a customer reply"></textarea></label><label class="field-help"><input id="inbox-approved" type="checkbox" required> I have reviewed the recipient, consent and provider action.</label><button class="button primary" type="submit">Send approved reply</button></form><div id="inbox-handoff" class="two-column" hidden><input id="inbox-agent" type="text" maxlength="120" placeholder="Agent UUID"><input id="inbox-handoff-reason" type="text" maxlength="240" placeholder="Handoff reason"><button id="inbox-handoff-button" class="button subtle" type="button">Handoff</button></div></section>
+          </div>
+        </div>
       </section>
       <section id="growth-panel" class="panel-section" hidden aria-labelledby="page-title">
         <div class="growth-intro"><div><span class="eyebrow">Customer operations workspace</span><h2>One place for lead flow, campaigns and follow-up.</h2><p>Draft, version and govern the work your team runs. External actions stay paused until their providers are connected.</p></div><div class="growth-status"><span class="status-dot"></span><span>Tenant-scoped records</span></div></div>

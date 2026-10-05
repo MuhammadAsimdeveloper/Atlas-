@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '123.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '126.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   const authority = await read('packages/atlas-core/authority.mjs');
@@ -187,11 +187,19 @@ try {
   const serviceMigration = await read('infra/postgres/FINAL-MIGRATION-V123.sql');
   check('V123 production integration fabric', serviceOperations.includes('validateServiceRequest') && integrationRuntime.includes('createJobberAdapter') && integrationRuntime.includes('createZapierWebhookAdapter') && oauthRuntime.includes('exchangeOAuthCode') && serviceMigration.includes('atlas_v123_jobs') && serviceMigration.includes('ROW LEVEL SECURITY'), 'Service operations, OAuth, Zapier/Jobber runtime and tenant-isolated persistence are present');
 
+  const unifiedInbox = await read('packages/atlas-core/unified-inbox.mjs');
+  const unifiedInboxTests = await read('packages/atlas-core/unified-inbox.test.mjs');
+  const inboxMigration = await read('infra/postgres/FINAL-MIGRATION-V126.sql');
+  const inboxStore = await read('apps/api/capability-store.mjs');
+  const inboxRoutes = await read('apps/api/capability-routes.mjs');
+  const inboxWorker = await read('apps/worker/handlers/v125-production.mjs');
+  check('P126 unified communications runtime', unifiedInbox.includes('buildOutboundIdempotencyKey') && unifiedInboxTests.includes('delivery state machine') && inboxMigration.includes('atlas_v126_inbox_events') && inboxMigration.includes('atlas_v126_get_message_for_worker') && inboxStore.includes('communication.message.send') && inboxRoutes.includes('/api/v1/inbox/webhooks/') && inboxWorker.includes('communication.message.send'), 'Inbox queueing, webhook ingress, worker delivery and provider receipts are wired through V125');
+  check('P126 reference-only content boundary', inboxMigration.includes("content_ref text") && !/message_body|conversation_body/i.test(inboxMigration) && await read('apps/inbox-content/README.md').then(text => text.includes('encrypted object storage/KMS')), 'Customer message content remains outside PostgreSQL and queue payloads behind the reviewed content module');
   const capabilityFabric = await read('packages/atlas-core/capability-fabric.mjs');
   const capabilityCheck = await read('scripts/capabilities-check.mjs');
   const capabilityMigration = await read('infra/postgres/FINAL-MIGRATION-V122.sql');
   const capabilityGrants = await read('infra/postgres/API-ROLE-GRANTS-V122.sql');
-  check('V122 complete capability fabric', capabilityFabric.includes('ATLAS_CAPABILITIES') && capabilityFabric.includes("communication.unified_inbox") && capabilityFabric.includes("enterprise.load_failover") && capabilityCheck.includes('exactly 60') && capabilityMigration.includes('atlas_v122_conversations') && capabilityMigration.includes('ROW LEVEL SECURITY') && capabilityGrants.includes('atlas_app'), 'All 60 requested capabilities have governed runtime registration, tenant persistence, API grants and fail-closed security boundaries');
+  check('V122 complete capability fabric', capabilityFabric.includes('ATLAS_CAPABILITIES') && capabilityFabric.includes("communication.unified_inbox") && capabilityFabric.includes("enterprise.load_failover") && capabilityCheck.includes('62 registered capabilities') && capabilityMigration.includes('atlas_v122_conversations') && capabilityMigration.includes('ROW LEVEL SECURITY') && capabilityGrants.includes('atlas_app'), 'All 60 requested capabilities plus two provider runtime actions have governed runtime registration, tenant persistence, API grants and fail-closed security boundaries');
 
   const executionSql = await read('infra/postgres/FINAL-MIGRATION-V119.sql');
   const executionGrants = await read('infra/postgres/API-ROLE-GRANTS-V119.sql');

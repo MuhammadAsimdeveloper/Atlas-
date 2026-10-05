@@ -111,6 +111,18 @@ export class PostgresRuntimeStore {
     return rows[0] || null;
   }
 
+  async getInboxMessageForWorker(job, workerId, messageId) {
+    if (!job || !UUID.test(job.tenant_id || '') || !UUID.test(job.job_id || '') || !UUID.test(messageId || '') || !/^[a-zA-Z0-9_.:-]{1,120}$/.test(workerId || '')) throw new TypeError('Worker inbox message identity is invalid.');
+    const { rows } = await this.pool.query('SELECT * FROM atlas_v126_get_message_for_worker($1,$2,$3,$4)', [job.tenant_id, job.job_id, workerId, messageId]);
+    return rows[0] || null;
+  }
+
+  async markInboxMessageForWorker(job, workerId, messageId, status, providerRef = null, errorCode = null) {
+    if (!job || !UUID.test(job.tenant_id || '') || !UUID.test(job.job_id || '') || !UUID.test(messageId || '') || !/^[a-zA-Z0-9_.:-]{1,120}$/.test(workerId || '') || !/^[a-z][a-z0-9_.-]{0,79}$/.test(status || '')) throw new TypeError('Worker inbox message update is invalid.');
+    const { rows } = await this.pool.query('SELECT atlas_v126_mark_message_for_worker($1,$2,$3,$4,$5,$6,$7) AS updated', [job.tenant_id, job.job_id, workerId, messageId, status, providerRef, errorCode]);
+    return rows[0]?.updated === true;
+  }
+
   async getWorkflowExecutionForJob(job, workerId) {
     const { rows } = await this.pool.query('SELECT * FROM atlas_v120_get_execution_for_job($1,$2,$3)', [job.tenant_id, job.job_id, workerId]);
     return rows[0] || null;

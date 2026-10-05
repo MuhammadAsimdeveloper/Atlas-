@@ -1,3 +1,9 @@
+## V126 — Unified communications and production inbox
+
+V126 finishes the first real unified communications layer on top of V125: tenant-scoped conversation queues, message timelines, human handoff/read state, atomic outbound queueing, provider-worker delivery, inbound webhook threading and delivery receipts. Message bodies and attachments remain behind a deployment-reviewed encrypted content-store module; PostgreSQL and queue payloads contain only opaque references. Provider callbacks are deduplicated and reconciled into durable message state.
+
+See [P126 Unified Communications](docs/P126-UNIFIED-COMMUNICATIONS.md).
+
 ## V125 — Production worker and provider action runtime
 
 V125 activates the durable workflow executor with a deployment-reviewed production handler, lease-bound provider connection lookup, KMS/vault secret resolver boundary, explicit consent/approval enforcement, bounded provider requests, deterministic retry/dead-letter behavior and provider-neutral action dispatch for Postmark, Twilio, WhatsApp Cloud, Zapier and Jobber. Provider source presence still does not mean Live: each tenant connection must be verified and tested end-to-end before delivery is enabled.
@@ -24,7 +30,7 @@ V122 adds a hardened runtime foundation for the complete 60-capability surface: 
 
 Atlas is a laptop-first, multi-tenant business operations foundation for CRM, customer service, automation, AI agents, revenue operations and governed actions.
 
-## Current release: V121
+## Current release: V126
 
 V120 adds security hardening on top of V119 on top of the V117 safe preview and V115 queue foundation. Saved published workflows now have version-pinned execution state, durable step history, approval/cancel/replay controls, immutable execution timeline events, and an atomic `workflow.execute` queue handoff. Package metadata is normalized to 120.0.0; historical migration and engineering documentation remains available.
 
@@ -32,7 +38,7 @@ V121 adds the first post-MiroFish activation slice: a tenant-scoped outcome chec
 
 Paddle plans now support a verified 14-day free trial with Paddle-hosted cancellation and payment management. Atlas verifies the configured price before enabling checkout and records trial use per workspace. Setup requires real Paddle sandbox/live plan prices, API permissions, webhook configuration and credentials; see the [trial setup guide](docs/14-DAY-FREE-TRIAL.md).
 
-Customer records and builder definitions are live after migrations and a managed database are configured. V119 supplies durable workflow execution state and control APIs, but production execution remains feature-gated and V115/V119 ship no default business handler module; durable queue state therefore does not imply that workflow graph nodes or customer messages are actually executed. AI inference/chat sessions, email/SMS delivery, social publishing, public websites, affiliate attribution/payouts, review collection, SaaS plan enforcement and a full customer inbox still need provider services. No user-facing label implies a provider is connected when it is not. This release does not verify millions-of-users capacity.
+Customer records and builder definitions are live after migrations and a managed database are configured. V119 supplies durable workflow execution state and control APIs, but production execution remains feature-gated and V115/V119 ship no default business handler module; durable queue state therefore does not imply that workflow graph nodes or customer messages are actually executed. AI inference/chat sessions, social publishing, public websites, affiliate attribution/payouts, review collection and SaaS plan enforcement still need their provider services. P126 supplies the first production unified inbox path for email, SMS, WhatsApp and voice, but real deployment still requires verified provider accounts, webhooks and the reviewed content/secret modules. No user-facing label implies a provider is connected when it is not. This release does not verify millions-of-users capacity.
 
 Production startup verifies the restricted `atlas_app` database role. The production Compose template requires a bootstrap password from deployment secrets and exposes the API only on loopback for a local HTTPS proxy. See [API deployment instructions](apps/api/README.md).
 

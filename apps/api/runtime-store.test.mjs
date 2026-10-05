@@ -16,6 +16,7 @@ const memberA='33333333-3333-4333-8333-333333333333';
 async function database() {
   const db = new PGlite();
   const migrationDirectory = path.join(root,'infra/postgres');
+  await db.exec('CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;');
   const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1])-Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
   for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
   await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');

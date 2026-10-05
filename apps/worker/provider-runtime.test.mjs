@@ -17,15 +17,15 @@ test('dispatches only verified tenant-owned Postmark connection',async()=>{
 });
 test('fails closed on unverified connection',async()=>{
  const runtime=createProviderRuntime({connectionStore:store({tenant_id:tenantId,connection_id:connectionId,provider_key:'postmark.email',channel:'email',status:'draft',credential_ref:'kms/postmark',metadata:{from:'a@example.com'}}),secretResolver:async()=> 'secret-ref',fetchImpl});
- await assert.rejects(()=>runtime.execute({job,context,node:{config:{capabilityId:'communication.email',connectionRef:connectionId,to:'b@example.com',subject:'x',textBody:'hello'}}}),/not verified/);
+ await assert.rejects(()=>runtime.execute({job,context,node:{config:{capabilityId:'communication.email',connectionRef:connectionId,consent:true,approved:true,to:'b@example.com',subject:'x',textBody:'hello'}}}),/not verified/);
 });
 test('fails closed on cross-tenant connection',async()=>{
  const runtime=createProviderRuntime({connectionStore:store({tenant_id:'44444444-4444-4444-8444-444444444444',connection_id:connectionId,provider_key:'postmark.email',channel:'email',status:'verified',credential_ref:'kms/postmark',metadata:{from:'a@example.com'}}),secretResolver:async()=> 'secret-ref',fetchImpl});
- await assert.rejects(()=>runtime.execute({job,context,node:{config:{capabilityId:'communication.email',connectionRef:connectionId,to:'b@example.com',subject:'x',textBody:'hello'}}}),/tenant mismatch/);
+ await assert.rejects(()=>runtime.execute({job,context,node:{config:{capabilityId:'communication.email',connectionRef:connectionId,consent:true,approved:true,to:'b@example.com',subject:'x',textBody:'hello'}}}),/tenant mismatch/);
 });
 test('dispatches bounded Jobber GraphQL without persisting provider data',async()=>{
  let calls=0;
- const runtime=createProviderRuntime({connectionStore:store({tenant_id:tenantId,connection_id:connectionId,provider_key:'jobber.graphql',channel:null,status:'verified',credential_ref:'kms/jobber',metadata:{apiVersion:'2025-04-16'}}),secretResolver:async()=> 'access-token-value',fetchImpl:async()=>{calls++;return {ok:true,status:200,text:async()=>JSON.stringify({data:{account:{id:'jobber-account'}}}),headers:new Headers()};}});
+ const runtime=createProviderRuntime({connectionStore:store({tenant_id:tenantId,connection_id:connectionId,provider_key:'jobber.graphql',channel:null,status:'verified',credential_ref:'kms/jobber',metadata:{apiVersion:'2025-04-16'}}),secretResolver:async()=> 'access-token-value-123456',fetchImpl:async()=>{calls++;return {ok:true,status:200,text:async()=>JSON.stringify({data:{account:{id:'jobber-account'}}}),headers:new Headers()};}});
  const r=await runtime.execute({job,context,node:{config:{capabilityId:'service.jobber',connectionRef:connectionId,consent:true,approved:true,query:'query Account { account { id } }',variables:{}}}});
  assert.equal(calls,1);
  assert.equal(r.providerRef,context.idempotencyKey);
