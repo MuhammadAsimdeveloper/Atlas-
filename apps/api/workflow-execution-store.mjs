@@ -111,20 +111,21 @@ export class PostgresWorkflowExecutionStore{
     });
   }
 
-  async cancel({actorId,tenantId,workflowId,executionId,now=Date.now()}){
-    return this.#mutate({actorId,tenantId,workflowId,executionId,now,kind:'cancel',apply:state=>cancelWorkflowExecution({execution:state,requestedByActorId:actorId,now})});
+  async cancel({actorId,tenantId,workflowId,executionId,expectedVersion=null,now=Date.now()}){
+    return this.#mutate({actorId,tenantId,workflowId,executionId,expectedVersion,now,kind:'cancel',apply:state=>cancelWorkflowExecution({execution:state,requestedByActorId:actorId,now})});
   }
 
-  async approve({actorId,tenantId,workflowId,executionId,approvalId,evidenceRef=null,now=Date.now()}){
-    return this.#mutate({actorId,tenantId,workflowId,executionId,now,kind:'approve',apply:state=>approveWorkflowExecution({execution:state,approvalId,approvedByActorId:actorId,evidenceRef,now})});
+  async approve({actorId,tenantId,workflowId,executionId,expectedVersion=null,approvalId,evidenceRef=null,now=Date.now()}){
+    return this.#mutate({actorId,tenantId,workflowId,executionId,expectedVersion,now,kind:'approve',apply:state=>approveWorkflowExecution({execution:state,approvalId,approvedByActorId:actorId,evidenceRef,now})});
   }
 
-  async replay({actorId,tenantId,workflowId,executionId,replayExecutionId=null,now=Date.now()}){
+  async replay({actorId,tenantId,workflowId,executionId,replayExecutionId=null,expectedVersion=null,now=Date.now()}){
     return this.#transaction(async client=>{
       await this.#scope(client,{actorId,tenantId},{write:true});
       const result=await client.query('SELECT * FROM atlas_workflow_executions WHERE tenant_id=$1 AND execution_id=$2 AND workflow_id=$3 FOR UPDATE',[tenantId,executionId,workflowId]);
       if(!result.rows[0]) throw createAuthError(404,'workflow_execution_not_found');
       const current=rowToState(result.rows[0]);
+      if(expectedVersion!==null && (!Number.isSafeInteger(expectedVersion) || expectedVersion!==current.version)) throw createAuthError(409,'workflow_execution_version_conflict','The execution changed. Refresh and try again.');
       if(!['failed','dead_letter','canceled'].includes(current.status)) throw createAuthError(409,'workflow_replay_not_allowed','Only failed, dead-lettered or canceled executions can be replayed.');
       const next=replayWorkflowExecution({execution:current,replayExecutionId:replayExecutionId||undefined,requestedByActorId:actorId,now});
       await client.query(`INSERT INTO atlas_workflow_executions
@@ -140,12 +141,13 @@ export class PostgresWorkflowExecutionStore{
     });
   }
 
-  async #mutate({actorId,tenantId,workflowId,executionId,now,kind,apply}){
+  async #mutate({actorId,tenantId,workflowId,executionId,expectedVersion=null,now,kind,apply}){
     return this.#transaction(async client=>{
       await this.#scope(client,{actorId,tenantId},{write:true});
       const result=await client.query('SELECT * FROM atlas_workflow_executions WHERE tenant_id=$1 AND execution_id=$2 AND workflow_id=$3 FOR UPDATE',[tenantId,executionId,workflowId]);
       if(!result.rows[0]) throw createAuthError(404,'workflow_execution_not_found');
       const current=rowToState(result.rows[0]);
+      if(expectedVersion!==null && (!Number.isSafeInteger(expectedVersion) || expectedVersion!==current.version)) throw createAuthError(409,'workflow_execution_version_conflict','The execution changed. Refresh and try again.');
       const next=apply(current);
       if(next===current) return current;
       if(next.version!==current.version+1) throw createAuthError(500,'workflow_execution_version_invalid');
