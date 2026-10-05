@@ -1,8 +1,10 @@
-# Atlas V115 Launch Readiness
+# Atlas V150 Launch Readiness
+
+V146–V150 convert the distributed runtime contracts into deployable operational processes: autoscaling control, alert delivery, provider reconciliation, executable recovery drills and machine-verifiable infrastructure evidence.
 
 ## V115 repository status
 
-The current source release is V115. The authenticated tenant API, Growth Center records, Paddle subscription webhook path, PostgreSQL durable queue/outbox/scheduler mechanics, and generic worker loop are covered by local automated checks. No default workflow or provider handlers ship, and the worker refuses to start without an operator-reviewed module. Migrations have only been exercised against ephemeral PGlite in this workspace. See [the V115 master roadmap](ATLAS-MASTER-ROADMAP.md) for DONE/PARTIAL/BLOCKED status by phase.
+The current source release is V150. The authenticated tenant API, Growth Center records, Paddle subscription webhook path, PostgreSQL durable queue/outbox/scheduler mechanics, and generic worker loop are covered by local automated checks. No default workflow or provider handlers ship, and the worker refuses to start without an operator-reviewed module. Migrations have only been exercised against ephemeral PGlite in this workspace. See [the V115 master roadmap](ATLAS-MASTER-ROADMAP.md) for DONE/PARTIAL/BLOCKED status by phase.
 
 ## What is launchable now
 
@@ -27,7 +29,7 @@ These are product/infrastructure dependencies, not bugs hidden by the source bui
 
 1. Configure a production HTTPS domain/edge, managed PostgreSQL, transactional email and Paddle settings, including active recurring plan prices with verified 14-day free trials and the required API permissions.
 2. Apply V115 migrations and grants with separate migration, API and worker roles; validate forced RLS in the target environment.
-3. Supply reviewed workflow/provider handler modules before enabling queue workers; Redis is not part of V115 queue runtime.
+3. Supply reviewed workflow/provider handler modules before enabling queue workers; Redis is optional for V139+ acceleration/wakeup and PostgreSQL remains the durable authority.
 4. Connect and verify real email/SMS/WhatsApp/social/voice/calendar/payment providers as needed.
 5. Configure secret management/KMS, object storage, WAF/CDN and OpenTelemetry export.
 6. Add live inbox, graph execution, execution/replay UI, worker operations and complete tenant lifecycle controls.
@@ -39,3 +41,12 @@ These are product/infrastructure dependencies, not bugs hidden by the source bui
 ## Release rule
 
 Do not describe the sample command center, deterministic contracts, or static preview as a connected SaaS product. A channel is connected only after credentials, callback verification, delivery tests and production observability have passed.
+
+
+## V146–V150 launch controls
+
+- V146 autoscaler is advisory until a reviewed HTTPS actuator and measured scaling evidence are configured.
+- V147 alerts require verified destinations and durable delivery attempts.
+- V148 ambiguous provider outcomes require reconciliation; they are not automatically resent.
+- V149 recovery drills can run in CI-safe simulation mode and must pass in staging before production.
+- V150 requires current evidence for managed Postgres, Redis HA, KMS, WAF/CDN, backup/PITR, restore, load, DR, providers and HTTPS origin.

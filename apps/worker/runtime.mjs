@@ -16,7 +16,7 @@ function handlerMap(value, label) {
 }
 
 export class AtlasQueueWorker {
-  constructor({ store, workerId, jobHandlers, eventHandlers = {}, concurrency = 4, leaseSeconds = 60, pollMs = 1000, runtimePoolId = null, sloEvaluationIntervalMs = 30_000, logger = console } = {}) {
+  constructor({ store, workerId, jobHandlers, eventHandlers = {}, concurrency = 4, leaseSeconds = 60, pollMs = 1000, runtimePoolId = null, sloEvaluationIntervalMs = 30_000, redisWakeup = null, logger = console } = {}) {
     if (!store || !/^[a-zA-Z0-9_.:-]{1,120}$/.test(workerId || '')) throw new TypeError('A queue store and bounded worker ID are required.');
     if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) throw new TypeError('Worker concurrency must be between 1 and 32.');
     if (!Number.isInteger(leaseSeconds) || leaseSeconds < 15 || leaseSeconds > 900) throw new TypeError('Worker lease must be between 15 and 900 seconds.');
@@ -28,6 +28,7 @@ export class AtlasQueueWorker {
     this.concurrency = concurrency;
     this.leaseSeconds = leaseSeconds;
     this.pollMs = pollMs;
+    this.redisWakeup = redisWakeup;
     this.runtimePoolId = runtimePoolId;
     if (!Number.isInteger(sloEvaluationIntervalMs) || sloEvaluationIntervalMs < 5_000 || sloEvaluationIntervalMs > 300_000) throw new TypeError('SLO evaluation interval must be between 5000 and 300000 milliseconds.');
     this.sloEvaluationIntervalMs = sloEvaluationIntervalMs;
@@ -157,18 +158,35 @@ export class AtlasQueueWorker {
     }
   }
 
-  async run() {
-    if (!this.jobHandlers.size && !this.eventHandlers.size) throw new Error('No Atlas execution or outbox handlers are registered; worker refuses to claim work.');
-    while (!this.stopping) {
-      try { await this.runOnce(); }
-      catch (error) { this.logger.error?.(`Atlas worker cycle failed (${errorCode(error)}).`); }
-      if (!this.stopping) await new Promise(resolve => {
+  async #waitForNextWork() {
+    if (!this.redisWakeup) return new Promise(resolve => {
+      let timer;
+      const finish = () => { clearTimeout(timer); this.wake = null; resolve(); };
+      this.wake = finish;
+      timer = setTimeout(finish, this.pollMs);
+      timer.unref?.();
+    });
+    try {
+      const queues = [...new Set([...this.jobHandlers.keys(), ...this.eventHandlers.keys()])];
+      await this.redisWakeup.receive(queues, Math.max(1, Math.ceil(this.pollMs / 1000)));
+    } catch (error) {
+      this.logger.warn?.(`Atlas Redis wakeup degraded; continuing PostgreSQL polling (${error?.message || 'unknown'}).`);
+      await new Promise(resolve => {
         let timer;
         const finish = () => { clearTimeout(timer); this.wake = null; resolve(); };
         this.wake = finish;
         timer = setTimeout(finish, this.pollMs);
         timer.unref?.();
       });
+    }
+  }
+
+  async run() {
+    if (!this.jobHandlers.size && !this.eventHandlers.size) throw new Error('No Atlas execution or outbox handlers are registered; worker refuses to claim work.');
+    while (!this.stopping) {
+      try { await this.runOnce(); }
+      catch (error) { this.logger.error?.(`Atlas worker cycle failed (${errorCode(error)}).`); }
+      if (!this.stopping) await this.#waitForNextWork();
     }
     await Promise.allSettled([...this.active]);
     return { ...this.counts };
@@ -177,6 +195,7 @@ export class AtlasQueueWorker {
   async stop() {
     this.stopping = true;
     this.wake?.();
+    this.redisWakeup?.client?.disconnect?.();
     await Promise.allSettled([...this.active]);
   }
 }

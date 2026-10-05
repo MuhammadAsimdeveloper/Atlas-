@@ -1,3 +1,18 @@
+ATLAS V150.0.0 — Operational completion release
+
+Implemented
+- V146 bounded autoscaler control loop and optional HTTPS actuator.
+- V147 durable SLO alert delivery.
+- V148 provider reconciliation/idempotency.
+- V149 executable recovery/DR drills.
+- V150 machine-verifiable production evidence and launch gates.
+- V139-V145 distributed runtime lineage retained, with PostgreSQL as durable authority and Redis as acceleration/wakeup.
+- Repository gates distinguish deployable code from live infrastructure evidence.
+
+Verification boundary
+- CI is authoritative for merge validation.
+- Local PostgreSQL/Redis, provider credentials, KMS, WAF/CDN, domain/TLS, OTLP collector, backups/PITR, restore/load/failover and independent security/compliance evidence remain deployment responsibilities.
+
 ATLAS V120.0.0 — Security hardening release
 
 Implemented

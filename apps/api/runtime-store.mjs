@@ -1,13 +1,14 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
 import { nextScheduleOccurrence, assertIanaTimezone, boundedJson, eventDedupKey } from '../../packages/atlas-core/production-frontier.mjs';
+import { createDispatchEnvelope } from '../../packages/atlas-runtime/distributed-fabric.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
 const PREFIX = /^[a-f0-9]{56}$/;
 
 export class PostgresRuntimeStore {
-  constructor(pool) { this.pool = pool; }
+  constructor(pool, { redisTransport = null, logger = console } = {}) { this.pool = pool; this.redisTransport = redisTransport; this.logger = logger; }
 
   async #tenantTransaction({ actorId, tenantId }, work) {
     if (!UUID.test(actorId || '') || !UUID.test(tenantId || '')) throw createAuthError(409, 'workspace_required');
@@ -38,11 +39,23 @@ export class PostgresRuntimeStore {
     if (!UUID.test(jobId || '') || !/^[a-z][a-z0-9_.-]{1,79}$/.test(jobType || '') || !SHA256.test(idempotencyKey || '') || !Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 12) {
       throw createAuthError(400, 'runtime_job_invalid');
     }
-    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+    const persistedJobId = await this.#tenantTransaction({ actorId, tenantId }, async client => {
       const { rows } = await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7) AS job_id',
         [tenantId, jobId, jobType, JSON.stringify(payloadRef), idempotencyKey, runAt, maxAttempts]);
       return rows[0].job_id;
     });
+
+    // Redis is an acceleration/wakeup hint only. Publish strictly after the durable
+    // PostgreSQL transaction commits so Redis can never reference a rolled-back job.
+    if (this.redisTransport) {
+      const envelope = createDispatchEnvelope({ tenantId, jobId: persistedJobId, jobType, idempotencyKey, attempt: 1, payloadRef });
+      try {
+        await this.redisTransport.publish(jobType, envelope, 5);
+      } catch {
+        this.logger.warn?.('Atlas Redis dispatch degraded to PostgreSQL.');
+      }
+    }
+    return persistedJobId;
   }
 
   async createSchedule({ actorId, tenantId, scheduleId, jobType, payloadRef, idempotencyPrefix, nextRunAt, intervalSeconds = null, maxAttempts = 5 }) {
@@ -441,10 +454,11 @@ export class PostgresRuntimeStore {
     return rows[0].state;
   }
 
-  async recordDispatchState({ tenantId, jobId, jobType, attempt = 1, status = 'published', errorCode = null } = {}) {
-    if (!UUID.test(tenantId || '') || !UUID.test(jobId || '') || !/^[a-z][a-z0-9_.-]{1,79}$/.test(jobType || '') || !Number.isInteger(attempt) || attempt < 0 || attempt > 1000 || !['pending','published','degraded','failed'].includes(status)) throw new TypeError('dispatch_state_invalid');
-    const sql = "INSERT INTO atlas_runtime_dispatch_records(tenant_id,dispatch_id,job_id,job_type,priority,transport,envelope_sha256,status,attempts,last_error_code,last_attempt_at,acknowledged_at) VALUES($1,$2,$2,$3,5,'postgres',$7,$4,$5,$6,now(),CASE WHEN $4='published' THEN now() ELSE NULL END) ON CONFLICT(tenant_id,job_id) DO UPDATE SET status=EXCLUDED.status,attempts=atlas_runtime_dispatch_records.attempts+1,last_error_code=EXCLUDED.last_error_code,last_attempt_at=now(),acknowledged_at=CASE WHEN EXCLUDED.status='published' THEN now() ELSE atlas_runtime_dispatch_records.acknowledged_at END RETURNING dispatch_id,status,attempts";
-    const { rows } = await this.pool.query(sql,[tenantId,jobId,jobType,status,attempt,errorCode,createHash('sha256').update(jobId).digest('hex')]); return rows[0];
+  async recordDispatchState({ tenantId, jobId, jobType, attempt = 1, status = 'published', transport = 'postgres', priority = 5, envelopeSha256 = null, errorCode = null } = {}) {
+    if (!UUID.test(tenantId || '') || !UUID.test(jobId || '') || !/^[a-z][a-z0-9_.-]{1,79}$/.test(jobType || '') || !Number.isInteger(attempt) || attempt < 0 || attempt > 1000 || !['pending','published','degraded','failed'].includes(status) || !['postgres','redis'].includes(transport) || !Number.isInteger(priority) || priority < 0 || priority > 9) throw new TypeError('dispatch_state_invalid');
+    const digest=envelopeSha256&&SHA256.test(envelopeSha256)?envelopeSha256:createHash('sha256').update(jobId).digest('hex');
+    const sql = "INSERT INTO atlas_runtime_dispatch_records(tenant_id,dispatch_id,job_id,job_type,priority,transport,envelope_sha256,status,attempts,last_error_code,last_attempt_at,acknowledged_at) VALUES($1,$2,$2,$3,$8,$9,$10,$4,$5,$6,now(),CASE WHEN $4='published' THEN now() ELSE NULL END) ON CONFLICT(tenant_id,job_id) DO UPDATE SET status=EXCLUDED.status,transport=EXCLUDED.transport,priority=EXCLUDED.priority,envelope_sha256=EXCLUDED.envelope_sha256,attempts=atlas_runtime_dispatch_records.attempts+1,last_error_code=EXCLUDED.last_error_code,last_attempt_at=now(),acknowledged_at=CASE WHEN EXCLUDED.status='published' THEN now() ELSE atlas_runtime_dispatch_records.acknowledged_at END RETURNING dispatch_id,status,attempts,transport";
+    const { rows } = await this.pool.query(sql,[tenantId,jobId,jobType,status,attempt,errorCode,digest,priority,transport]); return rows[0];
   }
 
   async recordControlEvent(event) {
@@ -452,6 +466,136 @@ export class PostgresRuntimeStore {
     const decision=JSON.stringify(event.decision||{}); if(Buffer.byteLength(decision,'utf8')>4096) throw new TypeError('control_event_too_large');
     const sql="INSERT INTO atlas_runtime_control_events(event_id,event_type,severity,pool_id,worker_id,decision,decision_sha256,occurred_at) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8) ON CONFLICT(event_id) DO NOTHING RETURNING event_id";
     const {rows}=await this.pool.query(sql,[event.eventId,event.type,event.severity,event.poolId,event.workerId,decision,event.decisionSha256,event.occurredAt]); return rows[0]||null;
+  }
+
+
+  async getRuntimeScalingPolicy(poolId) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '')) throw new TypeError('runtime_scaling_policy_invalid');
+    const { rows } = await this.pool.query('SELECT pool_id,min_workers,max_workers,target_utilization,scale_up_cooldown_seconds,scale_down_cooldown_seconds,slo_error_budget_floor,enabled FROM atlas_runtime_scaling_policies WHERE pool_id=$1', [poolId]);
+    return rows[0] || null;
+  }
+
+  async getRuntimeSloBudget(poolId) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '')) throw new TypeError('runtime_slo_budget_invalid');
+    const { rows } = await this.pool.query('SELECT min(error_budget_remaining) AS budget FROM atlas_runtime_slo_evaluations WHERE pool_id=$1 AND created_at >= now()-interval \'10 minutes\'', [poolId]);
+    return rows[0]?.budget === null || rows[0]?.budget === undefined ? 1 : Number(rows[0].budget);
+  }
+
+  async acquireScalerLease(poolId, workerId, leaseSeconds = 60) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '') || !/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId || '')) throw new TypeError('scaler_lease_invalid');
+    const { rows } = await this.pool.query('SELECT atlas_v146_acquire_scaler_lease($1,$2,$3) AS acquired', [poolId,workerId,leaseSeconds]);
+    return rows[0]?.acquired === true;
+  }
+
+  async recordScalingDecision(decision) {
+    if (!decision || !/^[a-f0-9]{64}$/.test(decision.decisionId || '') || !/^[A-Za-z0-9_.:-]{1,120}$/.test(decision.poolId || '') || !/^[A-Za-z0-9_.:-]{1,120}$/.test(decision.workerId || '')) throw new TypeError('scaling_decision_invalid');
+    const { rows } = await this.pool.query(
+      `INSERT INTO atlas_runtime_scaling_decisions(decision_id,pool_id,worker_id,action,target_workers,queue_depth,active_workers,worker_utilization,slo_error_budget_remaining,reason,status,actuator_ref_hash,decided_at,actuated_at,error_code)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now(),$13,$14)
+       ON CONFLICT(pool_id,decision_id) DO UPDATE SET status=EXCLUDED.status,error_code=EXCLUDED.error_code,actuator_ref_hash=EXCLUDED.actuator_ref_hash,actuated_at=EXCLUDED.actuated_at
+       RETURNING decision_id,status`,
+      [decision.decisionId,decision.poolId,decision.workerId,decision.action,decision.targetWorkers,decision.queueDepth,decision.activeWorkers,decision.workerUtilization,decision.sloErrorBudgetRemaining,decision.reason,decision.status,decision.actuatorRefHash||null,decision.actuatedAt||null,decision.errorCode||null]
+    );
+    return rows[0];
+  }
+
+  async updateScalingDecision({decisionId,status,actuatorRefHash=null,actuatedAt=null,errorCode=null}={}) {
+    if (!/^[a-f0-9]{64}$/.test(decisionId || '') || !['proposed','advisory','actuated','failed','skipped'].includes(status)) throw new TypeError('scaling_decision_update_invalid');
+    const { rows } = await this.pool.query('UPDATE atlas_runtime_scaling_decisions SET status=$2,actuator_ref_hash=$3,actuated_at=$4,error_code=$5 WHERE decision_id=$1 RETURNING decision_id,status', [decisionId,status,actuatorRefHash,actuatedAt,errorCode]);
+    return rows[0] || null;
+  }
+
+  async listObservabilityDestinations({enabled=true,limit=100}={}) {
+    if (!Number.isInteger(limit)||limit<1||limit>500) throw new TypeError('observability_destination_invalid');
+    const { rows } = await this.pool.query('SELECT destination_id,kind,endpoint_ref,secret_ref,enabled,created_at,updated_at FROM atlas_runtime_observability_destinations WHERE enabled=$1 ORDER BY destination_id LIMIT $2',[Boolean(enabled),limit]);
+    return rows;
+  }
+
+  async claimAlertDelivery({alertId,destinationId,leaseOwner,leaseSeconds=60}={}) {
+    if (!/^[A-Za-z0-9_.:-]{1,160}$/.test(alertId||'')||!/^[A-Za-z0-9_.:-]{1,160}$/.test(destinationId||'')||!/^[A-Za-z0-9_.:-]{1,120}$/.test(leaseOwner||'')) throw new TypeError('alert_delivery_claim_invalid');
+    const deliveryId=createHash('sha256').update(alertId+'|'+destinationId).digest('hex');
+    const { rows } = await this.pool.query(
+      `INSERT INTO atlas_runtime_alert_deliveries(delivery_id,alert_id,destination_id,status,attempts,lease_owner,lease_until,next_attempt_at)
+       VALUES($1,$2,$3,'leased',1,$4,now()+make_interval(secs=>$5),now())
+       ON CONFLICT(alert_id,destination_id) DO UPDATE SET status='leased',attempts=atlas_runtime_alert_deliveries.attempts+1,lease_owner=EXCLUDED.lease_owner,lease_until=EXCLUDED.lease_until,updated_at=now()
+       WHERE atlas_runtime_alert_deliveries.status <> 'delivered'
+         AND (atlas_runtime_alert_deliveries.lease_until IS NULL OR atlas_runtime_alert_deliveries.lease_until <= now())
+         AND atlas_runtime_alert_deliveries.next_attempt_at <= now()
+       RETURNING delivery_id`,
+      [deliveryId,alertId,destinationId,leaseOwner,leaseSeconds]
+    );
+    return Boolean(rows.length);
+  }
+
+  async completeAlertDelivery({alertId,destinationId,leaseOwner}={}) {
+    const { rows }=await this.pool.query('UPDATE atlas_runtime_alert_deliveries SET status=\'delivered\',delivered_at=now(),lease_owner=NULL,lease_until=NULL,updated_at=now() WHERE alert_id=$1 AND destination_id=$2 AND lease_owner=$3 AND status=\'leased\' RETURNING delivery_id',[alertId,destinationId,leaseOwner]);
+    return Boolean(rows.length);
+  }
+
+  async failAlertDelivery({alertId,destinationId,leaseOwner,errorCode}={}) {
+    if (!/^[a-z][a-z0-9_.-]{0,79}$/.test(errorCode||'')) throw new TypeError('alert_error_code_invalid');
+    const { rows }=await this.pool.query(`UPDATE atlas_runtime_alert_deliveries
+      SET status='failed',last_error_code=$4,lease_owner=NULL,lease_until=NULL,next_attempt_at=now()+make_interval(secs=>LEAST(3600,GREATEST(30,POWER(2,GREATEST(0,attempts-1))))),updated_at=now()
+      WHERE alert_id=$1 AND destination_id=$2 AND lease_owner=$3 AND status='leased' RETURNING delivery_id`,[alertId,destinationId,leaseOwner,errorCode]);
+    return Boolean(rows.length);
+  }
+
+  async startProviderAction(input) {
+    const { rows }=await this.pool.query('SELECT * FROM atlas_v148_start_provider_action($1,$2,$3,$4,$5,$6)',[input.tenantId,input.jobId,input.providerKey,input.connectionId,input.actionKey,input.idempotencyKey]);
+    return rows[0] || null;
+  }
+
+  async recordProviderOutcome(input) {
+    const { rows }=await this.pool.query('SELECT atlas_v148_record_provider_outcome($1,$2,$3,$4,$5,$6,$7) AS updated',[input.tenantId,input.jobId,input.idempotencyKey,input.state,input.providerRef||null,input.errorCode||null,input.resolutionCode||null]);
+    return rows[0]?.updated === true;
+  }
+
+  async startRecoveryDrill({drillId,poolId,scenario}={}) {
+    if (!/^[A-Za-z0-9_.:-]{1,160}$/.test(drillId||'')||!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId||'')||!['worker_crash','redis_failure','postgres_failure','duplicate_execution','split_brain'].includes(scenario)) throw new TypeError('recovery_drill_invalid');
+    await this.pool.query(`INSERT INTO atlas_runtime_recovery_drills(drill_id,pool_id,scenario,status,started_at) VALUES($1,$2,$3,'running',now())
+      ON CONFLICT(drill_id) DO UPDATE SET status='running',started_at=now(),completed_at=NULL,evidence_sha256=NULL`,[drillId,poolId,scenario]);
+    return drillId;
+  }
+
+  async recordRecoveryDrillStep({drillId,stepIndex,action,status,evidenceRef=null,evidenceSha256=null}={}) {
+    if(!/^[A-Za-z0-9_.:-]{1,160}$/.test(drillId||'')||!Number.isInteger(stepIndex)||stepIndex<1||stepIndex>100||!['planned','running','passed','failed','skipped'].includes(status)) throw new TypeError('recovery_step_invalid');
+    boundedJson({evidenceRef:evidenceRef||null},8000);
+    const stepId=createHash('sha256').update(drillId+'|'+stepIndex).digest('hex');
+    const {rows}=await this.pool.query(`INSERT INTO atlas_runtime_recovery_drill_steps(step_id,drill_id,step_index,action,status,evidence_ref,evidence_sha256)
+      VALUES($1,$2,$3,$4,$5,$6,$7)
+      ON CONFLICT(drill_id,step_index) DO UPDATE SET action=EXCLUDED.action,status=EXCLUDED.status,evidence_ref=EXCLUDED.evidence_ref,evidence_sha256=EXCLUDED.evidence_sha256
+      RETURNING step_id`,[stepId,drillId,stepIndex,action,status,evidenceRef,evidenceSha256]);
+    return rows[0]?.step_id;
+  }
+
+  async finishRecoveryDrill({drillId,status,evidenceSha256}={}) {
+    if(!/^[A-Za-z0-9_.:-]{1,160}$/.test(drillId||'')||!['passed','failed'].includes(status)||!/^[a-f0-9]{64}$/.test(evidenceSha256||'')) throw new TypeError('recovery_finish_invalid');
+    const {rows}=await this.pool.query('UPDATE atlas_runtime_recovery_drills SET status=$2,evidence_sha256=$3,completed_at=now() WHERE drill_id=$1 RETURNING status,evidence_sha256',[drillId,status,evidenceSha256]);
+    return rows[0]||null;
+  }
+
+  async runLiveRecoveryProbe() {
+    throw Object.assign(new Error('live recovery probes require deployment-specific infrastructure adapters'),{code:'live_recovery_probe_unconfigured'});
+  }
+
+  async getRuntimeWorkerSnapshot(poolId) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '')) throw new TypeError('runtime_worker_snapshot_invalid');
+    const { rows } = await this.pool.query(
+      `SELECT
+         count(*) FILTER (WHERE observed_at >= now()-interval '90 seconds')::integer AS active_workers,
+         coalesce(sum(queue_depth) FILTER (WHERE observed_at >= now()-interval '90 seconds'),0)::integer AS queue_depth,
+         coalesce(sum(active_jobs) FILTER (WHERE observed_at >= now()-interval '90 seconds'),0)::integer AS active_jobs
+       FROM atlas_runtime_pool_heartbeats
+       WHERE pool_id=$1`,
+      [poolId]
+    );
+    return rows[0] || { active_workers:0,queue_depth:0,active_jobs:0 };
+  }
+
+  async getLastScalingActuation(poolId) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '')) throw new TypeError('runtime_scaling_history_invalid');
+    const { rows } = await this.pool.query('SELECT extract(epoch FROM (now()-max(actuated_at)))*1000 AS age_ms FROM atlas_runtime_scaling_decisions WHERE pool_id=$1 AND status=\'actuated\'', [poolId]);
+    return rows[0]?.age_ms == null ? 0 : Math.max(0,Number(rows[0].age_ms));
   }
 
   async counts() {

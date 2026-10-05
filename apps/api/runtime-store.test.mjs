@@ -197,3 +197,28 @@ test('V138 runtime capacity is globally bounded, lease-owned and recoverable', a
     await db.close();
   }
 });
+
+
+test('API enqueue publishes Redis wakeup through the configured acceleration transport', async () => {
+  const { db,pool } = await database();
+  const published=[];
+  const api = new PostgresRuntimeStore(pool,{redisTransport:{publish:async(...args)=>{published.push(args);return 1;}}});
+  try {
+    const jobId=randomUUID();
+    const idempotencyKey=digest('redis-wakeup-test');
+    assert.equal(await api.enqueueJob({
+      actorId:actorA,tenantId:tenantA,jobId,jobType:'test.redis',
+      payloadRef:{kind:'workflow',id:randomUUID(),version:1},idempotencyKey
+    }),jobId);
+    assert.equal(published.length,1);
+    assert.equal(published[0][0],'test.redis');
+    const envelope=JSON.parse(published[0][1] instanceof Buffer ? published[0][1].toString() : published[0][1]);
+    assert.equal(envelope.jobId,jobId);
+    assert.equal(envelope.tenantId,tenantA);
+    assert.equal(envelope.jobType,'test.redis');
+    assert.equal(envelope.idempotencyKey,idempotencyKey);
+  } finally {
+    try { await db.exec('RESET ROLE'); } catch {}
+    await db.close();
+  }
+});

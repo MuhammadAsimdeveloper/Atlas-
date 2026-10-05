@@ -1,6 +1,7 @@
 import {createPostmarkAdapter,createTwilioMessagingAdapter,createTwilioVoiceAdapter,createWhatsAppCloudAdapter} from './provider-adapters.mjs';
 import {createZapierWebhookAdapter,createJobberAdapter} from './integration-runtime.mjs';
 import {executeProviderAction} from '../../packages/atlas-core/provider-adapters.mjs';
+import {ProviderReconciler} from '../../packages/atlas-runtime/provider-reconciliation.mjs';
 
 const KEY=/^[a-z][a-z0-9_.-]{1,79}$/;
 const REF=/^[A-Za-z0-9_.:/-]{8,240}$/;
@@ -45,24 +46,46 @@ function requestForNode({node,connection,job,context}){
 export function createProviderRuntime({connectionStore,secretResolver,fetchImpl=fetch,logger=console}={}){
  if(!connectionStore||typeof connectionStore.getProviderConnectionForWorker!=='function')throw new TypeError('A lease-bound provider connection store is required.');
  if(typeof secretResolver!=='function')throw new TypeError('A production secret resolver is required.');
+ const reconciler = typeof connectionStore.startProviderAction==='function' && typeof connectionStore.recordProviderOutcome==='function' ? new ProviderReconciler({store:connectionStore,logger}) : null;
  return Object.freeze({execute:async({node,job,context})=>{
    const cfg=object(node.config||{},'node.config'),capabilityId=text(cfg.capabilityId,'capabilityId',120);
    if(cfg.consent!==true||cfg.approved!==true)throw Object.assign(new Error('Provider action requires explicit consent and approval.'),{code:'provider_consent_required'});
-   if(context.attempt>1)throw Object.assign(new Error('Provider action retry requires reconciliation because the configured adapter cannot guarantee exactly-once delivery.'),{code:'provider_retry_unsafe'});
    if(!PROVIDER_ACTIONS.has(capabilityId))throw Object.assign(new Error('Unsupported provider capability.'),{code:'provider_capability_unsupported'});
    const connectionRef=ref(cfg.connectionRef,'connectionRef');
    if(!UUID.test(connectionRef))throw Object.assign(new Error('Provider connection reference must be a UUID.'),{code:'provider_connection_invalid'});
    const connection=await connectionStore.getProviderConnectionForWorker(job,context.workerId,connectionRef);
    if(!connection||connection.status!=='verified')throw Object.assign(new Error('Provider connection is not verified.'),{code:'provider_not_verified'});
    if(connection.tenant_id!==job.tenant_id)throw Object.assign(new Error('Provider connection tenant mismatch.'),{code:'provider_tenant_mismatch'});
+   const reconciliation = reconciler ? await reconciler.start({
+     tenantId:job.tenant_id,jobId:job.job_id,providerKey:connection.provider_key,connectionId:connection.connection_id,
+     actionKey:capabilityId,idempotencyKey:context.idempotencyKey
+   }) : null;
+   if(reconciliation && (reconciliation.state==='sent'||reconciliation.state==='reconciled')){
+     return Object.freeze({selectedPort:cfg.successPort||'next',resultRef:{kind:'provider_action',id:reconciliation.provider_ref||context.idempotencyKey,version:1},providerRef:reconciliation.provider_ref||context.idempotencyKey,status:'sent',reconciled:reconciliation.state==='reconciled'});
+   }
    const credentialRef=ref(connection.credential_ref,'credential_ref');
    const secret=await secretResolver({tenantId:job.tenant_id,connectionId:connection.connection_id,credentialRef});
    if(typeof secret!=='string'||secret.length<8||secret.length>4096)throw Object.assign(new Error('Provider credential could not be resolved.'),{code:'provider_secret_unavailable'});
    const request=requestForNode({node,connection,job,context});
    const adapter=adapterFor({connection,secret,fetchImpl});
-   const result=connection.provider_key==='jobber.graphql'
-     ? Object.freeze({status:'sent',providerRef:context.idempotencyKey,dataRef:await adapter.query(request,{signal:context.signal})})
-     : await executeProviderAction({adapter,request,signal:context.signal});
+   if(reconciliation && (reconciliation.state==='ambiguous'||reconciliation.state==='reconciliation_required')){
+     const recovered=await reconciler.handleExisting({record:reconciliation,adapter,request,signal:context.signal,job,context});
+     if(recovered) return Object.freeze({selectedPort:cfg.successPort||'next',resultRef:{kind:'provider_action',id:recovered.providerRef||context.idempotencyKey,version:1},providerRef:recovered.providerRef||null,status:'sent',reconciled:true});
+   }
+   if(context.attempt>1)throw Object.assign(new Error('Provider action retry requires reconciliation because the configured adapter cannot guarantee exactly-once delivery.'),{code:'provider_retry_unsafe'});
+   let result;
+   try{
+     result=connection.provider_key==='jobber.graphql'
+       ? Object.freeze({status:'sent',providerRef:context.idempotencyKey,dataRef:await adapter.query(request,{signal:context.signal})})
+       : await executeProviderAction({adapter,request,signal:context.signal});
+     if(reconciler) await reconciler.recordSent({tenantId:job.tenant_id,jobId:job.job_id,idempotencyKey:context.idempotencyKey,providerRef:result.providerRef||context.idempotencyKey});
+   }catch(error){
+     if(reconciler){
+       if(ProviderReconciler.isAmbiguousError(error)) await reconciler.recordAmbiguous({tenantId:job.tenant_id,jobId:job.job_id,idempotencyKey:context.idempotencyKey,errorCode:error?.code});
+       else await reconciler.recordFailed({tenantId:job.tenant_id,jobId:job.job_id,idempotencyKey:context.idempotencyKey,errorCode:error?.code||'provider_failed'});
+     }
+     throw error;
+   }
    logger.info?.('Atlas provider action completed.',{tenantId:job.tenant_id,jobId:job.job_id,connectionId:connection.connection_id,provider:connection.provider_key,status:result.status});
    return Object.freeze({selectedPort:cfg.successPort||'next',resultRef:{kind:'provider_action',id:result.providerRef||context.idempotencyKey,version:1},providerRef:result.providerRef||null,status:result.status});
  }});

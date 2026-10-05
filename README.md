@@ -1,3 +1,13 @@
+# Atlas Business Operating System
+
+## V146–V150 — Operational completion frontier
+
+Atlas now includes the repository-side runtime controls for autoscaling actuation, SLO alert delivery, provider outcome reconciliation, executable recovery drills and machine-verifiable deployment evidence.
+
+**Launch truth:** these controls are deployable code, not proof that external infrastructure is live. Managed PostgreSQL/Redis, KMS, WAF/CDN, real provider credentials, OTLP collectors, domain/DNS/TLS, backups/PITR, restore/load/failover measurements and independent security/compliance evidence still have to be produced by the deployment environment.
+
+See [V146–V150 operational completion plan](docs/V146-V150-OPERATIONAL-COMPLETION-PLAN.md) and [production launch runbook](docs/PRODUCTION-LAUNCH-RUNBOOK.md).
+
 ## V144 — Runtime control-plane integration
 
 V144 closes the repository-side control/observability gap: durable dispatch state is recorded by the worker, bounded runtime control events provide an auditable decision ledger, and optional OTLP HTTP export is best-effort so telemetry can never block customer work.
@@ -224,3 +234,8 @@ Apply SQL targets in order with `npm run db:migrate`: V80, V85, V90–V96, V99, 
 For GHL/n8n/monday/HubSpot analysis and explicit feature gaps, see [October 2026 competitor benchmark](docs/COMPETITOR-BENCHMARK-2026-10.md). For the V95 duplicate-case behavior see [V95 Case Intelligence](docs/V95-CASE-INTELLIGENCE.md); the [V94 Copilot and Service Desk](docs/V94-COPILOT-SERVICE-DESK.md) document describes the underlying contracts.
 
 For findings, addressed risks and items that still need a production environment, see the [V96 deep audit](docs/DEEP-AUDIT-V96.md), [V95 deep audit](docs/DEEP-AUDIT-V95.md), [V94 deep audit](docs/DEEP-AUDIT-V94.md) and [V93 deep audit](docs/DEEP-AUDIT-V93.md).
+
+
+## V145 — Real Redis runtime acceleration
+
+V145 adds a bounded native Redis RESP2 client and worker wakeup integration. Redis can now wake workers through BRPOP/LPUSH, while PostgreSQL remains the durable execution authority and polling fallback remains active when Redis is unavailable.

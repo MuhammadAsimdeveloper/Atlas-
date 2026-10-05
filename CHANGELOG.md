@@ -1,3 +1,13 @@
+## 150.0.0 — Operational completion (V146–V150)
+- Added a single-leader bounded autoscaler control loop with optional HTTPS actuation and durable scaling decisions.
+- Added durable SLO alert delivery with signed HTTPS webhooks and injected email/OTLP delivery adapters.
+- Added provider outcome reconciliation and idempotency ledger so ambiguous provider outcomes never become unsafe automatic resends.
+- Added executable worker/Redis/PostgreSQL/duplicate/split-brain recovery simulations with hashed evidence.
+- Added machine-verifiable infrastructure evidence manifests, expiration handling, launch runbook and manual evidence workflow.
+- Extended migration, doctor, production activation and launch gates through V150.
+- Added a separately deployable runtime control-plane process and local recovery-drill command.
+- External infrastructure remains explicitly unverified until real deployment evidence exists.
+
 ## 143.0.0 — Distributed production execution fabric (V139–V143)
 - Added a Redis transport abstraction with priority queues and bounded dispatch envelopes.
 - Kept PostgreSQL as the durable execution authority and added explicit Redis-failure fallback/recovery semantics.
