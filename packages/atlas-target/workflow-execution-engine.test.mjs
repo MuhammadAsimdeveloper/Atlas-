@@ -6,6 +6,7 @@ import {
   requestWorkflowApproval,
   approveWorkflowExecution,
   completeWorkflowStep,
+  startWorkflowStep,
   resumeWorkflowExecution,
   failWorkflowStep,
   cancelWorkflowExecution,
