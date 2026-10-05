@@ -143,6 +143,7 @@ scenarios.push(['calendar conflict', () => {
   const input = baseInput();
   input.journeyId = 'journey_miro_002';
   input.existingAppointments = [first.appointment];
+  input.bookingWindow = { startAt: first.appointment.startAt, endAt: first.appointment.endAt };
   return runLeadToBookingJourney(input);
 }, result => result.status === 'booking_unavailable' && result.appointment === null]);
 
