@@ -26,8 +26,10 @@ export async function executeWorkflowJob({store,job,workerId,resolveAction=async
  if(node.requiresApproval) return {status:'waiting_approval',execution};
  try{
    const capabilityId=typeof node.config?.capabilityId==='string'?node.config.capabilityId:null;
+   const inferredCapabilityId=node.type==='send_message'&&typeof node.config?.channel==='string'?'communication.'+node.config.channel:null;
+   const effectiveCapabilityId=capabilityId||inferredCapabilityId;
    const providerStatus=node.config?.providerStatus;
-   if(node.requiresAdapter && (!capabilityId || !externalSideEffectAllowed({capabilityId,providerStatus,consent:node.config?.consent===true,approved:node.config?.approved===true}))){
+   if(node.requiresAdapter && (!effectiveCapabilityId || !externalSideEffectAllowed({capabilityId:effectiveCapabilityId,providerStatus,consent:node.config?.consent===true,approved:node.config?.approved===true}))){
      throw Object.assign(new Error('External side effect is not verified for this node.'),{code:'provider_not_verified'});
    }
    const result=await resolveAction(Object.freeze({node,execution,tenantId:job.tenant_id,jobId:job.job_id,signal:undefined}));
