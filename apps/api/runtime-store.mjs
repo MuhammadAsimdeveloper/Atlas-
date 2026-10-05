@@ -39,24 +39,23 @@ export class PostgresRuntimeStore {
     if (!UUID.test(jobId || '') || !/^[a-z][a-z0-9_.-]{1,79}$/.test(jobType || '') || !SHA256.test(idempotencyKey || '') || !Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 12) {
       throw createAuthError(400, 'runtime_job_invalid');
     }
-    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+    const persistedJobId = await this.#tenantTransaction({ actorId, tenantId }, async client => {
       const { rows } = await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7) AS job_id',
         [tenantId, jobId, jobType, JSON.stringify(payloadRef), idempotencyKey, runAt, maxAttempts]);
-      const persistedJobId = rows[0].job_id;
-      if (this.redisTransport) {
-        const envelope = createDispatchEnvelope({tenantId,jobId:persistedJobId,jobType,idempotencyKey,attempt:1,payloadRef});
-        try {
-          await this.redisTransport.publish(jobType,envelope,5);
-          await this.recordDispatchState({tenantId,jobId:persistedJobId,jobType,attempt:1,status:'published',transport:'redis',priority:5,envelopeSha256:envelope.envelopeHash}).catch(()=>{});
-        } catch {
-          this.logger.warn?.('Atlas Redis dispatch degraded to PostgreSQL.');
-          await this.recordDispatchState({tenantId,jobId:persistedJobId,jobType,attempt:1,status:'degraded',transport:'postgres',priority:5,envelopeSha256:envelope.envelopeHash,errorCode:'redis_dispatch_failed'}).catch(()=>{});
-        }
-      } else {
-        await this.recordDispatchState({tenantId,jobId:persistedJobId,jobType,attempt:1,status:'published',transport:'postgres',priority:5}).catch(()=>{});
-      }
-      return persistedJobId;
+      return rows[0].job_id;
     });
+
+    // Redis is an acceleration/wakeup hint only. Publish strictly after the durable
+    // PostgreSQL transaction commits so Redis can never reference a rolled-back job.
+    if (this.redisTransport) {
+      const envelope = createDispatchEnvelope({ tenantId, jobId: persistedJobId, jobType, idempotencyKey, attempt: 1, payloadRef });
+      try {
+        await this.redisTransport.publish(jobType, envelope, 5);
+      } catch {
+        this.logger.warn?.('Atlas Redis dispatch degraded to PostgreSQL.');
+      }
+    }
+    return persistedJobId;
   }
 
   async createSchedule({ actorId, tenantId, scheduleId, jobType, payloadRef, idempotencyPrefix, nextRunAt, intervalSeconds = null, maxAttempts = 5 }) {
