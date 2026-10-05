@@ -70,7 +70,7 @@ function assertSourceAsset(sourceAsset, tenantId) {
 function normalizeSubmission(submission) {
   if (!submission || typeof submission !== 'object' || Array.isArray(submission)) throw new TypeError('Form submission is required');
   const firstName = text(submission.firstName, 'firstName', 80);
-  const lastName = submission.lastName == null ? '' : text(submission.lastName, 'lastName', 80);
+  const lastName = submission.lastName == null ? '' : text(submission.lastName, 'lastName', 80, { empty: true });
   const email = submission.email == null ? null : text(submission.email, 'email', 254).toLowerCase();
   const phone = submission.phone == null ? null : text(submission.phone, 'phone', 18);
   if (email && !EMAIL.test(email)) throw new TypeError('email is invalid');
