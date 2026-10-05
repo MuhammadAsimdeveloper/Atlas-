@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { buildControlEvent, createOtlpHttpExporter } from '../../packages/atlas-runtime/control-plane.mjs';
 const ERROR_CODE = /^[a-z][a-z0-9_.-]{0,79}$/;
 const SLO_TARGETS = Object.freeze({ job_duration_ms: 30_000, error_rate: 0.01, success_rate: 0.995 });
 
@@ -36,6 +38,8 @@ export class AtlasQueueWorker {
     this.preferEvents = false;
     this.active = new Set();
     this.counts = { jobsSucceeded: 0, jobsFailed: 0, eventsAcknowledged: 0, eventsFailed: 0, leaseLost: 0 };
+    this.controlEventsEnabled = process.env.ATLAS_RUNTIME_CONTROL_EVENTS_ENABLED === 'true';
+    this.otlpExporter = createOtlpHttpExporter({ endpoint: process.env.ATLAS_OTLP_ENDPOINT || '', authSecret: process.env.ATLAS_OTLP_AUTH_SECRET_REF || null, timeoutMs: Number(process.env.ATLAS_OTLP_TIMEOUT_MS || 3000), logger });
   }
 
   async runOnce() {
@@ -111,6 +115,8 @@ export class AtlasQueueWorker {
     }, Math.max(5_000, Math.floor(this.leaseSeconds * 1000 / 3)));
     timer.unref?.();
     try {
+      if (isJob && typeof this.store.recordDispatchState === 'function') { try { await this.store.recordDispatchState({ tenantId:item.tenant_id,jobId:item.job_id,jobType:item.job_type,attempt:item.attempts,status:'published' }); } catch (error) { this.logger.warn?.(`Atlas dispatch ledger update failed (${error?.message || 'unknown'}).`); } }
+      const spanStart=Date.now()*1_000_000;
       if (typeof handler !== 'function') throw Object.assign(new Error('No handler is registered.'), { code: 'handler_unavailable' });
       const context = isJob
         ? { tenantId: item.tenant_id, jobId: id, jobType: item.job_type, idempotencyKey: item.idempotency_key, attempt: item.attempts, workerId: this.workerId, workerStore: this.store, signal: controller.signal }
@@ -132,6 +138,8 @@ export class AtlasQueueWorker {
       this.counts[isJob ? 'jobsFailed' : 'eventsFailed']++;
       this.logger.warn?.(`Atlas worker ${kind} ${id} failed (${code}).`);
     } finally {
+      if (isJob && this.controlEventsEnabled && typeof this.store.recordControlEvent === 'function') { try { await this.store.recordControlEvent(buildControlEvent({type:succeeded?'runtime.job.completed':(leaseLost?'runtime.job.lease_lost':'runtime.job.failed'),severity:succeeded?'info':'warning',poolId:this.runtimePoolId,workerId:this.workerId,decision:{jobType:item.job_type,attempt:item.attempts,status:succeeded?'published':(leaseLost?'lease_lost':'failed')}})); } catch (error) { this.logger.warn?.(`Atlas control event persistence failed (${error?.message || 'unknown'}).`); } }
+      if (isJob && this.otlpExporter.enabled) void this.otlpExporter.exportSpan({traceId:randomUUID().replaceAll('-',''),spanId:randomUUID().replaceAll('-','').slice(0,16),name:'atlas.worker.job',startTimeUnixNano:spanStart,endTimeUnixNano:Date.now()*1_000_000,attributes:{jobType:item.job_type,status:succeeded?'succeeded':(leaseLost?'lease_lost':'failed')}});
       clearInterval(timer);
       if (isJob && this.runtimePoolId && typeof this.store.releaseRuntimeCapacity === 'function') {
         try { await this.store.releaseRuntimeCapacity(this.runtimePoolId, this.workerId, 1); } catch (error) { this.logger.warn?.(`Atlas runtime capacity release failed (${error?.message || 'unknown'}).`); }
