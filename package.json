@@ -1,7 +1,7 @@
 {
   "name": "atlas-business-os",
   "private": true,
-  "version": "123.0.0",
+  "version": "124.0.0",
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1",
@@ -18,17 +18,12 @@
     "start:api": "node apps/api/server.mjs",
     "start:worker": "node apps/worker/main.mjs",
     "production:check": "node scripts/production-check.mjs",
+    "production:activation-check": "node scripts/production-activation-check.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "capabilities:check": "node scripts/capabilities-check.mjs",
     "service:check": "node --test packages/atlas-core/service-operations.test.mjs packages/atlas-core/oauth.test.mjs apps/worker/integration-runtime.test.mjs"
   },
-  "engines": {
-    "node": ">=20"
-  },
-  "dependencies": {
-    "pg": "8.23.1"
-  },
-  "devDependencies": {
-    "@electric-sql/pglite": "0.5.8"
-  }
+  "engines": {"node": ">=20"},
+  "dependencies": {"pg": "8.23.1"},
+  "devDependencies": {"@electric-sql/pglite": "0.5.8"}
 }
