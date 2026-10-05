@@ -46,7 +46,7 @@ test('V119 persists a pinned workflow execution and atomically queues its execut
   const {db,pool}=await setup();
   try{
     const store=new PostgresWorkflowExecutionStore(pool);
-    const workflow={id:workflowId,module:'workflows',state:'published',payload:{graph:createWorkflowGraph({
+    const workflow={id:workflowId,tenantId:tenantA,module:'workflows',state:'published',payload:{graph:createWorkflowGraph({
       tenantId:tenantA,id:workflowId,version:5,name:'Lead journey',
       nodes:[{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'stop',type:'stop'}],
       edges:[{id:'e1',from:'start',to:'stop',port:'next'}]
