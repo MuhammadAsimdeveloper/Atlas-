@@ -1,5 +1,17 @@
 # Atlas Business Operating System
 
+## V124 — Production activation and trust gate
+
+V124 hardens the production boundary around the V123 provider/service-operations integration fabric. It adds a deterministic activation gate for release metadata, critical configuration, API security wiring, worker isolation, provider fail-closed behavior, non-root deployment and CI least-privilege permissions. See [V124 Production Activation](docs/V124-PRODUCTION-ACTIVATION.md).
+
+Atlas is a laptop-first, multi-tenant business operating system for CRM, customer service, automation, AI agents, revenue operations, governed actions and service-business operations.
+
+## V123 — Production integrations and service operations
+
+V123 adds provider-neutral integration plumbing plus concrete Postmark, Twilio messaging/voice, WhatsApp Cloud, Zapier webhook and Jobber GraphQL adapters, hardened OAuth state/code exchange, service-request/job/visit/quote/invoice persistence and API contracts. Provider accounts, credentials and end-to-end verification remain deployment responsibilities; source presence never implies Live status.
+
+# Atlas Business Operating System
+
 ## V122 — Complete capability fabric
 
 V122 adds a hardened runtime foundation for the complete 60-capability surface: unified communications and channel adapters, durable workflow execution, signed webhook/event ingress, OAuth/credential references, advanced CRM and marketing definitions, AI/SaaS/agency capability policy, and enterprise security/DR control metadata. See [V122 capability fabric](docs/V122-COMPLETE-CAPABILITY-FABRIC.md). External providers remain fail-closed until credentials, callbacks, sandbox delivery and monitoring are verified.
