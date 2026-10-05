@@ -156,7 +156,7 @@ export function runLeadToBookingJourney({
 
   assertSourceAsset(sourceAsset, tenantId);
   assertGrowth(pipeline, tenantId, 'pipelines', 'Pipeline');
-  assertGrowth(qualificationProfile, tenantId, 'Qualification profile');
+  assertGrowth(qualificationProfile, tenantId, 'ai-qualification', 'Qualification profile');
   const submission = normalizeSubmission(formSubmission);
   const followUpActions = validateFollowUp(followUp, tenantId);
   if (!verifyBookingCalendar(calendar) || calendar.tenantId !== tenantId) throw new Error('Calendar tenant or checksum is invalid');
