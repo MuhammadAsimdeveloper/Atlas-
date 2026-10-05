@@ -135,5 +135,11 @@ $policies$;
 DROP POLICY IF EXISTS atlas_v122_enterprise_controls_tenant ON atlas_v122_enterprise_controls;
 CREATE POLICY atlas_v122_enterprise_controls_tenant ON atlas_v122_enterprise_controls USING (tenant_id::text=nullif(current_setting('app.tenant_id',true),'')) WITH CHECK (tenant_id::text=nullif(current_setting('app.tenant_id',true),''));
 
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM atlas_worker;
+DO $worker_revoke$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='atlas_worker') THEN
+    EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA public FROM atlas_worker';
+  END IF;
+END;
+$worker_revoke$;
 COMMIT;
