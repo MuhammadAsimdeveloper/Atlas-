@@ -47,7 +47,9 @@ CREATE INDEX IF NOT EXISTS atlas_v126_conversations_queue ON atlas_v122_conversa
 CREATE INDEX IF NOT EXISTS atlas_v126_messages_thread ON atlas_v122_messages(tenant_id,conversation_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS atlas_v126_messages_provider ON atlas_v122_messages(tenant_id,provider_message_ref) WHERE provider_message_ref IS NOT NULL;
 ALTER TABLE atlas_v126_inbox_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE atlas_v126_inbox_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE atlas_v126_message_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE atlas_v126_message_receipts FORCE ROW LEVEL SECURITY;
 CREATE POLICY atlas_v126_inbox_events_tenant ON atlas_v126_inbox_events USING (tenant_id::text=nullif(current_setting('app.tenant_id',true),'')) WITH CHECK (tenant_id::text=nullif(current_setting('app.tenant_id',true),''));
 CREATE POLICY atlas_v126_message_receipts_tenant ON atlas_v126_message_receipts USING (tenant_id::text=nullif(current_setting('app.tenant_id',true),'')) WITH CHECK (tenant_id::text=nullif(current_setting('app.tenant_id',true),''));
 
