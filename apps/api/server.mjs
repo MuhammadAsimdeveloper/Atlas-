@@ -15,6 +15,8 @@ import { createCapabilityApi } from './capability-routes.mjs';
 import { loadInboxContentStore } from './inbox-content.mjs';
 import { loadWebhookSecretResolver } from './webhook-secrets.mjs';
 import { runWorkflowScheduler } from './workflow-scheduler.mjs';
+import { RedisRespClient } from '../packages/atlas-runtime/redis-client.mjs';
+import { RedisTransport } from '../packages/atlas-runtime/distributed-fabric.mjs';
 
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
@@ -83,6 +85,7 @@ let runtimeStore = null;
 let inboxContentStore = null;
 let webhookSecretResolver = null;
 let schedulerTimer = null;
+let redisClient = null;
 if (env.ATLAS_DATABASE_URL) {
   const { Pool } = await import('pg');
   pool = new Pool(await createPostgresPoolConfig(env, { application_name: `atlas-api-${release.toLowerCase()}` }));
@@ -91,7 +94,11 @@ if (env.ATLAS_DATABASE_URL) {
   if (runtime === 'production') await authStore.assertSafeRuntimeRole();
   growthStore = new PostgresGrowthStore(pool);
   workflowExecutionStore = new PostgresWorkflowExecutionStore(pool);
-  runtimeStore = new PostgresRuntimeStore(pool);
+  if (env.ATLAS_REDIS_URL) {
+    redisClient = new RedisRespClient({ url: env.ATLAS_REDIS_URL, connectTimeoutMs: Number(env.ATLAS_REDIS_CONNECT_TIMEOUT_MS || 3000) });
+  }
+  const redisTransport = redisClient ? new RedisTransport({ client: redisClient, namespace: env.ATLAS_REDIS_NAMESPACE || 'atlas' }) : null;
+  runtimeStore = new PostgresRuntimeStore(pool, { redisTransport });
   authApi = createAuthApi({ store: authStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
   growthApi = createGrowthApi({ store: growthStore, executionStore: workflowExecutionStore, runtimeStore, authStore, env });
   capabilityStore = new PostgresCapabilityStore(pool);
@@ -159,7 +166,7 @@ async function shutdown(signal) {
   process.stdout.write(`Atlas API received ${signal}; closing gracefully.\n`);
   server.close(async () => {
     if(schedulerTimer) clearInterval(schedulerTimer);
-    try { await authStore?.close(); } finally { process.exit(0); }
+    try { redisClient?.disconnect?.(); await authStore?.close(); } finally { process.exit(0); }
   });
   const timeout = setTimeout(() => process.exit(1), 15_000);
   timeout.unref();
