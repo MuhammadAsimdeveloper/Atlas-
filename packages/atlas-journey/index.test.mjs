@@ -141,6 +141,9 @@ test('V145 flagship journey connects funnel -> CRM -> qualification -> follow-up
   assert.equal(result.status, 'booked');
   assert.equal(result.tenantId, TENANT);
   assert.equal(result.contact.module, 'contacts');
+  assert.match(result.contact.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.match(result.lead.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.equal(result.lead.payload.pipelineId, '44444444-4444-4444-8444-444444444444');
   assert.equal(result.lead.module, 'leads');
   assert.equal(result.lead.payload.qualification.status, 'ready');
   assert.equal(result.followUp.actions.length, 2);
