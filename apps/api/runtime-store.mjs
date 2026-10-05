@@ -349,6 +349,24 @@ export class PostgresRuntimeStore {
     return rows[0];
   }
 
+  async claimWorkflowSchedules(limit=100) {
+    if(!Number.isInteger(limit)||limit<1||limit>500) throw new TypeError('schedule_claim_invalid');
+    const {rows}=await this.pool.query('SELECT * FROM atlas_v130_claim_workflow_schedules($1)',[limit]);
+    return rows;
+  }
+
+  async finalizeWorkflowSchedule({tenantId,scheduleId,nextRunAt,state='active'}) {
+    if(!UUID.test(tenantId||'')||!UUID.test(scheduleId||'')||!Number.isFinite(Date.parse(nextRunAt))||!['active','paused','completed'].includes(state)) throw new TypeError('schedule_finalize_invalid');
+    const client=await this.pool.connect();
+    try{
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);
+      const {rows}=await client.query('UPDATE atlas_workflow_schedules SET next_run_at=$3,state=$4,updated_at=now() WHERE tenant_id=$1 AND schedule_id=$2 RETURNING schedule_id,next_run_at,state',[tenantId,scheduleId,nextRunAt,state]);
+      await client.query('COMMIT');
+      return rows[0]||null;
+    }catch(error){try{await client.query('ROLLBACK');}catch{} throw error;}finally{client.release();}
+  }
+
   async completeJob(job, workerId) {
     const { rows } = await this.pool.query('SELECT atlas_v115_complete_job($1,$2,$3) AS completed', [job.tenant_id, job.job_id, workerId]);
     return rows[0].completed;
