@@ -21,7 +21,7 @@ import { RedisTransport } from '../packages/atlas-runtime/distributed-fabric.mjs
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
 const runtime = env.NODE_ENV || 'development';
-const release = env.ATLAS_RELEASE || 'V126';
+const release = env.ATLAS_RELEASE || 'V150';
 const webAssets = new Map([
   ['/', ['../command-center/auth.html', 'text/html; charset=utf-8']],
   ['/login', ['../command-center/auth.html', 'text/html; charset=utf-8']],
