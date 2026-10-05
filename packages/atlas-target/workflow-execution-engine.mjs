@@ -157,11 +157,12 @@ export function completeWorkflowStep({
   now = Date.now()
 } = {}) {
   assertMutable(execution);
-  if (execution.currentNodeId !== nodeId) throw new Error('Workflow step is not the current step');
   if (!Number.isSafeInteger(attempt) || attempt < 1 || attempt > 10) throw new Error('Workflow step attempt is invalid');
 
   const prior = execution.steps.find(step => step.nodeId === nodeId && step.attempt === attempt && step.status === 'completed');
   if (prior) return execution;
+
+  if (execution.currentNodeId !== nodeId) throw new Error('Workflow step is not the current step');
 
   const node = nodeFor(execution, nodeId);
   if (attempt > node.retry.maxAttempts) throw new Error('Attempt exceeds this node retry limit');
