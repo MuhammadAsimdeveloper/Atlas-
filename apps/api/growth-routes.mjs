@@ -5,7 +5,7 @@ import { resolveAtlasAuthority } from '../../packages/atlas-core/authority.mjs';
 import { paddlePlanCatalog, verifyPaddleFreeTrialPrice, createPaddleCheckout, createPaddlePortalSession, normalizePaddleBillingEvent, paddleBodySha256, verifyPaddleSignature } from './paddle-billing.mjs';
 import { simulateWorkflow } from '../../packages/atlas-target/workflow-simulator.mjs';
 import { enforceRateLimit, securityHeaders } from './security.mjs';
-import { createPromotionManifest } from '../../packages/atlas-core/production-frontier.mjs';
+import { createPromotionManifest, routeEvent } from '../../packages/atlas-core/production-frontier.mjs';
 
 const MAX_BODY_BYTES = 110_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
