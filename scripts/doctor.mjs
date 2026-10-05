@@ -154,6 +154,9 @@ try {
   const previewTests = await read('packages/atlas-target/workflow-simulator.test.mjs');
   const previewApiTest = await read('apps/api/workflow-preview-routes.test.mjs');
   check('V117 safe workflow preview runtime', previewRuntime.includes('preview: true') && previewRuntime.includes('externalSideEffects') && previewRuntime.includes('planWorkflowNode') && previewRuntime.includes('trigger_mismatch') && previewTests.includes('cross-tenant execution') && previewTests.includes('condition preview selects'), 'Saved graphs can be rehearsed in a bounded side-effect-free preview that reuses workflow policy and tenant checks');
+  const workflowStudio = await read('apps/command-center/workflow-studio.mjs');
+  check('V117 Workflow Studio preview UI', workflowStudio.includes('Run preview') && workflowStudio.includes('/growth/workflows/') && workflowStudio.includes('/simulate') && workflowStudio.includes('preview: true'), 'Saved workflows expose a safe preview action and render the returned execution result without enabling production side effects');
+
   check('V117 authenticated preview API', growthRoutes.includes("action === 'simulate'") && growthRoutes.includes('simulateWorkflow') && previewApiTest.includes('workflow preview endpoint executes only in safe preview mode') && previewApiTest.includes('csrf'), 'Workflow preview is exposed only through an authenticated, CSRF-protected tenant API route and requires an existing saved graph');
 
   check('V116 authenticated tenant-scoped capability catalog', workflowRoutes.includes("path === '/api/v1/growth/workflows/catalog'") && workflowStore.includes('WORKFLOW_TRIGGER_CATALOG') && workflowStore.includes("{ module: 'workflows' }"), 'Trigger and node metadata is only read after the normal authenticated workflow permission check');
