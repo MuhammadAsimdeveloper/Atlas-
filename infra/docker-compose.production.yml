@@ -59,7 +59,6 @@ services:
       ATLAS_WORKER_POLL_MS: "${ATLAS_WORKER_POLL_MS:-1000}"
       ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
     volumes:
-      - "${ATLAS_WORKER_HANDLERS_PATH:-/dev/null}:/app/apps/worker/handlers/v125-production.mjs:ro"
       - "${ATLAS_WORKER_SECRETS_PATH:?Mount a reviewed local secret resolver directory}:/app/apps/worker/secrets:ro"
     depends_on:
       postgres:
