@@ -5,6 +5,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const checks = [];
 const check = (name, ok, detail) => checks.push({ name, ok: Boolean(ok), detail });
 async function exists(file) { try { await access(path.join(root,file)); return true; } catch { return false; } }
+check('V144 runtime control-plane assets',await exists('packages/atlas-runtime/control-plane.mjs')&&await exists('packages/atlas-runtime/control-plane.test.mjs')&&await exists('infra/postgres/FINAL-MIGRATION-V144.sql')&&await exists('infra/postgres/API-ROLE-GRANTS-V144.sql'),'V144 runtime control-plane assets exist');
 check('production API entrypoint', await exists('apps/api/server.mjs'), 'HTTP entrypoint exists');
 check('container definition', await exists('Dockerfile'), 'Production container exists');
 check('production compose reference', await exists('infra/docker-compose.production.yml'), 'API/Postgres/Redis deployment reference exists');

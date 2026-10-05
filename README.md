@@ -1,3 +1,9 @@
+## V144 — Runtime control-plane integration
+
+V144 closes the repository-side control/observability gap: durable dispatch state is recorded by the worker, bounded runtime control events provide an auditable decision ledger, and optional OTLP HTTP export is best-effort so telemetry can never block customer work.
+
+**Production truth boundary:** external Redis HA, managed infrastructure, credentials, WAF/CDN, backups, restore drills, load tests and OTLP collectors remain deployment evidence.
+
 ## V139–V143 — Distributed production execution fabric
 
 Atlas now contains the repository-side distributed runtime layer across V139–V143:
