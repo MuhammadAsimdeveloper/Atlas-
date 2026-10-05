@@ -41,7 +41,7 @@ function displayOrder(nodes, edges) {
 }
 
 export function createWorkflowStudio(host, request) {
-  const state = { catalog: null, catalogError: '', name: '', nodes: [], edges: [], readOnly: false };
+  const state = { catalog: null, catalogError: '', name: '', nodes: [], edges: [], readOnly: false, workflowId: null };
 
   async function ensureCatalog() {
     if (state.catalog || state.catalogError) return;
@@ -120,7 +120,7 @@ export function createWorkflowStudio(host, request) {
     const basics = element('div', '', 'workflow-basics');
     basics.append(label('Workflow name', nameInput), label('Starts when', trigger));
 
-    const limitNotice = element('div', 'This deployment stores and validates workflow versions. Workflow jobs are not connected, so publish does not start runs.', 'workflow-runtime-notice');
+    const limitNotice = element('div', state.workflowId ? 'Preview is available for this saved workflow. Preview never calls providers or performs external side effects; publishing still does not start production runs.' : 'This deployment stores and validates workflow versions. Save the workflow before using safe preview; publishing does not start production runs.', 'workflow-runtime-notice');
     const canvasHead = element('div', '', 'workflow-canvas-heading');
     canvasHead.append(element('div', '', 'workflow-heading-copy'));
     canvasHead.firstChild.append(element('h4', 'Flow'), element('p', 'Connect steps to shape the path. Each node keeps its own bounded settings.'));
@@ -197,12 +197,59 @@ export function createWorkflowStudio(host, request) {
     addEdgeRow.append(from, to, port, connect); connections.append(addEdgeRow);
 
     const footer = element('p', `Capability registry: ${state.catalog.triggers.length} event types · ${state.catalog.nodes.length} node types. “Adapter needed” means the provider operation has a contract but is not configured here.`, 'workflow-studio-footer');
+    if (state.workflowId) {
+      const previewSection = element('section', '', 'growth-special-card workflow-preview');
+      const previewTitle = element('h4', 'Safe workflow preview');
+      const previewHelp = element('p', 'Test the saved version with sample event data. Provider, AI, payment and messaging steps are simulated and produce zero external side effects.', 'field-help');
+      const eventArea = document.createElement('textarea');
+      eventArea.rows = 7;
+      eventArea.spellcheck = false;
+      eventArea.setAttribute('aria-label', 'Preview event JSON');
+      const triggerEvent = state.nodes.find(item => item.type === 'trigger')?.config?.eventType || 'contact.created';
+      eventArea.value = JSON.stringify({ type: triggerEvent, firstName: 'Preview', email: 'preview@example.net', contactId: '11111111-1111-4111-8111-111111111111' }, null, 2);
+      const runButton = element('button', 'Run preview', 'button primary');
+      runButton.type = 'button';
+      const output = element('pre', '', 'field-help');
+      output.hidden = true;
+      runButton.addEventListener('click', async () => {
+        let event;
+        try {
+          event = JSON.parse(eventArea.value);
+        } catch {
+          output.hidden = false;
+          output.textContent = 'Preview event must be valid JSON.';
+          return;
+        }
+        runButton.disabled = true;
+        output.hidden = false;
+        output.textContent = 'Running safe preview…';
+        try {
+          const result = await request('/growth/workflows/' + state.workflowId + '/simulate', {
+            method: 'POST',
+            body: { event, executionId: 'preview-' + Date.now() }
+          });
+          const lines = [
+            'Status: ' + result.status,
+            'Steps: ' + result.summary.total + ' · completed ' + result.summary.completed + ' · simulated ' + result.summary.simulated + ' · approvals ' + result.summary.approvals,
+            'External side effects: ' + result.externalSideEffects
+          ];
+          output.textContent = lines.join('\\n') + '\\n\\n' + JSON.stringify(result.steps, null, 2);
+        } catch (error) {
+          output.textContent = error.message || 'Preview failed.';
+        } finally {
+          runButton.disabled = false;
+        }
+      });
+      previewSection.append(previewTitle, previewHelp, label('Event JSON', eventArea), runButton, output);
+      host.append(previewSection);
+    }
     host.append(header, basics, limitNotice, canvasHead, canvas, connections, footer);
   }
 
-  async function load(payload, { readOnly = false } = {}) {
+  async function load(payload, { readOnly = false, workflowId = null } = {}) {
     await ensureCatalog();
     state.readOnly = readOnly;
+    state.workflowId = workflowId || null;
     state.name = payload?.name || 'New workflow';
     state.nodes = Array.isArray(payload?.graph?.nodes) ? payload.graph.nodes.map(item => ({ id: item.id, type: item.type, name: item.name || item.id, config: item.config || {}, retry: item.retry, timeoutMs: item.timeoutMs })) : [
       { id: 'start', type: 'trigger', name: 'Contact created', config: { eventType: 'contact.created' } },

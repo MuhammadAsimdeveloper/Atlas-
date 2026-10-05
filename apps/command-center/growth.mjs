@@ -116,7 +116,7 @@ function showRecord(item) {
   const isWorkflow = item.module === 'workflows';
   $('#growth-payload-field').hidden = isWorkflow;
   $('#growth-workflow-studio').hidden = !isWorkflow;
-  if (isWorkflow) void detailStudio.load(item.payload, { readOnly: !state.canWrite || ['published', 'scheduled'].includes(item.state) });
+  if (isWorkflow) void detailStudio.load(item.payload, { readOnly: !state.canWrite || ['published', 'scheduled'].includes(item.state), workflowId: item.id });
   $('#growth-save').disabled = !state.canWrite || ['published', 'scheduled'].includes(item.state);
   const note = ['published', 'scheduled'].includes(item.state) ? 'Pause this item before editing its content.' : providerNote(item.module);
   $('#growth-provider-note').textContent = note;
