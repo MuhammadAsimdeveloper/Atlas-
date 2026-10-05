@@ -19,7 +19,7 @@ async function database() {
   const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1])-Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
   for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
   await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
-  await db.exec('CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;');
+  await db.exec("DO $ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='atlas_worker') THEN CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS; END IF; END $;");
   for (const grant of ['API-ROLE-GRANTS-V112.sql','API-ROLE-GRANTS-V114.sql','API-ROLE-GRANTS-V115.sql','API-ROLE-GRANTS-V119.sql','API-ROLE-GRANTS-V120.sql']) await db.exec(await readFile(path.join(migrationDirectory,grant),'utf8'));
   await db.exec(`INSERT INTO atlas_auth_users(user_id,email,display_name,password_hash,email_verified_at) VALUES
     ('${actorA}','owner-a@runtime.test','Owner A','scrypt$test',now()),
