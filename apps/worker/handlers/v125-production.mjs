@@ -2,6 +2,7 @@ import {executeWorkflowJob} from '../workflow-executor.mjs';
 import {createProviderRuntime} from '../provider-runtime.mjs';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import path from 'node:path';
+import {loadInboxContentStore} from '../../api/inbox-content.mjs';
 
 async function loadSecretResolver(){
  const moduleName=process.env.ATLAS_WORKER_SECRET_RESOLVER_MODULE;
@@ -14,6 +15,31 @@ async function loadSecretResolver(){
  return loaded.resolveSecret;
 }
 const secretResolver=await loadSecretResolver();
+const inboxContent=await loadInboxContentStore();
+async function sendInboxMessage(payloadRef,context){
+ const {messageId}=payloadRef||{};
+ if(typeof messageId!=='string')throw Object.assign(new Error('Inbox message reference is required.'),{code:'inbox_message_invalid'});
+ const store=context.workerStore; const job={tenant_id:context.tenantId,job_id:context.jobId};
+ const message=await store.getInboxMessageForWorker(job,context.workerId,messageId); if(!message)throw Object.assign(new Error('Inbox message is unavailable.'),{code:'inbox_message_not_found'});
+ if(message.delivery_status!=='queued') return {status:'already_processed',messageId};
+ const content=await inboxContent.getMessageContent({tenantId:context.tenantId,messageId:message.message_id,contentRef:message.content_ref});
+ const capabilityId='communication.'+message.channel;
+ const cfg={capabilityId,connectionRef:message.provider_connection_id,to:message.recipient_ref,from:message.sender_ref,subject:message.subject,consent:true,approved:true,successPort:'next',textBody:content?.text||'',htmlBody:content?.html};
+ if(message.channel==='voice') cfg.twimlUrl=content?.twimlUrl;
+ if(message.channel==='email' && !cfg.textBody) throw Object.assign(new Error('Email content is unavailable.'),{code:'inbox_content_unavailable'});
+ if((message.channel==='sms'||message.channel==='whatsapp') && !cfg.textBody) throw Object.assign(new Error('Message content is unavailable.'),{code:'inbox_content_unavailable'});
+ const node={config:cfg};
+ try{
+   await store.markInboxMessageForWorker(job,context.workerId,message.message_id,'sending',null,null);
+   const result=await providerRuntime.execute({node,job,context:{workerId:context.workerId,idempotencyKey:message.idempotency_key,attempt:context.attempt,signal:context.signal}});
+   await store.markInboxMessageForWorker(job,context.workerId,message.message_id,'sent',result.providerRef||null,null);
+   return result;
+ }catch(error){
+   await store.markInboxMessageForWorker(job,context.workerId,message.message_id,'failed',null,error?.code||'provider_failed').catch(()=>{});
+   throw error;
+ }
+}
+
 export const jobHandlers=Object.freeze({'workflow.execute':async(_payloadRef,context)=>{
  const store=context.workerStore;
  if(!store)throw Object.assign(new Error('Worker execution store is unavailable.'),{code:'worker_store_unavailable'});
@@ -35,5 +61,5 @@ export const jobHandlers=Object.freeze({'workflow.execute':async(_payloadRef,con
    throw Object.assign(new Error('No production action handler is registered for this workflow node.'),{code:'workflow_action_unavailable'});
   }
  });
-}});
+},'communication.message.send':sendInboxMessage});
 export const eventHandlers=Object.freeze({});
