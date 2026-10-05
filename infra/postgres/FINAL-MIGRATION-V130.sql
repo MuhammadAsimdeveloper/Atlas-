@@ -14,7 +14,7 @@ RETURNS TABLE(tenant_id UUID,schedule_id UUID,workflow_id TEXT,workflow_version 
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 BEGIN
   IF p_limit < 1 OR p_limit > 500 THEN RAISE EXCEPTION 'invalid schedule limit'; END IF;
   RETURN QUERY
@@ -32,7 +32,7 @@ BEGIN
   WHERE s.tenant_id=d.tenant_id AND s.schedule_id=d.schedule_id
   RETURNING s.tenant_id,s.schedule_id,s.workflow_id,s.workflow_version,s.schedule_kind,s.expression,s.timezone,s.dst_policy,d.next_run_at;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION atlas_v130_claim_workflow_schedules(INTEGER) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION atlas_v130_claim_workflow_schedules(INTEGER) TO atlas_app;
 COMMIT;
