@@ -1,3 +1,11 @@
+## V128 — Durable workflow wake/resume control
+
+V128 closes a critical execution gap after V127: durable `waiting` and `retryable` workflow states are now re-queued when their `resumeAt` or `retryAt` becomes due. The wake path is tenant-safe, uses `FOR UPDATE SKIP LOCKED`, creates only opaque `workflow.execute` references, and keeps actual execution behind the reviewed V125 worker/provider boundary.
+
+This makes delayed/retryable automation resumable instead of merely persisted. Full schedule UI, richer predicates/routing, connector lifecycle, broad action catalog, AI agent sessions, environment promotion and distributed Redis/load evidence remain subsequent production phases.
+
+See [P128 durable workflow wake/resume control](docs/P128-DURABLE-WORKFLOW-WAKE.md).
+
 ## V127 — Automation execution control plane
 
 V127 begins the next production layer after the unified inbox: tenant-authenticated event ingress now records replay-safe automation events, resolves published workflows by trigger type, creates durable version-pinned executions, and reports matched/failed workflow starts. Event/resource payloads are reference-only; raw customer payloads are never persisted in the trigger ledger. Ingress is fail-closed behind `ATLAS_WORKFLOW_EVENT_INGRESS_ENABLED` plus the existing production workflow-handler gate.
