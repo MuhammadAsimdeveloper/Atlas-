@@ -209,6 +209,7 @@ test('V145 uses the booking layer for conflicts instead of bypassing availabilit
   const conflictInput = input();
   conflictInput.journeyId = 'journey_002';
   conflictInput.existingAppointments = [occupied.appointment];
+  conflictInput.bookingWindow = { startAt: occupied.appointment.startAt, endAt: occupied.appointment.endAt };
   const result = runLeadToBookingJourney(conflictInput);
   assert.equal(result.status, 'booking_unavailable');
   assert.equal(result.appointment, null);
