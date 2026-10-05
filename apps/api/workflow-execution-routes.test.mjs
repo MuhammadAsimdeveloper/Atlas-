@@ -56,7 +56,7 @@ test('starting a published workflow creates a durable queued execution',async()=
     assert.equal(response.status,202);
     assert.equal(body.execution.status,'queued');
     assert.equal(api.calls.find(([kind])=>kind==='create')[1].tenantId,tenantId);
-    assert.equal(api.calls.find(([kind])=>kind==='create')[1].workflow.version,3);
+    assert.equal(api.calls.find(([kind])=>kind==='create')[1].workflow.payload.graph.version,3);
   }finally{await api.close();}
 });
 
