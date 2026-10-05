@@ -53,9 +53,9 @@ function resultReference(value, label = 'resultRef') {
   const keys = Object.keys(value);
   if (keys.some(key => !['kind','id','version'].includes(key))) throw new Error(label + ' contains unsupported fields');
   if (typeof value.kind !== 'string' || !/^[a-z][a-z0-9_.-]{0,79}$/.test(value.kind)) throw new Error(label + '.kind is invalid');
-  if (typeof value.id !== 'string' || value.id.length < 1 || value.id.length > 180 || /[\r\n\u0000]/.test(value.id)) throw new Error(label + '.id is invalid');
+  const id = reference(value.id, label + '.id');
   if ('version' in value && (!Number.isSafeInteger(value.version) || value.version < 1)) throw new Error(label + '.version is invalid');
-  return deepFreeze({ kind: value.kind, id: value.id, ...(value.version === undefined ? {} : { version: value.version }) });
+  return deepFreeze({ kind: value.kind, id, ...(value.version === undefined ? {} : { version: value.version }) });
 }
 
 function freezeState(body) {
