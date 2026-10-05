@@ -1,3 +1,10 @@
+## 127.0.0 — Automation execution control plane
+- Added tenant-authenticated automation event ingress with replay-safe event identity.
+- Added published-workflow trigger resolution and durable execution creation for matching event types.
+- Added reference-only trigger ledger persistence with forced tenant RLS and bounded resource references.
+- Added explicit production event-ingress activation gate alongside the reviewed worker-handler gate.
+- Added matched/failed workflow-start accounting for operator-visible event outcomes.
+
 ## 126.0.0 — Unified communications and production inbox
 - Added durable unified conversation/message APIs for filtered inbox queues, message timelines, optimistic read state and human handoff.
 - Added atomic outbound message creation plus communication.message.send queue jobs backed by the V125 production provider runtime.
