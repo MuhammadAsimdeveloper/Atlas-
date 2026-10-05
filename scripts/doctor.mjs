@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '122.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '123.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   const authority = await read('packages/atlas-core/authority.mjs');
@@ -180,6 +180,12 @@ try {
   check('V121 durable waits', executionEngineV121.includes("export function resumeWorkflowExecution") && executionEngineV121.includes("Workflow delay must be between 1 second and 30 days") && executionEngineV121Tests.includes('delay and wait nodes pause execution'), 'Workflow delays and wait-until nodes persist a bounded resume time and resume only when due');
   check('V121 activation path', activationRoutes.includes("/api/v1/growth/activation") && activationStore.includes("getActivationChecklist") && activationUi.includes("loadActivationChecklist") && activationStore.includes("provider adapter is claimed live"), 'Growth Center exposes a tenant-scoped first-outcome checklist without falsely claiming provider connectivity');
   check('V121 execution triage filters', activationRoutes.includes("triggerEventType") && activationRoutes.includes("errorCode") && executionStore.includes("safeStatus"), 'Execution history supports bounded status, trigger and error filtering for operator triage');
+
+  const serviceOperations = await read('packages/atlas-core/service-operations.mjs');
+  const integrationRuntime = await read('apps/worker/integration-runtime.mjs');
+  const oauthRuntime = await read('packages/atlas-core/oauth.mjs');
+  const serviceMigration = await read('infra/postgres/FINAL-MIGRATION-V123.sql');
+  check('V123 production integration fabric', serviceOperations.includes('validateServiceRequest') && integrationRuntime.includes('createJobberAdapter') && integrationRuntime.includes('createZapierWebhookAdapter') && oauthRuntime.includes('exchangeOAuthCode') && serviceMigration.includes('atlas_v123_jobs') && serviceMigration.includes('ROW LEVEL SECURITY'), 'Service operations, OAuth, Zapier/Jobber runtime and tenant-isolated persistence are present');
 
   const capabilityFabric = await read('packages/atlas-core/capability-fabric.mjs');
   const capabilityCheck = await read('scripts/capabilities-check.mjs');
