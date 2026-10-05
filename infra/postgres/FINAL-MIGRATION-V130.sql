@@ -34,5 +34,4 @@ BEGIN
 END;
 $$;
 REVOKE ALL ON FUNCTION atlas_v130_claim_workflow_schedules(INTEGER) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION atlas_v130_claim_workflow_schedules(INTEGER) TO atlas_app;
 COMMIT;
