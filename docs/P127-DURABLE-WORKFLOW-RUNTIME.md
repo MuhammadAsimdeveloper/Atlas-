@@ -20,6 +20,10 @@ Before P127, Atlas persisted waiting and retryable execution states, but the wor
 
 The resume RPC is SECURITY DEFINER, uses a fixed pg_catalog,public search path, accepts only the restricted atlas_worker session, validates the active lease, and is executable only by atlas_worker.
 
+## Verification
+
+The P127 test suite covers wait scheduling and replay-safe resume requests. CI must additionally verify the complete repository migration chain and production activation checks before merge.
+
 ## Remaining execution frontier
 
 P127 makes durable waits/retries real, but the broader automation frontier still includes event-triggered workflow starts, broad CRM/action node handlers, production agent/model execution, calendar/social connectors, workflow inspection UI and measured distributed worker scaling.
