@@ -123,4 +123,3 @@ CREATE POLICY atlas_workflow_execution_events_tenant ON atlas_workflow_execution
   );
 
 REVOKE ALL ON atlas_workflow_executions, atlas_workflow_execution_events FROM PUBLIC;
-REVOKE ALL ON atlas_workflow_executions, atlas_workflow_execution_events FROM atlas_app, atlas_worker;
