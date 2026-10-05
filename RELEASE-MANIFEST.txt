@@ -1,3 +1,17 @@
+ATLAS V120.0.0 — Security hardening release
+
+Implemented
+- Worker workflow execution table access is removed; durable execution access is lease-bound through restricted PostgreSQL RPCs.
+- Browser/API security headers are centralized, production health readiness requires an explicit token, and sensitive mutation/webhook paths are distributed-rate-limited with HMAC-derived client keys.
+- CI is restricted to read-only repository contents with a bounded job timeout and Dependabot tracks npm and GitHub Actions updates.
+- Production provider/workflow execution remains behind the existing reviewed-handler and feature gates.
+
+Verification
+- Current release verification is performed by GitHub Actions on the protected pull request before merge. This section will not claim a pass until the current head completes.
+
+Security boundary
+- No KMS/managed secret vault, WAF, MFA/2FA, external penetration test or managed PostgreSQL deployment is claimed by this source release.
+
 ATLAS V116.0.0 — Durable runtime, visual workflow authoring and verified trial release
 
 Implemented
