@@ -46,10 +46,10 @@ function requestForNode({node,connection,job,context}){
 export function createProviderRuntime({connectionStore,secretResolver,fetchImpl=fetch,logger=console}={}){
  if(!connectionStore||typeof connectionStore.getProviderConnectionForWorker!=='function')throw new TypeError('A lease-bound provider connection store is required.');
  if(typeof secretResolver!=='function')throw new TypeError('A production secret resolver is required.');
+ const reconciler = typeof connectionStore.startProviderAction==='function' && typeof connectionStore.recordProviderOutcome==='function' ? new ProviderReconciler({store:connectionStore,logger}) : null;
  return Object.freeze({execute:async({node,job,context})=>{
    const cfg=object(node.config||{},'node.config'),capabilityId=text(cfg.capabilityId,'capabilityId',120);
    if(cfg.consent!==true||cfg.approved!==true)throw Object.assign(new Error('Provider action requires explicit consent and approval.'),{code:'provider_consent_required'});
-   if(context.attempt>1)throw Object.assign(new Error('Provider action retry requires reconciliation because the configured adapter cannot guarantee exactly-once delivery.'),{code:'provider_retry_unsafe'});
    if(!PROVIDER_ACTIONS.has(capabilityId))throw Object.assign(new Error('Unsupported provider capability.'),{code:'provider_capability_unsupported'});
    const connectionRef=ref(cfg.connectionRef,'connectionRef');
    if(!UUID.test(connectionRef))throw Object.assign(new Error('Provider connection reference must be a UUID.'),{code:'provider_connection_invalid'});
