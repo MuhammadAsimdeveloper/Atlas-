@@ -1,3 +1,11 @@
+## Unreleased — V117 Workflow Preview
+
+- Added a tenant-authenticated workflow simulation endpoint for safe test-mode rehearsal of saved workflow graphs.
+- Added bounded preview execution for native data/control-flow nodes, deterministic condition routing, approval pauses and honest adapter/model simulation.
+- Preview mode performs zero external side effects and rejects cross-tenant execution and trigger mismatches.
+- Added workflow preview unit/API tests and documented the flagship Lead-to-Booking validation path.
+- Normalized the V118 provider integration documentation final newline so the repository documentation gate remains green.
+
 ## 116.0.0 — Visual workflow authoring
 - Added a laptop-first visual workflow editor inside the authenticated workspace for triggers, node settings, connection paths and ports, backed by the existing checksummed/versioned graph contract.
 - Added a read-only workflow catalog endpoint. It resolves the current session and active tenant and enforces the workspace’s workflow-read permission before returning canonical event/node metadata.
