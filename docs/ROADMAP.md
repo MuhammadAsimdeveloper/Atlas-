@@ -16,3 +16,11 @@ Repository readiness is not the same as live infrastructure. External controls m
 - Durable dispatch state and bounded control-event ledger.
 - Optional best-effort OTLP HTTP export.
 - Runtime execution now records auditable worker outcomes without making telemetry authoritative.
+
+
+## V145 — Real Redis acceleration and worker wakeup
+
+- Native RESP2 Redis client with redis:// and rediss:// support.
+- Worker BRPOP wakeup path that only accelerates the PostgreSQL claim loop.
+- Redis failure automatically degrades to bounded PostgreSQL polling.
+- PostgreSQL remains authoritative; Redis envelopes are wakeup hints, not execution state.
