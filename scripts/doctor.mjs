@@ -28,7 +28,7 @@ try {
     const migration = await read(`infra/postgres/FINAL-MIGRATION-V${version}.sql`);
     check(`V${version} distributed production fabric`, migration.includes('BEGIN;') && migration.includes('COMMIT;'), `V${version} migration is transaction-wrapped.`);
   }
-  check('V139 Redis acceleration with durable fallback', distributedFabric.includes('class RedisTransport') && distributedFabric.includes('postgres') && distributedFabric.includes('transport') && fabricTest.includes('Redis failure is not a durability failure'), 'Redis is an acceleration/wakeup layer and PostgreSQL remains the durable fallback.');
+  check('V139 Redis acceleration with durable fallback', distributedFabric.includes('class RedisTransport') && distributedFabric.includes('postgres') && distributedFabric.includes('transport') && fabricTest.includes('redis failure is not a durability failure'), 'Redis is an acceleration/wakeup layer and PostgreSQL remains the durable fallback.');
   check('V140 bounded autoscaling', distributedFabric.includes('computeScaleDecision') && distributedFabric.includes('sloErrorBudgetRemaining') && fabricTest.includes('autoscaler respects SLO and bounds'), 'Autoscaling is bounded by worker limits, cooldowns and SLO error budget.');
   check('V141 failover control', distributedFabric.includes('evaluateFailover') && distributedFabric.includes('database_unavailable') && distributedFabric.includes('postgres_fallback'), 'Worker, Redis and database failure states fail closed or recover through durable leases.');
   check('V142 OTLP contract', distributedFabric.includes('buildOtlpSpan') && fabricTest.includes('OTLP spans'), 'OTLP span construction is bounded and tested; a collector remains deployment evidence.');
