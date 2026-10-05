@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
 import { nextScheduleOccurrence, assertIanaTimezone, boundedJson, eventDedupKey } from '../../packages/atlas-core/production-frontier.mjs';
 
@@ -443,8 +443,8 @@ export class PostgresRuntimeStore {
 
   async recordDispatchState({ tenantId, jobId, jobType, attempt = 1, status = 'published', errorCode = null } = {}) {
     if (!UUID.test(tenantId || '') || !UUID.test(jobId || '') || !/^[a-z][a-z0-9_.-]{1,79}$/.test(jobType || '') || !Number.isInteger(attempt) || attempt < 0 || attempt > 1000 || !['pending','published','degraded','failed'].includes(status)) throw new TypeError('dispatch_state_invalid');
-    const sql = "INSERT INTO atlas_runtime_dispatch_records(tenant_id,dispatch_id,job_id,job_type,priority,transport,envelope_sha256,status,attempts,last_error_code,last_attempt_at,acknowledged_at) VALUES($1,$2,$2,$3,5,'postgres',encode(digest($2,'sha256'),'hex'),$4,$5,$6,now(),CASE WHEN $4='published' THEN now() ELSE NULL END) ON CONFLICT(tenant_id,job_id) DO UPDATE SET status=EXCLUDED.status,attempts=atlas_runtime_dispatch_records.attempts+1,last_error_code=EXCLUDED.last_error_code,last_attempt_at=now(),acknowledged_at=CASE WHEN EXCLUDED.status='published' THEN now() ELSE atlas_runtime_dispatch_records.acknowledged_at END RETURNING dispatch_id,status,attempts";
-    const { rows } = await this.pool.query(sql,[tenantId,jobId,jobType,status,attempt,errorCode]); return rows[0];
+    const sql = "INSERT INTO atlas_runtime_dispatch_records(tenant_id,dispatch_id,job_id,job_type,priority,transport,envelope_sha256,status,attempts,last_error_code,last_attempt_at,acknowledged_at) VALUES($1,$2,$2,$3,5,'postgres',$7,$4,$5,$6,now(),CASE WHEN $4='published' THEN now() ELSE NULL END) ON CONFLICT(tenant_id,job_id) DO UPDATE SET status=EXCLUDED.status,attempts=atlas_runtime_dispatch_records.attempts+1,last_error_code=EXCLUDED.last_error_code,last_attempt_at=now(),acknowledged_at=CASE WHEN EXCLUDED.status='published' THEN now() ELSE atlas_runtime_dispatch_records.acknowledged_at END RETURNING dispatch_id,status,attempts";
+    const { rows } = await this.pool.query(sql,[tenantId,jobId,jobType,status,attempt,errorCode,createHash('sha256').update(jobId).digest('hex')]); return rows[0];
   }
 
   async recordControlEvent(event) {
