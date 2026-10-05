@@ -33,3 +33,25 @@ test('email destination uses injected mailer and rejects missing sender',async()
   assert.equal(sent[0].to,'ops@example.com');
   assert.throws(()=>email.sendAlert({address:'bad',alert:{policyId:'p',poolId:'pool',severity:'warning'}}));
 });
+
+
+test('OTLP alert sender delivers only bounded HTTPS telemetry',async()=>{
+  let request;
+  const sender=new (await import('./alert-router.mjs')).OtlpAlertSender({
+    fetchImpl:async(_url,init)=>{request=init;return {ok:true,status:200};}
+  });
+  await sender.send({
+    endpoint:'https://otel.example.test/v1/logs',
+    secret:'secret-secret-secret',
+    alert:{alertId:'a1',policyId:'p1',poolId:'pool',severity:'critical'}
+  });
+  assert.equal(request.method,'POST');
+  assert.equal(request.headers.authorization,'Bearer secret-secret-secret');
+  assert.match(request.body,/resourceLogs/);
+  assert.match(request.body,/a1/);
+});
+
+test('OTLP alert sender rejects insecure endpoints',async()=>{
+  const sender=new (await import('./alert-router.mjs')).OtlpAlertSender();
+  await assert.rejects(sender.send({endpoint:'http://otel.example.test/v1/logs',alert:{alertId:'a1'}}),/HTTPS/);
+});
