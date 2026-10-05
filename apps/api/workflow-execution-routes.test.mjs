@@ -94,3 +94,17 @@ test('execution cancellation, approval and replay stay tenant-scoped and require
     assert.equal(api.calls.at(-1)[1].tenantId,tenantId);
   }finally{await api.close();}
 });
+
+
+test('execution history accepts bounded filters for operator triage', async () => {
+  const api = await fixture();
+  try {
+    const response = await fetch(api.base + '/api/v1/growth/workflows/' + workflowId + '/executions?limit=25&status=retryable&triggerEventType=contact.created&errorCode=provider_timeout', { headers: { cookie: api.headers.cookie } });
+    assert.equal(response.status, 200);
+    const call = api.calls.find(([kind]) => kind === 'list');
+    assert.equal(call[1].limit, 25);
+    assert.equal(call[1].status, 'retryable');
+    assert.equal(call[1].triggerEventType, 'contact.created');
+    assert.equal(call[1].errorCode, 'provider_timeout');
+  } finally { await api.close(); }
+});
