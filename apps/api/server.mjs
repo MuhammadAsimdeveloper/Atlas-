@@ -11,6 +11,8 @@ import { PostgresWorkflowExecutionStore } from './workflow-execution-store.mjs';
 import { securityHeaders, validateHealthToken } from './security.mjs';
 import { PostgresCapabilityStore } from './capability-store.mjs';
 import { createCapabilityApi } from './capability-routes.mjs';
+import { loadInboxContentStore } from './inbox-content.mjs';
+import { loadWebhookSecretResolver } from './webhook-secrets.mjs';
 
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
@@ -75,6 +77,8 @@ let workflowExecutionStore = null;
 let growthApi = null;
 let capabilityStore = null;
 let capabilityApi = null;
+let inboxContentStore = null;
+let webhookSecretResolver = null;
 if (env.ATLAS_DATABASE_URL) {
   const { Pool } = await import('pg');
   pool = new Pool(await createPostgresPoolConfig(env, { application_name: `atlas-api-${release.toLowerCase()}` }));
@@ -86,7 +90,9 @@ if (env.ATLAS_DATABASE_URL) {
   authApi = createAuthApi({ store: authStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
   growthApi = createGrowthApi({ store: growthStore, executionStore: workflowExecutionStore, authStore, env });
   capabilityStore = new PostgresCapabilityStore(pool);
-  capabilityApi = createCapabilityApi({ store: capabilityStore, authStore, env });
+  inboxContentStore = await loadInboxContentStore(env);
+  webhookSecretResolver = await loadWebhookSecretResolver(env);
+  capabilityApi = createCapabilityApi({ store: capabilityStore, authStore, env, inboxContentStore, webhookSecretResolver });
 }
 
 const server = createServer(async (req, res) => {
