@@ -14,7 +14,7 @@ export async function parseAndVerifyInboxWebhook({providerKey,endpoint,secret,ra
  if(providerKey.startsWith('twilio.')&&!twilioOk({url,params:query,signature:headerValue(headers,'x-twilio-signature'),secret})){
    const contentType=String(headerValue(headers,'content-type')).toLowerCase();
    if(contentType.includes('application/x-www-form-urlencoded')){
-     const params=Object.fromEntries(new URLSearchParams(rawBody));if(!twilioOk({url,params,signature:headerValue(headers,'x-twilio-signature'),secret}))throw Object.assign(new Error('Twilio webhook signature invalid.'),{code:'webhook_signature_invalid'});
+     const params={...query,...Object.fromEntries(new URLSearchParams(rawBody))};if(!twilioOk({url,params,signature:headerValue(headers,'x-twilio-signature'),secret}))throw Object.assign(new Error('Twilio webhook signature invalid.'),{code:'webhook_signature_invalid'});
    } else throw Object.assign(new Error('Twilio webhook signature invalid.'),{code:'webhook_signature_invalid'});
  }
  if(providerKey==='meta.whatsapp'&&!metaOk(rawBody,headerValue(headers,'x-hub-signature-256'),secret))throw Object.assign(new Error('WhatsApp webhook signature invalid.'),{code:'webhook_signature_invalid'});
