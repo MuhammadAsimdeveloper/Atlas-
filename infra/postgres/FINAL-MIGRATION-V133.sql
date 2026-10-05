@@ -8,4 +8,13 @@ CREATE TABLE IF NOT EXISTS atlas_tenant_action_bindings (
 );
 ALTER TABLE atlas_tenant_action_bindings ENABLE ROW LEVEL SECURITY; ALTER TABLE atlas_tenant_action_bindings FORCE ROW LEVEL SECURITY;
 CREATE POLICY atlas_tenant_action_bindings_tenant ON atlas_tenant_action_bindings USING(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid) WITH CHECK(tenant_id=nullif(current_setting('app.tenant_id',true),'')::uuid);
+INSERT INTO atlas_action_catalog(action_key,connector_key,action_version,input_schema,output_schema,risk_class,requires_approval)
+VALUES
+ ('communication.email','postmark',1,'{"type":"object","required":["connectionRef","to","from","subject","textBody"]}','{"type":"object","properties":{"providerRef":{"type":"string"}}}','standard',true),
+ ('communication.sms','twilio',1,'{"type":"object","required":["connectionRef","to","body"]}','{"type":"object","properties":{"providerRef":{"type":"string"}}}','sensitive',true),
+ ('communication.whatsapp','whatsapp_cloud',1,'{"type":"object","required":["connectionRef","to","body"]}','{"type":"object","properties":{"providerRef":{"type":"string"}}}','sensitive',true),
+ ('communication.voice','twilio_voice',1,'{"type":"object","required":["connectionRef","to","twimlUrl"]}','{"type":"object","properties":{"providerRef":{"type":"string"}}}','sensitive',true),
+ ('automation.webhook','webhook',1,'{"type":"object","required":["connectionRef","payload"]}','{"type":"object","properties":{"providerRef":{"type":"string"}}}','sensitive',true),
+ ('service.jobber','jobber',1,'{"type":"object","required":["connectionRef","query","variables"]}','{"type":"object"}','standard',true)
+ON CONFLICT(action_key) DO NOTHING;
 COMMIT;
