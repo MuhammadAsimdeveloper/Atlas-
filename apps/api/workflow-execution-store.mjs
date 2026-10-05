@@ -42,7 +42,7 @@ export class PostgresWorkflowExecutionStore{
     return membership.rows[0];
   }
 
-  async #transaction(scope,work){
+  async #transaction(work){
     const client=await this.pool.connect();
     try{
       await client.query('BEGIN');
