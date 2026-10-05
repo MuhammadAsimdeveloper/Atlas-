@@ -113,6 +113,17 @@ Each item should produce code, tests, observability and documentation where appl
 
 ## V121 — AI Workflow + Agents
 
+### Delivered first activation slice
+
+- [x] MiroFish-driven tenant activation checklist for the flagship Lead → follow-up → appointment outcome
+- [x] Durable delay/wait-until state with bounded 30-day resume window
+- [x] Due-only resume transition with checksum/version integrity
+- [x] Operator execution-history filters for status, trigger and error code
+
+### Remaining P0
+
+
+
 ### P0
 
 - [ ] Natural-language workflow draft generator
