@@ -1,13 +1,14 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
 import { nextScheduleOccurrence, assertIanaTimezone, boundedJson, eventDedupKey } from '../../packages/atlas-core/production-frontier.mjs';
+import { createDispatchEnvelope } from '../../packages/atlas-runtime/distributed-fabric.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
 const PREFIX = /^[a-f0-9]{56}$/;
 
 export class PostgresRuntimeStore {
-  constructor(pool) { this.pool = pool; }
+  constructor(pool, { redisTransport = null, logger = console } = {}) { this.pool = pool; this.redisTransport = redisTransport; this.logger = logger; }
 
   async #tenantTransaction({ actorId, tenantId }, work) {
     if (!UUID.test(actorId || '') || !UUID.test(tenantId || '')) throw createAuthError(409, 'workspace_required');
@@ -41,7 +42,20 @@ export class PostgresRuntimeStore {
     return this.#tenantTransaction({ actorId, tenantId }, async client => {
       const { rows } = await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7) AS job_id',
         [tenantId, jobId, jobType, JSON.stringify(payloadRef), idempotencyKey, runAt, maxAttempts]);
-      return rows[0].job_id;
+      const persistedJobId = rows[0].job_id;
+      if (this.redisTransport) {
+        const envelope = createDispatchEnvelope({tenantId,jobId:persistedJobId,jobType,idempotencyKey,attempt:1,payloadRef});
+        try {
+          await this.redisTransport.publish(jobType,envelope,5);
+          await this.recordDispatchState({tenantId,jobId:persistedJobId,jobType,attempt:1,status:'published',transport:'redis',priority:5,envelopeSha256:envelope.envelopeHash}).catch(()=>{});
+        } catch {
+          this.logger.warn?.('Atlas Redis dispatch degraded to PostgreSQL.');
+          await this.recordDispatchState({tenantId,jobId:persistedJobId,jobType,attempt:1,status:'degraded',transport:'postgres',priority:5,envelopeSha256:envelope.envelopeHash,errorCode:'redis_dispatch_failed'}).catch(()=>{});
+        }
+      } else {
+        await this.recordDispatchState({tenantId,jobId:persistedJobId,jobType,attempt:1,status:'published',transport:'postgres',priority:5}).catch(()=>{});
+      }
+      return persistedJobId;
     });
   }
 
@@ -441,10 +455,11 @@ export class PostgresRuntimeStore {
     return rows[0].state;
   }
 
-  async recordDispatchState({ tenantId, jobId, jobType, attempt = 1, status = 'published', errorCode = null } = {}) {
-    if (!UUID.test(tenantId || '') || !UUID.test(jobId || '') || !/^[a-z][a-z0-9_.-]{1,79}$/.test(jobType || '') || !Number.isInteger(attempt) || attempt < 0 || attempt > 1000 || !['pending','published','degraded','failed'].includes(status)) throw new TypeError('dispatch_state_invalid');
-    const sql = "INSERT INTO atlas_runtime_dispatch_records(tenant_id,dispatch_id,job_id,job_type,priority,transport,envelope_sha256,status,attempts,last_error_code,last_attempt_at,acknowledged_at) VALUES($1,$2,$2,$3,5,'postgres',$7,$4,$5,$6,now(),CASE WHEN $4='published' THEN now() ELSE NULL END) ON CONFLICT(tenant_id,job_id) DO UPDATE SET status=EXCLUDED.status,attempts=atlas_runtime_dispatch_records.attempts+1,last_error_code=EXCLUDED.last_error_code,last_attempt_at=now(),acknowledged_at=CASE WHEN EXCLUDED.status='published' THEN now() ELSE atlas_runtime_dispatch_records.acknowledged_at END RETURNING dispatch_id,status,attempts";
-    const { rows } = await this.pool.query(sql,[tenantId,jobId,jobType,status,attempt,errorCode,createHash('sha256').update(jobId).digest('hex')]); return rows[0];
+  async recordDispatchState({ tenantId, jobId, jobType, attempt = 1, status = 'published', transport = 'postgres', priority = 5, envelopeSha256 = null, errorCode = null } = {}) {
+    if (!UUID.test(tenantId || '') || !UUID.test(jobId || '') || !/^[a-z][a-z0-9_.-]{1,79}$/.test(jobType || '') || !Number.isInteger(attempt) || attempt < 0 || attempt > 1000 || !['pending','published','degraded','failed'].includes(status) || !['postgres','redis'].includes(transport) || !Number.isInteger(priority) || priority < 0 || priority > 9) throw new TypeError('dispatch_state_invalid');
+    const digest=envelopeSha256&&SHA256.test(envelopeSha256)?envelopeSha256:createHash('sha256').update(jobId).digest('hex');
+    const sql = "INSERT INTO atlas_runtime_dispatch_records(tenant_id,dispatch_id,job_id,job_type,priority,transport,envelope_sha256,status,attempts,last_error_code,last_attempt_at,acknowledged_at) VALUES($1,$2,$2,$3,$8,$9,$10,$4,$5,$6,now(),CASE WHEN $4='published' THEN now() ELSE NULL END) ON CONFLICT(tenant_id,job_id) DO UPDATE SET status=EXCLUDED.status,transport=EXCLUDED.transport,priority=EXCLUDED.priority,envelope_sha256=EXCLUDED.envelope_sha256,attempts=atlas_runtime_dispatch_records.attempts+1,last_error_code=EXCLUDED.last_error_code,last_attempt_at=now(),acknowledged_at=CASE WHEN EXCLUDED.status='published' THEN now() ELSE atlas_runtime_dispatch_records.acknowledged_at END RETURNING dispatch_id,status,attempts,transport";
+    const { rows } = await this.pool.query(sql,[tenantId,jobId,jobType,status,attempt,errorCode,digest,priority,transport]); return rows[0];
   }
 
   async recordControlEvent(event) {
