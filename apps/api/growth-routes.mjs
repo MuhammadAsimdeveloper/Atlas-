@@ -135,6 +135,7 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
       }
       if (path === '/api/v1/automation/events' && req.method === 'POST') {
         await requireMutation(req, who.session);
+        if (env.ATLAS_WORKFLOW_EVENT_INGRESS_ENABLED !== 'true') return send(res, 503, { error: 'workflow_event_ingress_disabled', message: 'Automation event ingress is disabled until production execution is explicitly activated.' }, env);
         if (env.ATLAS_WORKFLOW_EXECUTION_ENABLED !== 'true' || env.ATLAS_WORKFLOW_EXECUTION_HANDLER_READY !== 'true') {
           return send(res, 503, { error: 'workflow_execution_not_enabled', message: 'Live automation events require a reviewed production workflow handler.' }, env);
         }
