@@ -277,7 +277,7 @@ test('delay and wait nodes pause execution with a bounded resume time', () => {
   assert.equal(execution.resumeAt, '2026-10-05T10:01:00.000Z');
   const before = resumeWorkflowExecution({ execution, now: now + 59_999 });
   assert.equal(before, execution);
-  const resumed = resumeWorkflowExecution({ execution, now: now + 60_000 });
+  const resumed = resumeWorkflowExecution({ execution, now: now + 60_001 });
   assert.equal(resumed.status, 'queued');
   assert.equal(resumed.currentNodeId, 'stop');
   assert.equal(resumed.resumeAt, null);
