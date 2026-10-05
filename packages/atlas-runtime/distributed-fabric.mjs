@@ -12,7 +12,7 @@ export class RedisTransport {
   }
   key(queue,priority=0){if(!JOB.test(queue)||!Number.isInteger(priority)||priority<0||priority>9)throw new TypeError('Queue or priority is invalid.');return `${this.namespace}:q:${queue}:p${priority}`;}
   async publish(queue,envelope,priority=5){const body=JSON.stringify(envelope);if(body.length>64_000)throw new TypeError('Dispatch envelope exceeds 64KiB.');return this.client.lpush(this.key(queue,priority),body);}
-  async receive(queues,timeoutSeconds=1){for(const q of queues){for(let p=9;p>=0;p--){const result=await this.client.brpop(this.key(q,p),timeoutSeconds);if(result?.[1])return JSON.parse(result[1]);}}return null;}
+  async receive(queues,timeoutSeconds=1){if(!Array.isArray(queues)||!queues.length)throw new TypeError('At least one queue is required.');const keys=[];for(const q of queues)for(let p=9;p>=0;p--)keys.push(this.key(q,p));const result=await this.client.brpop(...keys,timeoutSeconds);return result?.[1]?JSON.parse(result[1]):null;}
 }
 
 export function createDispatchEnvelope({tenantId,jobId,jobType,idempotencyKey,attempt=1,payloadRef={},traceId=randomUUID()}){
@@ -26,7 +26,7 @@ export class DurableDispatchController {
    const envelope=createDispatchEnvelope(job);
    if(!this.transport)return {mode:'postgres',published:false,envelope};
    try{await this.transport.publish(job.jobType,envelope,priority);return {mode:'redis',published:true,envelope};}
-   catch(error){this.logger.warn?.(`Redis dispatch degraded to PostgreSQL: ${error?.message||'unknown'}`);return {mode:'postgres',published:false,envelope};}
+   catch(error){this.logger.warn?.(`Redis dispatch degraded to PostgreSQL: ${error?.message||'unknown'}`);if(typeof this.store.recordDispatchFallback==='function'){await this.store.recordDispatchFallback(envelope,job.jobType,priority).catch(()=>{});}return {mode:'postgres',published:false,envelope};}
  }
  async recover(queueTypes,limit=100){const jobs=await this.store.claimJobs('__dispatch-recovery__',limit,60,queueTypes);return jobs.map(j=>createDispatchEnvelope({tenantId:j.tenant_id,jobId:j.job_id,jobType:j.job_type,idempotencyKey:j.idempotency_key,attempt:j.attempts,payloadRef:j.payload_ref}));}
 }
