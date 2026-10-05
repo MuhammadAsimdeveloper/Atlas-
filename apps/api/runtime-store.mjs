@@ -283,7 +283,7 @@ export class PostgresRuntimeStore {
     if(!UUID.test(sessionId||'')||!/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(agentReleaseRef||'')||!/^[a-z][a-z0-9_.-]{1,79}$/.test(channel||'')||!['none','session','tenant'].includes(memoryScope)) throw createAuthError(400,'agent_session_invalid');
     if(customerRef!==null&&!/^[A-Za-z0-9_.:/@+-]{1,240}$/.test(customerRef)) throw createAuthError(400,'customer_ref_invalid');
     return this.#tenantTransaction({actorId,tenantId},async client=>{
-      await client.query('INSERT INTO atlas_agent_sessions(tenant_id,session_id,agent_release_ref,channel,customer_ref,memory_scope,created_by) VALUES($1,$2,$3,$4,$5,$6,$7)',[tenantId,sessionId,agentReleaseRef,channel,customerRef,memoryScope,actorId]);
+      await client.query('INSERT INTO atlas_ai_agent_sessions(tenant_id,session_id,agent_release_ref,channel,customer_ref,memory_scope,created_by) VALUES($1,$2,$3,$4,$5,$6,$7)',[tenantId,sessionId,agentReleaseRef,channel,customerRef,memoryScope,actorId]);
       return sessionId;
     });
   }
@@ -308,7 +308,7 @@ export class PostgresRuntimeStore {
   async transitionAgentSession({ actorId, tenantId, sessionId, status }) {
     if(!UUID.test(sessionId||'')||!['active','waiting_approval','handoff','completed','failed','canceled'].includes(status)) throw createAuthError(400,'agent_session_invalid');
     return this.#tenantTransaction({actorId,tenantId},async client=>{
-      const {rows}=await client.query('UPDATE atlas_agent_sessions SET status=$3,updated_at=now() WHERE tenant_id=$1 AND session_id=$2 RETURNING session_id,status,updated_at',[tenantId,sessionId,status]);
+      const {rows}=await client.query('UPDATE atlas_ai_agent_sessions SET status=$3,updated_at=now() WHERE tenant_id=$1 AND session_id=$2 RETURNING session_id,status,updated_at',[tenantId,sessionId,status]);
       if(!rows.length) throw createAuthError(404,'agent_session_not_found');
       return rows[0];
     });
