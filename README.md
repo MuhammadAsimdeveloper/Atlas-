@@ -1,3 +1,17 @@
+## V139–V143 — Distributed production execution fabric
+
+Atlas now contains the repository-side distributed runtime layer across V139–V143:
+
+- **V139:** Redis priority dispatch, bounded envelopes, distributed wakeup transport and PostgreSQL durability fallback.
+- **V140:** SLO-aware autoscaling decision logic with min/max bounds and cooldown protection.
+- **V141:** worker/Redis/PostgreSQL failure-state evaluation plus recovery-drill evidence.
+- **V142:** bounded OTLP span construction and observability destination contracts.
+- **V143:** deployment-evidence gates for managed PostgreSQL, Redis HA, KMS/secrets, WAF/CDN, backups/PITR, restore drills, load testing, disaster recovery, provider credentials and the public HTTPS origin.
+
+**Production truth boundary:** these repository controls do not pretend that managed infrastructure, Redis HA, provider credentials, DNS/WAF, backup/restore evidence or measured failover are live. The deployment gate stays unready until those external controls are actually configured and evidenced.
+
+See [Distributed Production Fabric](docs/DISTRIBUTED-PRODUCTION-FABRIC.md).
+
 ## V138 — Distributed runtime capacity and backpressure
 
 V138 adds durable global concurrency control for worker pools. Workers acquire bounded capacity leases before claiming jobs, release unused reservations, and release each completed slot. Expired leases are recoverable, so a crashed worker cannot permanently consume pool capacity. This is the PostgreSQL authority layer; Redis acceleration remains a subsequent deployment/runtime adapter rather than a fake configuration claim.

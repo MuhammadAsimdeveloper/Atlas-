@@ -1,3 +1,13 @@
+## 143.0.0 — Distributed production execution fabric (V139–V143)
+- Added a Redis transport abstraction with priority queues and bounded dispatch envelopes.
+- Kept PostgreSQL as the durable execution authority and added explicit Redis-failure fallback/recovery semantics.
+- Added bounded SLO-aware autoscaling decisions with queue-depth/utilization pressure, worker bounds and cooldown protection.
+- Added failover-state evaluation for worker crash, Redis degradation and PostgreSQL outage, plus recovery-drill evidence persistence.
+- Added bounded OTLP span construction and observability destination contracts.
+- Added deployment evidence controls for managed PostgreSQL, Redis HA, KMS/secrets, WAF/CDN, backups/PITR, restore drills, load tests, disaster recovery, provider credentials and public origin.
+- Added release doctor, production activation and focused runtime tests for V139–V143.
+- External infrastructure and measured production evidence remain explicitly unverified until deployed; the repository does not claim them as live.
+
 ## 138.0.0 — Distributed runtime capacity and backpressure
 - Added durable runtime-pool capacity leases with atomic pool-row arbitration.
 - Added bounded global concurrency enforcement across workers in the same runtime pool.
