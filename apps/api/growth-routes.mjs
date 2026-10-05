@@ -144,7 +144,7 @@ export function createGrowthApi({ store, authStore, executionStore = null, env =
         const workflowId = executionMatch[1];
         const executionId = executionMatch[2] || null;
         const executionAction = executionMatch[3] || null;
-        if (req.method === 'GET' && !executionId) return send(res, 200, await executionStore.list({ ...who, workflowId, limit: Number(url.searchParams.get('limit') || 50) }), env);
+        if (req.method === 'GET' && !executionId) return send(res, 200, await executionStore.list({ ...who, workflowId, limit: Number(url.searchParams.get('limit') || 50), status: url.searchParams.get('status') || null, triggerEventType: url.searchParams.get('triggerEventType') || null, errorCode: url.searchParams.get('errorCode') || null }), env);
         if (req.method === 'GET' && executionId && !executionAction) return send(res, 200, { execution: await executionStore.get({ ...who, workflowId, executionId }) }, env);
         if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' }, env, { allow: 'GET, POST' });
         await requireMutation(req, who.session);
