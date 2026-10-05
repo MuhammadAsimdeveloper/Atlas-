@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
-import { nextScheduleOccurrence, boundedJson, eventDedupKey } from '../../packages/atlas-core/production-frontier.mjs';
+import { nextScheduleOccurrence, assertIanaTimezone, boundedJson, eventDedupKey } from '../../packages/atlas-core/production-frontier.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -201,7 +201,8 @@ export class PostgresRuntimeStore {
   }
 
   async createWorkflowSchedule({ actorId, tenantId, scheduleId, workflowId, workflowVersion, scheduleKind, expression, timezone, dstPolicy = 'skip', nextRunAt } = {}) {
-    if (!UUID.test(scheduleId || '') || !/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(workflowId || '') || !Number.isInteger(workflowVersion) || workflowVersion < 1 || !['cron','interval','calendar'].includes(scheduleKind) || !/^[A-Za-z0-9_*,?\-/: ]{1,240}$/.test(expression || '') || !/^[A-Za-z0-9_+\-]{1,80}(?:\/[A-Za-z0-9_+\-]{1,40})*$/.test(timezone || '') || !['skip','shift_forward','run_once'].includes(dstPolicy) || !Number.isFinite(Date.parse(nextRunAt))) throw createAuthError(400, 'workflow_schedule_invalid');
+    if (!UUID.test(scheduleId || '') || !/^[A-Za-z0-9_.:/@+-]{1,160}$/.test(workflowId || '') || !Number.isInteger(workflowVersion) || workflowVersion < 1 || !['cron','interval','calendar'].includes(scheduleKind) || typeof expression !== 'string' || expression.length < 1 || expression.length > 240 || typeof timezone !== 'string' || !['skip','shift_forward','run_once'].includes(dstPolicy) || !Number.isFinite(Date.parse(nextRunAt))) throw createAuthError(400, 'workflow_schedule_invalid');
+    try { assertIanaTimezone(timezone); if(scheduleKind === 'cron') nextScheduleOccurrence({schedule_kind:scheduleKind,expression,timezone,dst_policy:dstPolicy},new Date(nextRunAt)); } catch { throw createAuthError(400,'workflow_schedule_invalid'); }
     return this.#tenantTransaction({ actorId, tenantId }, async client => {
       await client.query('INSERT INTO atlas_workflow_schedules(tenant_id,schedule_id,workflow_id,workflow_version,schedule_kind,expression,timezone,dst_policy,next_run_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)', [tenantId,scheduleId,workflowId,workflowVersion,scheduleKind,expression,timezone,dstPolicy,nextRunAt]);
       return scheduleId;
