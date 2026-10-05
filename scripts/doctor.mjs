@@ -181,6 +181,12 @@ try {
   check('V121 activation path', activationRoutes.includes("/api/v1/growth/activation") && activationStore.includes("getActivationChecklist") && activationUi.includes("loadActivationChecklist") && activationStore.includes("provider adapter is claimed live"), 'Growth Center exposes a tenant-scoped first-outcome checklist without falsely claiming provider connectivity');
   check('V121 execution triage filters', activationRoutes.includes("triggerEventType") && activationRoutes.includes("errorCode") && executionStore.includes("safeStatus"), 'Execution history supports bounded status, trigger and error filtering for operator triage');
 
+  const capabilityFabric = await read('packages/atlas-core/capability-fabric.mjs');
+  const capabilityCheck = await read('scripts/capabilities-check.mjs');
+  const capabilityMigration = await read('infra/postgres/FINAL-MIGRATION-V122.sql');
+  const capabilityGrants = await read('infra/postgres/API-ROLE-GRANTS-V122.sql');
+  check('V122 complete capability fabric', capabilityFabric.includes('ATLAS_CAPABILITIES') && capabilityFabric.includes("communication.unified_inbox") && capabilityFabric.includes("enterprise.load_failover") && capabilityCheck.includes('exactly 60') && capabilityMigration.includes('atlas_v122_conversations') && capabilityMigration.includes('ROW LEVEL SECURITY') && capabilityGrants.includes('atlas_app'), 'All 60 requested capabilities have governed runtime registration, tenant persistence, API grants and fail-closed security boundaries');
+
   const executionSql = await read('infra/postgres/FINAL-MIGRATION-V119.sql');
   const executionGrants = await read('infra/postgres/API-ROLE-GRANTS-V119.sql');
   check('V119 durable workflow state machine', workflowEngine.includes('createWorkflowExecution') && workflowEngine.includes('completeWorkflowStep') && workflowEngine.includes('requestWorkflowApproval') && workflowEngine.includes('approveWorkflowExecution') && workflowEngine.includes('cancelWorkflowExecution') && workflowEngine.includes('replayWorkflowExecution') && workflowEngineTests.includes('replay creates a new execution'), 'Workflow runs pin graph version/checksum and support durable step, approval, retry, cancel and replay transitions');
