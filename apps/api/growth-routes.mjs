@@ -133,6 +133,11 @@ export function createGrowthApi({ store, authStore, executionStore = null, env =
         const portal = await createPaddlePortalSession({ customerId: current.customerId, subscriptionId: current.subscriptionId, env, fetchImpl });
         return send(res, 201, { portal }, env);
       }
+      if (path === '/api/v1/growth/activation') {
+        if (req.method !== 'GET') return send(res, 405, { error: 'method_not_allowed' }, env, { allow: 'GET' });
+        if (typeof store.getActivationChecklist !== 'function') throw createAuthError(503, 'activation_unavailable');
+        return send(res, 200, await store.getActivationChecklist(who), env);
+      }
       if (path === '/api/v1/growth/workflows/catalog') {
         if (req.method !== 'GET') return send(res, 405, { error: 'method_not_allowed' }, env, { allow: 'GET' });
         if (typeof store.getWorkflowCatalog !== 'function') throw createAuthError(503, 'workflow_catalog_unavailable');
