@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { computeScaleDecision } from './distributed-fabric.mjs';
 
 const ID=/^[A-Za-z0-9_.:-]{1,160}$/;
@@ -82,7 +82,7 @@ export class AutoscalerController {
     try{
       const result=await this.actuator.scaleTo({poolId,targetWorkers:decision.targetWorkers,decisionId:dId,minWorkers:policy.min_workers,maxWorkers:policy.max_workers});
       await this.store.updateScalingDecision({decisionId:dId,status:'actuated',actuatorRefHash:createHash('sha256').update(dId).digest('hex'),actuatedAt:new Date().toISOString()});
-      await this.store.recordControlEvent?.({eventId:crypto.randomUUID?.()||dId,type:'autoscaler.actuated',severity:'info',poolId,workerId,decision:{decisionId:dId,targetWorkers:decision.targetWorkers}});
+      await this.store.recordControlEvent?.({eventId:randomUUID(),type:'autoscaler.actuated',severity:'info',poolId,workerId,decision:{decisionId:dId,targetWorkers:decision.targetWorkers}});
       return {...decision,status:'actuated',decisionId:dId,result};
     }catch(error){
       const code=boundedText(error?.code||'autoscaler_actuator_failed','errorCode',80);
