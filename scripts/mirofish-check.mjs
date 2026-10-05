@@ -21,9 +21,9 @@ for (const [label, phrase] of required) {
   if (!source.includes(phrase)) throw new Error('MiroFish regression failed: missing ' + label);
 }
 
-const TENANT = 'tenant_miro_001';
-const OTHER_TENANT = 'tenant_miro_002';
-const ACTOR = 'actor_miro_001';
+const TENANT = '11111111-1111-4111-8111-111111111111';
+const OTHER_TENANT = '22222222-2222-4222-8222-222222222222';
+const ACTOR = '33333333-3333-4333-8333-333333333333';
 const NOW = Date.parse('2026-10-05T08:00:00.000Z');
 
 function record(module, id, payload, tenantId = TENANT) {
@@ -35,14 +35,14 @@ function baseInput() {
     tenantId: TENANT,
     journeyId: 'journey_miro_001',
     actorId: ACTOR,
-    sourceAsset: record('funnels', 'funnel_miro_001', {
+    sourceAsset: record('funnels', '44444444-4444-4444-8444-444444444444', {
       name: 'MiroFish service funnel',
       slug: 'miro-service',
       title: 'Book a service consultation',
       description: 'Book a service consultation.',
       blocks: [
-        { id: 'hero', type: 'hero', heading: 'Start', body: 'Tell us what you need.' },
-        { id: 'form', type: 'lead_form', heading: 'Lead form', body: '' }
+        { id: 'hero', type: 'hero', heading: 'Start', body: 'Tell us what you need.', items: [], buttonLabel: null, buttonUrl: null },
+        { id: 'form', type: 'lead_form', heading: 'Lead form', body: '', items: [], buttonLabel: null, buttonUrl: null }
       ],
       seo: { indexable: false, title: 'Book a service consultation', description: 'Book a service consultation.' }
     }),
@@ -55,7 +55,7 @@ function baseInput() {
       timeZone: 'UTC',
       consent: { email: true, sms: true, whatsapp: false }
     },
-    pipeline: record('pipelines', 'pipe_miro_001', {
+    pipeline: record('pipelines', '66666666-6666-4666-8666-666666666666', {
       name: 'Sales',
       stages: [
         { id: 'new', name: 'New', probability: 0.1, isClosedWon: false, isClosedLost: false },
@@ -64,7 +64,7 @@ function baseInput() {
       ],
       rules: { allowBackward: false, allowSkip: false, requireApprovalOnBackward: true }
     }),
-    qualificationProfile: record('ai-qualification', 'qual_miro_001', {
+    qualificationProfile: record('ai-qualification', '77777777-7777-4777-8777-777777777777', {
       name: 'Sales qualification',
       instructions: 'Qualify an inbound service buyer using explicit evidence.',
       criteria: [
@@ -81,20 +81,20 @@ function baseInput() {
     }),
     qualificationRatings: { need: 90, budget: 80 },
     qualificationEvidence: { need: 'evidence_need', budget: 'evidence_budget' },
-    followUp: record('ai-follow-up', 'followup_miro_001', {
+    followUp: record('ai-follow-up', '88888888-8888-4888-8888-888888888888', {
       name: 'Qualified lead follow-up',
       purpose: 'service',
       trigger: 'lead.qualified',
       steps: [
-        { id: 'step_1', delayMinutes: 0, channel: 'email', templateId: 'tpl_email_001', connectionId: 'conn_email_001', approvalRequired: true },
-        { id: 'step_2', delayMinutes: 60, channel: 'sms', templateId: 'tpl_sms_001', connectionId: 'conn_sms_001', approvalRequired: true }
+        { id: 'step_1', delayMinutes: 0, channel: 'email', templateId: '99999999-9999-4999-8999-999999999999', connectionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', approvalRequired: true },
+        { id: 'step_2', delayMinutes: 60, channel: 'sms', templateId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', connectionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', approvalRequired: true }
       ],
       stopOnReply: true,
       approvalRequired: true
     }),
     calendar: createBookingCalendar({
       tenantId: TENANT,
-      id: 'cal_miro_001',
+      id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
       timeZone: 'UTC',
       weeklyHours: { 0: [{ start: '09:00', end: '17:00' }], 1: [{ start: '09:00', end: '17:00' }], 2: [{ start: '09:00', end: '17:00' }], 3: [{ start: '09:00', end: '17:00' }], 4: [{ start: '09:00', end: '17:00' }], 5: [{ start: '09:00', end: '17:00' }] },
       slotDurationMinutes: 30,
@@ -150,7 +150,7 @@ scenarios.push(['voice consent boundary', healthy, result => result.voiceIntent.
 
 scenarios.push(['cross-tenant payload injection', () => {
   const input = baseInput();
-  input.sourceAsset = record('funnels', 'funnel_miro_other', input.sourceAsset.payload, OTHER_TENANT);
+  input.sourceAsset = record('funnels', '55555555-5555-4555-8555-555555555555', input.sourceAsset.payload, OTHER_TENANT);
   try { runLeadToBookingJourney(input); return { blocked: false }; } catch { return { blocked: true }; }
 }, result => result.blocked === true]);
 
@@ -163,8 +163,7 @@ scenarios.push(['workflow replay identity', () => {
 }, result => result.same === true]);
 
 scenarios.push(['public SEO refuses insecure origin', () => {
-  try {
-    assessSeoReadiness({
+  const result = assessSeoReadiness({
       title: 'Bad public page',
       description: 'A bad public page.',
       canonicalUrl: 'http://example.test/bad',
@@ -174,8 +173,7 @@ scenarios.push(['public SEO refuses insecure origin', () => {
       https: false,
       structuredDataTypes: []
     });
-    return { blocked: false };
-  } catch { return { blocked: true }; }
+    return { blocked: result.status === 'blocked' || result.https === false || result.ready === false };
 }, result => result.blocked === true]);
 
 scenarios.push(['agent destructive action needs approval', () => ({
