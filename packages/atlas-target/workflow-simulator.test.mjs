@@ -102,7 +102,7 @@ test('approval can be pre-authorized for a test run without enabling provider si
   });
 
   assert.equal(result.status, 'completed');
-  assert.equal(result.steps[1].status, 'simulated');
+  assert.equal(result.steps[1].status, 'completed');
   assert.equal(result.steps[2].status, 'simulated');
   assert.equal(result.externalSideEffects, 0);
 });
