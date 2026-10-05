@@ -1,3 +1,9 @@
+## 127.0.0 — Durable workflow resume runtime
+- Added lease-bound worker scheduling for workflow `delay`, `wait_until` and retry resume jobs.
+- Added idempotent resume identities so duplicate lease/retry handling cannot create duplicate execution resumes.
+- Approved workflow executions now enqueue a fresh `workflow.execute` job atomically with the approval transition.
+- Preserved tenant isolation, restricted `atlas_worker` access and reference-only queue payloads.
+
 ## 126.0.0 — Unified communications and production inbox
 - Added durable unified conversation/message APIs for filtered inbox queues, message timelines, optimistic read state and human handoff.
 - Added atomic outbound message creation plus communication.message.send queue jobs backed by the V125 production provider runtime.
