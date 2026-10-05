@@ -564,6 +564,26 @@ export class PostgresRuntimeStore {
     throw Object.assign(new Error('live recovery probes require deployment-specific infrastructure adapters'),{code:'live_recovery_probe_unconfigured'});
   }
 
+  async getRuntimeWorkerSnapshot(poolId) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '')) throw new TypeError('runtime_worker_snapshot_invalid');
+    const { rows } = await this.pool.query(
+      `SELECT
+         count(*) FILTER (WHERE observed_at >= now()-interval '90 seconds')::integer AS active_workers,
+         coalesce(sum(queue_depth) FILTER (WHERE observed_at >= now()-interval '90 seconds'),0)::integer AS queue_depth,
+         coalesce(sum(active_jobs) FILTER (WHERE observed_at >= now()-interval '90 seconds'),0)::integer AS active_jobs
+       FROM atlas_runtime_pool_heartbeats
+       WHERE pool_id=$1`,
+      [poolId]
+    );
+    return rows[0] || { active_workers:0,queue_depth:0,active_jobs:0 };
+  }
+
+  async getLastScalingActuation(poolId) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '')) throw new TypeError('runtime_scaling_history_invalid');
+    const { rows } = await this.pool.query('SELECT extract(epoch FROM (now()-max(actuated_at)))*1000 AS age_ms FROM atlas_runtime_scaling_decisions WHERE pool_id=$1 AND status=\'actuated\'', [poolId]);
+    return rows[0]?.age_ms == null ? 0 : Math.max(0,Number(rows[0].age_ms));
+  }
+
   async counts() {
     const { rows } = await this.pool.query('SELECT * FROM atlas_v115_runtime_queue_counts()');
     return rows[0];
