@@ -109,7 +109,7 @@ BEGIN
    UPDATE atlas_runtime_alerts SET status='resolved',resolved_at=now(),last_seen_at=now() WHERE fingerprint=alert_key AND status <> 'resolved';
  END IF;
  IF evaluation_status='critical' THEN
-   SELECT incident_id INTO incident_uuid FROM atlas_runtime_incidents WHERE fingerprint=incident_key;
+   SELECT ri.incident_id INTO incident_uuid FROM atlas_runtime_incidents AS ri WHERE ri.fingerprint=incident_key;
    IF incident_uuid IS NULL THEN incident_uuid := md5(incident_key)::uuid; END IF;
    INSERT INTO atlas_runtime_incidents(incident_id,fingerprint,severity,status,title,last_seen_at,resolved_at)
    VALUES(incident_uuid,incident_key,'critical','open','Atlas runtime SLO breach: ' || p_policy_id,now(),NULL)
