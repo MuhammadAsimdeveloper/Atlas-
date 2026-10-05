@@ -1,3 +1,7 @@
+## V138 — Distributed runtime capacity and backpressure
+
+V138 adds durable global concurrency control for worker pools. Workers acquire bounded capacity leases before claiming jobs, release unused reservations, and release each completed slot. Expired leases are recoverable, so a crashed worker cannot permanently consume pool capacity. This is the PostgreSQL authority layer; Redis acceleration remains a subsequent deployment/runtime adapter rather than a fake configuration claim.
+
 ## V137 — Durable observability and SLO control plane
 
 V137 turns V136's runtime samples into an operational control plane: bounded SLO policies, evaluation windows, error-budget state, deterministic alerts and critical incidents. Workers emit only metric values and opaque runtime identifiers; no customer payloads, secrets or message bodies enter telemetry. External OTel collectors, paging integrations and production SLO evidence still require deployment.

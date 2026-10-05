@@ -50,20 +50,26 @@ export class AtlasQueueWorker {
     if (this.eventHandlers.size) await this.store.reapOutbox(500);
     const jobsEnabled=this.jobHandlers.size>0, eventsEnabled=this.eventHandlers.size>0;
     let jobs=[],events=[];
+    let capacityGranted = jobsEnabled && this.runtimePoolId && typeof this.store.acquireRuntimeCapacity === 'function'
+      ? await this.store.acquireRuntimeCapacity(this.runtimePoolId, this.workerId, this.concurrency, this.leaseSeconds)
+      : (jobsEnabled ? this.concurrency : 0);
     if (jobsEnabled && eventsEnabled) {
       const eventFirst=this.preferEvents;
       this.preferEvents=!this.preferEvents;
       if (eventFirst) {
         events=await this.store.claimOutbox(this.workerId,this.concurrency,this.leaseSeconds,[...this.eventHandlers.keys()]);
-        const remaining=this.concurrency-events.length;
+        const remaining=Math.min(capacityGranted, this.concurrency-events.length);
         if (remaining) jobs=await this.store.claimJobs(this.workerId,remaining,this.leaseSeconds,[...this.jobHandlers.keys()]);
       } else {
-        jobs=await this.store.claimJobs(this.workerId,this.concurrency,this.leaseSeconds,[...this.jobHandlers.keys()]);
+        jobs=await this.store.claimJobs(this.workerId,capacityGranted,this.leaseSeconds,[...this.jobHandlers.keys()]);
         const remaining=this.concurrency-jobs.length;
         if (remaining) events=await this.store.claimOutbox(this.workerId,remaining,this.leaseSeconds,[...this.eventHandlers.keys()]);
       }
-    } else if (jobsEnabled) jobs=await this.store.claimJobs(this.workerId,this.concurrency,this.leaseSeconds,[...this.jobHandlers.keys()]);
+    } else if (jobsEnabled) jobs=await this.store.claimJobs(this.workerId,capacityGranted,this.leaseSeconds,[...this.jobHandlers.keys()]);
     else if (eventsEnabled) events=await this.store.claimOutbox(this.workerId,this.concurrency,this.leaseSeconds,[...this.eventHandlers.keys()]);
+    if (jobsEnabled && this.runtimePoolId && capacityGranted > jobs.length && typeof this.store.releaseRuntimeCapacity === 'function') {
+      try { await this.store.releaseRuntimeCapacity(this.runtimePoolId, this.workerId, capacityGranted-jobs.length); capacityGranted=jobs.length; } catch {}
+    }
     await Promise.all([
       ...jobs.map(job => this.#track(this.#process(job, this.jobHandlers.get(job.job_type), 'job'))),
       ...events.map(event => this.#track(this.#process(event, this.eventHandlers.get(event.event_type), 'event')))
@@ -77,7 +83,7 @@ export class AtlasQueueWorker {
         this.logger.warn?.(`Atlas runtime SLO evaluation failed (${error?.message || 'unknown'}).`);
       }
     }
-    return { jobsClaimed: jobs.length, eventsClaimed: events.length, ...this.counts };
+    return { jobsClaimed: jobs.length, capacityGranted, eventsClaimed: events.length, ...this.counts };
   }
 
   async #track(promise) {
@@ -127,6 +133,9 @@ export class AtlasQueueWorker {
       this.logger.warn?.(`Atlas worker ${kind} ${id} failed (${code}).`);
     } finally {
       clearInterval(timer);
+      if (isJob && this.runtimePoolId && typeof this.store.releaseRuntimeCapacity === 'function') {
+        try { await this.store.releaseRuntimeCapacity(this.runtimePoolId, this.workerId, 1); } catch (error) { this.logger.warn?.(`Atlas runtime capacity release failed (${error?.message || 'unknown'}).`); }
+      }
       if (isJob && this.runtimePoolId && typeof this.store.recordRuntimeSlo === 'function') {
         const duration = Math.max(0, Date.now() - startedAt);
         try {

@@ -11,10 +11,10 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '137.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '138.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
-  for (const version of ['129','130','131','132','133','134','135','136','137']) {
+  for (const version of ['129','130','131','132','133','134','135','136','137','138']) {
     const migration = await read(`infra/postgres/FINAL-MIGRATION-V${version}.sql`);
     check(`V${version} frontier migration`, migration.includes('BEGIN;') && migration.includes('COMMIT;'), `V${version} migration is present and transaction-wrapped.`);
   }
@@ -22,6 +22,10 @@ try {
   const v137Grants = await read('infra/postgres/API-ROLE-GRANTS-V137.sql');
   const v137RuntimeStore = await read('apps/api/runtime-store.mjs');
   check('V137 durable observability control plane', v137.includes('atlas_runtime_slo_policies') && v137.includes('atlas_runtime_slo_evaluations') && v137.includes('atlas_runtime_alerts') && v137.includes('atlas_runtime_incidents') && v137.includes('atlas_v137_evaluate_runtime_slo') && v137Grants.includes('atlas_worker') && v137RuntimeStore.includes('evaluateRuntimeSlo'), 'Runtime samples now feed durable SLO evaluations, alerts and incidents through a restricted evaluation function.');
+  const v138 = await read('infra/postgres/FINAL-MIGRATION-V138.sql');
+  const v138Grants = await read('infra/postgres/API-ROLE-GRANTS-V138.sql');
+  const v138Runtime = await read('apps/worker/runtime.mjs');
+  check('V138 distributed runtime capacity', v138.includes('atlas_runtime_capacity_leases') && v138.includes('atlas_v138_acquire_runtime_capacity') && v138.includes('FOR UPDATE') && v138Grants.includes('atlas_worker') && v138Runtime.includes('acquireRuntimeCapacity'), 'Worker capacity is globally bounded by durable pool leases and backpressure.');
   const v128 = await read('infra/postgres/FINAL-MIGRATION-V128.sql');
   check('V128 durable workflow wake scheduler', v128.includes('atlas_v128_tick_workflow_executions') && v128.includes('FOR UPDATE SKIP LOCKED') && v128.includes("'workflow.execute'"), 'Due waiting/retryable workflow executions are re-queued through an idempotent reference-only wake job.');
   const v127 = await read('infra/postgres/FINAL-MIGRATION-V127.sql');

@@ -118,6 +118,22 @@ export class PostgresRuntimeStore {
     return rows[0].count;
   }
 
+  async acquireRuntimeCapacity(poolId, workerId, requested, leaseSeconds = 60) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '') || !/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId || '') || !Number.isInteger(requested) || requested < 1 || requested > 100000) throw new TypeError('Runtime capacity request is invalid.');
+    const { rows } = await this.pool.query('SELECT atlas_v138_acquire_runtime_capacity($1,$2,$3,$4) AS granted', [poolId,workerId,requested,leaseSeconds]);
+    return Number(rows[0]?.granted || 0);
+  }
+
+  async releaseRuntimeCapacity(poolId, workerId, slots = 1) {
+    const { rows } = await this.pool.query('SELECT atlas_v138_release_runtime_capacity($1,$2,$3) AS remaining', [poolId,workerId,slots]);
+    return Number(rows[0]?.remaining || 0);
+  }
+
+  async getRuntimeCapacitySnapshot(poolId) {
+    const { rows } = await this.pool.query('SELECT * FROM atlas_v138_runtime_capacity_snapshot($1)', [poolId]);
+    return rows[0] || null;
+  }
+
   async claimJobs(workerId, limit = 10, leaseSeconds = 60, jobTypes = null) {
     if (jobTypes !== null && (!Array.isArray(jobTypes) || jobTypes.length < 1 || jobTypes.length > 100 || jobTypes.some(type => !/^[a-z][a-z0-9_.-]{1,79}$/.test(type)))) throw new TypeError('Job type filter is invalid.');
     const { rows } = await this.pool.query('SELECT * FROM atlas_v115_claim_jobs($1,$2,$3,$4::text[])', [workerId, limit, leaseSeconds, jobTypes]);
