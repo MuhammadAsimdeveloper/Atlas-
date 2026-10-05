@@ -23,7 +23,7 @@ BEGIN
  END IF;
  SELECT max_concurrency INTO max_slots FROM public.atlas_runtime_pools WHERE pool_id=p_pool_id AND enabled=true;
  IF max_slots IS NULL THEN RETURN 0; END IF;
- PERFORM pg_advisory_xact_lock(hashtextextended(p_pool_id,0));
+ PERFORM 1 FROM public.atlas_runtime_pools WHERE pool_id=p_pool_id AND enabled=true FOR UPDATE;
  DELETE FROM public.atlas_runtime_capacity_leases WHERE pool_id=p_pool_id AND lease_until<=now();
  SELECT greatest(0,max_slots-coalesce(sum(slots),0))::integer INTO available
  FROM public.atlas_runtime_capacity_leases WHERE pool_id=p_pool_id AND lease_until>now();
