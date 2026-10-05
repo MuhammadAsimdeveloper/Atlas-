@@ -73,8 +73,8 @@ export class PostgresWorkflowExecutionStore{
       const idempotencyKey=digest({tenantId,executionId:state.executionId,graphChecksum:state.graphChecksum});
       try{
         await client.query(`INSERT INTO atlas_workflow_executions
-          (tenant_id,execution_id,workflow_id,workflow_version,graph_checksum,status,current_node_id,trigger_event_type,trigger_event_ref,state,state_checksum,created_by,version,started_at,finished_at,created_at,updated_at)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17)`,
+          (tenant_id,execution_id,workflow_id,workflow_version,graph_checksum,status,current_node_id,trigger_event_type,trigger_event_ref,state,state_checksum,checksum,created_by,version,started_at,finished_at,created_at,updated_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$11,$12,$13,$14,$15,$16,$17)`,
           [tenantId,state.executionId,state.workflowId,state.workflowVersion,state.graphChecksum,state.status,state.currentNodeId,state.triggerEventType,state.triggerEventRef,JSON.stringify(state),state.checksum,actorId,state.version,state.startedAt,state.endedAt,state.createdAt,state.updatedAt]);
       }catch(error){
         if(error?.code==='23505') throw createAuthError(409,'workflow_execution_already_exists','That execution identity is already in use.');
@@ -129,8 +129,8 @@ export class PostgresWorkflowExecutionStore{
       if(!['failed','dead_letter','canceled'].includes(current.status)) throw createAuthError(409,'workflow_replay_not_allowed','Only failed, dead-lettered or canceled executions can be replayed.');
       const next=replayWorkflowExecution({execution:current,replayExecutionId:replayExecutionId||undefined,requestedByActorId:actorId,now});
       await client.query(`INSERT INTO atlas_workflow_executions
-        (tenant_id,execution_id,workflow_id,workflow_version,graph_checksum,status,current_node_id,trigger_event_type,trigger_event_ref,state,state_checksum,created_by,replay_of_execution_id,version,started_at,finished_at,created_at,updated_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18)`,
+        (tenant_id,execution_id,workflow_id,workflow_version,graph_checksum,status,current_node_id,trigger_event_type,trigger_event_ref,state,state_checksum,checksum,created_by,replay_of_execution_id,version,started_at,finished_at,created_at,updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$11,$12,$13,$14,$15,$16,$17,$18)`,
         [tenantId,next.executionId,next.workflowId,next.workflowVersion,next.graphChecksum,next.status,next.currentNodeId,next.triggerEventType,next.triggerEventRef,JSON.stringify(next),next.checksum,actorId,current.executionId,next.version,next.startedAt,next.endedAt,next.createdAt,next.updatedAt]);
       const idempotencyKey=digest({tenantId,executionId:next.executionId,graphChecksum:next.graphChecksum});
       await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7)',[
@@ -151,7 +151,7 @@ export class PostgresWorkflowExecutionStore{
       const next=apply(current);
       if(next===current) return current;
       if(next.version!==current.version+1) throw createAuthError(500,'workflow_execution_version_invalid');
-      const updated=await client.query(`UPDATE atlas_workflow_executions SET status=$4,current_node_id=$5,state=$6::jsonb,state_checksum=$7,last_error_code=$8,retry_at=$9,version=$10,finished_at=$11,canceled_by=$12,updated_at=$13
+      const updated=await client.query(`UPDATE atlas_workflow_executions SET status=$4,current_node_id=$5,state=$6::jsonb,state_checksum=$7,checksum=$7,last_error_code=$8,retry_at=$9,version=$10,finished_at=$11,canceled_by=$12,updated_at=$13
         WHERE tenant_id=$1 AND execution_id=$2 AND workflow_id=$3 AND version=$14`,
         [tenantId,executionId,workflowId,next.status,next.currentNodeId,JSON.stringify(next),next.checksum,next.lastErrorCode,next.retryAt,next.version,next.endedAt,next.canceledByActorId||null,next.updatedAt,current.version]);
       if(!updated.rowCount) throw createAuthError(409,'workflow_execution_version_conflict','The execution changed. Refresh and try again.');
