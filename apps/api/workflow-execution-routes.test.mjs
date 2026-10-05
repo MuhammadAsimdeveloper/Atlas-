@@ -39,7 +39,7 @@ async function fixture() {
     async replay(data){calls.push(['replay',data]);return {executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',status:'queued',workflowVersion:3};}
   };
   const growthStore={async get(data){calls.push(['workflowGet',data]);return workflowRecord();}};
-  const env={NODE_ENV:'development',ATLAS_PLATFORM_OWNER_EMAIL:'khan@example.net',ATLAS_WORKFLOW_EXECUTION_ENABLED:'true'};
+  const env={NODE_ENV:'development',ATLAS_PLATFORM_OWNER_EMAIL:'khan@example.net',ATLAS_WORKFLOW_EXECUTION_ENABLED:'true',ATLAS_WORKFLOW_EXECUTION_HANDLER_READY:'true'};
   const api=createGrowthApi({store:growthStore,executionStore,authStore,env});
   const server=createServer(async(req,res)=>{if(!(await api.handle(req,res))){res.writeHead(404);res.end();}});
   server.listen(0,'127.0.0.1'); await once(server,'listening');
@@ -77,12 +77,12 @@ test('execution cancellation, approval and replay stay tenant-scoped and require
   try{
     let response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions/'+executionId+'/cancel',{method:'POST',headers:{...api.headers,'x-atlas-csrf':''},body:JSON.stringify({})});
     assert.equal(response.status,403);
-    response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions/'+executionId+'/cancel',{method:'POST',headers:api.headers,body:JSON.stringify({})});
+    response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions/'+executionId+'/cancel',{method:'POST',headers:api.headers,body:JSON.stringify({expectedVersion:1})});
     assert.equal(response.status,200);
     assert.equal(api.calls.at(-1)[1].tenantId,tenantId);
     response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions/'+executionId+'/approve',{method:'POST',headers:api.headers,body:JSON.stringify({expectedVersion:2,approvalId:'approval_1',evidenceRef:{kind:'approval',id:'evidence-1'}})});
     assert.equal(response.status,200);
-    assert.equal(api.calls.at(-1)[1].approvedByActorId,'88888888-8888-4888-8888-888888888888');
+    assert.equal(api.calls.at(-1)[1].actorId,actorId);
     response=await fetch(api.base+'/api/v1/growth/workflows/'+workflowId+'/executions/'+executionId+'/replay',{method:'POST',headers:api.headers,body:JSON.stringify({expectedVersion:2,executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'})});
     assert.equal(response.status,202);
     assert.equal(api.calls.at(-1)[1].tenantId,tenantId);
