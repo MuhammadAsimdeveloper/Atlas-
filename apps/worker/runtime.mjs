@@ -85,7 +85,7 @@ export class AtlasQueueWorker {
     try {
       if (typeof handler !== 'function') throw Object.assign(new Error('No handler is registered.'), { code: 'handler_unavailable' });
       const context = isJob
-        ? { tenantId: item.tenant_id, jobId: id, jobType: item.job_type, idempotencyKey: item.idempotency_key, attempt: item.attempts, workerId: this.workerId, signal: controller.signal }
+        ? { tenantId: item.tenant_id, jobId: id, jobType: item.job_type, idempotencyKey: item.idempotency_key, attempt: item.attempts, workerId: this.workerId, workerStore: this.store, signal: controller.signal }
         : { tenantId: item.tenant_id, eventId: id, eventType: item.event_type, attempt: item.attempts, workerId: this.workerId, signal: controller.signal };
       await handler(Object.freeze(item.payload_ref), Object.freeze(context));
       if (leaseLost) { this.counts.leaseLost++; return; }
