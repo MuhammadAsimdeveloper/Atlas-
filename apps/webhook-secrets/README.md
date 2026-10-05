@@ -1,9 +1,5 @@
-# Atlas P126 webhook secret boundary
+# Webhook secret resolver
 
-A reviewed deployment module must export resolveSecret({tenantId,endpointId,providerKey,secretRef}).
+This module boundary is intentionally deployment-provided. Production deployments must supply `ATLAS_WEBHOOK_SECRET_RESOLVER_MODULE` with a reviewed implementation that resolves webhook verification secrets without exposing raw credentials to the API or worker logs.
 
-Twilio: return the account auth token or configured webhook shared key.
-Postmark: return the HTTP Basic credential in username:password form; Postmark does not sign webhooks with HMAC.
-WhatsApp Cloud: return the Meta app secret for X-Hub-Signature-256 verification.
-
-Never store these secrets in PostgreSQL, webhook payloads or logs.
+The resolver should fail closed on missing, malformed, cross-tenant, or stale secret references.
