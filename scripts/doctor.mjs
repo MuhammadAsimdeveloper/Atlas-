@@ -267,6 +267,11 @@ try {
   check('P130 durable scheduler', scheduler.includes('createScheduled') && frontierStore.includes('atlas_v130_claim_workflow_schedules') && v130.includes('FOR UPDATE SKIP LOCKED') && v130.includes('SECURITY DEFINER'), 'Due schedules are atomically claimed, pinned to immutable workflow versions and converted into durable executions.');
   check('P133 governed action catalog', v133.includes('communication.email') && v133.includes('automation.webhook') && frontierRoutes.includes('/api/v1/growth/actions/catalog'), 'Core provider capabilities are seeded into the governed action catalog and tenant binding API.');
   check('P136 restricted runtime telemetry', workerRuntime.includes('runtimePoolId') && frontierStore.includes('recordRuntimeHeartbeat') && v136.includes('atlas_worker'), 'Workers can emit pool heartbeats/SLO evidence without customer-table access.');
+  const journey = await read('packages/atlas-journey/index.mjs');
+  const journeyTests = await read('packages/atlas-journey/index.test.mjs');
+  const journeyPlan = await read('docs/ATLAS-DEVELOPMENT-PLAN-V145-V153-2026-10.md');
+  const journeyDoc = await read('docs/V145-LEAD-TO-BOOKING.md');
+  check('V145 cross-product journey', journey.includes('runLeadToBookingJourney') && journey.includes('createGrowthRecord') && journey.includes('scoreLeadQualification') && journey.includes('bookAppointment') && journey.includes('voiceIntent'), journeyTests.includes('flagship journey connects') && journeyDoc.includes('Funnel/website lead form') && journeyPlan.includes('V145 — Cross-product Lead-to-Booking Control Plane'), 'Funnel capture, CRM, qualification, follow-up planning, calendar booking, pipeline updates, voice intent and redacted reporting are composed in one tenant-bound journey.');
 
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
