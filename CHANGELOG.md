@@ -1,3 +1,8 @@
+## 128.0.0 — Durable workflow wake/resume control
+- Added a database-backed wake scheduler for due `waiting` and `retryable` workflow executions.
+- Added idempotent reference-only `workflow.execute` wake jobs and worker integration.
+- Added migration/grant/doctor coverage so deferred automation cannot silently stall.
+
 ## 127.0.0 — Automation execution control plane
 - Added tenant-authenticated automation event ingress with replay-safe event identity.
 - Added published-workflow trigger resolution and durable execution creation for matching event types.
