@@ -178,8 +178,8 @@ try {
   const activationStore = await read('apps/api/growth-store.mjs');
   const activationUi = await read('apps/command-center/growth.mjs');
   check('V121 durable waits', executionEngineV121.includes("export function resumeWorkflowExecution") && executionEngineV121.includes("Workflow delay must be between 1 second and 30 days") && executionEngineV121Tests.includes('delay and wait nodes pause execution'), 'Workflow delays and wait-until nodes persist a bounded resume time and resume only when due');
-  check('V121 activation path', activationRoutes.includes("/api/v1/growth/activation") && activationStore.includes("getActivationChecklist") && activationUi.includes("loadActivationChecklist") && activationRoutes.includes("provider adapter is claimed live"), 'Growth Center exposes a tenant-scoped first-outcome checklist without falsely claiming provider connectivity');
-  check('V121 execution triage filters', activationRoutes.includes("triggerEventType") && activationRoutes.includes("errorCode") && activationStore.includes("safeStatus"), 'Execution history supports bounded status, trigger and error filtering for operator triage');
+  check('V121 activation path', activationRoutes.includes("/api/v1/growth/activation") && activationStore.includes("getActivationChecklist") && activationUi.includes("loadActivationChecklist") && activationStore.includes("provider adapter is claimed live"), 'Growth Center exposes a tenant-scoped first-outcome checklist without falsely claiming provider connectivity');
+  check('V121 execution triage filters', activationRoutes.includes("triggerEventType") && activationRoutes.includes("errorCode") && executionStore.includes("safeStatus"), 'Execution history supports bounded status, trigger and error filtering for operator triage');
 
   const executionSql = await read('infra/postgres/FINAL-MIGRATION-V119.sql');
   const executionGrants = await read('infra/postgres/API-ROLE-GRANTS-V119.sql');
