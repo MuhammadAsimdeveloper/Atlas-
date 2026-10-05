@@ -441,6 +441,19 @@ export class PostgresRuntimeStore {
     return rows[0].state;
   }
 
+  async recordDispatchState({ tenantId, jobId, jobType, attempt = 1, status = 'published', errorCode = null } = {}) {
+    if (!UUID.test(tenantId || '') || !UUID.test(jobId || '') || !/^[a-z][a-z0-9_.-]{1,79}$/.test(jobType || '') || !Number.isInteger(attempt) || attempt < 0 || attempt > 1000 || !['pending','published','degraded','failed'].includes(status)) throw new TypeError('dispatch_state_invalid');
+    const sql = "INSERT INTO atlas_runtime_dispatch_records(tenant_id,dispatch_id,job_id,job_type,priority,transport,envelope_sha256,status,attempts,last_error_code,last_attempt_at,acknowledged_at) VALUES($1,$2,$2,$3,5,'postgres',encode(digest($2,'sha256'),'hex'),$4,$5,$6,now(),CASE WHEN $4='published' THEN now() ELSE NULL END) ON CONFLICT(tenant_id,job_id) DO UPDATE SET status=EXCLUDED.status,attempts=atlas_runtime_dispatch_records.attempts+1,last_error_code=EXCLUDED.last_error_code,last_attempt_at=now(),acknowledged_at=CASE WHEN EXCLUDED.status='published' THEN now() ELSE atlas_runtime_dispatch_records.acknowledged_at END RETURNING dispatch_id,status,attempts";
+    const { rows } = await this.pool.query(sql,[tenantId,jobId,jobType,status,attempt,errorCode]); return rows[0];
+  }
+
+  async recordControlEvent(event) {
+    if (!event || typeof event.eventId !== 'string' || !/^[a-f0-9-]{36}$/i.test(event.eventId)) throw new TypeError('control_event_invalid');
+    const decision=JSON.stringify(event.decision||{}); if(Buffer.byteLength(decision,'utf8')>4096) throw new TypeError('control_event_too_large');
+    const sql="INSERT INTO atlas_runtime_control_events(event_id,event_type,severity,pool_id,worker_id,decision,decision_sha256,occurred_at) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8) ON CONFLICT(event_id) DO NOTHING RETURNING event_id";
+    const {rows}=await this.pool.query(sql,[event.eventId,event.type,event.severity,event.poolId,event.workerId,decision,event.decisionSha256,event.occurredAt]); return rows[0]||null;
+  }
+
   async counts() {
     const { rows } = await this.pool.query('SELECT * FROM atlas_v115_runtime_queue_counts()');
     return rows[0];
