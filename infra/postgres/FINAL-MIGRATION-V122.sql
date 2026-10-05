@@ -2,10 +2,8 @@
 -- CRM/marketing extensions, agency controls and enterprise security metadata.
 -- Secret material is intentionally NOT stored here; credential_ref points to an external KMS/vault.
 BEGIN;
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 CREATE TABLE IF NOT EXISTS atlas_v122_provider_connections(
- tenant_id UUID NOT NULL, connection_id UUID NOT NULL DEFAULT gen_random_uuid(), provider_key TEXT NOT NULL,
+ tenant_id UUID NOT NULL, connection_id UUID NOT NULL, provider_key TEXT NOT NULL,
  channel TEXT, status TEXT NOT NULL DEFAULT 'draft', credential_ref TEXT, scopes JSONB NOT NULL DEFAULT '[]',
  metadata JSONB NOT NULL DEFAULT '{}', last_verified_at TIMESTAMPTZ, version INTEGER NOT NULL DEFAULT 1,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
