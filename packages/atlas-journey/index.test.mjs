@@ -4,16 +4,16 @@ import { createGrowthRecord, scoreLeadQualification } from '../growth-suite/inde
 import { createBookingCalendar } from '../atlas-target/index.mjs';
 import { runLeadToBookingJourney } from './index.mjs';
 
-const TENANT = 'tenant_demo_001';
-const OTHER_TENANT = 'tenant_demo_002';
-const ACTOR = 'actor_demo_001';
+const TENANT = '11111111-1111-4111-8111-111111111111';
+const OTHER_TENANT = '22222222-2222-4222-8222-222222222222';
+const ACTOR = '33333333-3333-4333-8333-333333333333';
 const NOW = Date.parse('2026-10-05T08:00:00.000Z');
 
 function pipelineRecord(tenantId = TENANT) {
   return createGrowthRecord({
     tenantId,
     module: 'pipelines',
-    id: 'pipe_sales_001',
+    id: '44444444-4444-4444-8444-444444444444',
     actorId: ACTOR,
     now: NOW,
     payload: {
@@ -33,7 +33,7 @@ function qualificationProfile() {
   return createGrowthRecord({
     tenantId: TENANT,
     module: 'ai-qualification',
-    id: 'qual_default_001',
+    id: '55555555-5555-4555-8555-555555555555',
     actorId: ACTOR,
     now: NOW,
     payload: {
@@ -58,7 +58,7 @@ function followUpRecord() {
   return createGrowthRecord({
     tenantId: TENANT,
     module: 'ai-follow-up',
-    id: 'followup_default_001',
+    id: '66666666-6666-4666-8666-666666666666',
     actorId: ACTOR,
     now: NOW,
     payload: {
@@ -66,8 +66,8 @@ function followUpRecord() {
       purpose: 'service',
       trigger: 'lead.qualified',
       steps: [
-        { id: 'step_1', delayMinutes: 0, channel: 'email', templateId: 'tpl_email_001', connectionId: 'conn_email_001', approvalRequired: true },
-        { id: 'step_2', delayMinutes: 60, channel: 'sms', templateId: 'tpl_sms_001', connectionId: 'conn_sms_001', approvalRequired: true }
+        { id: 'step_1', delayMinutes: 0, channel: 'email', templateId: '77777777-7777-4777-8777-777777777777', connectionId: '99999999-9999-4999-8999-999999999999', approvalRequired: true },
+        { id: 'step_2', delayMinutes: 60, channel: 'sms', templateId: '88888888-8888-4888-8888-888888888888', connectionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', approvalRequired: true }
       ],
       stopOnReply: true,
       approvalRequired: true
@@ -79,7 +79,7 @@ function funnelRecord(tenantId = TENANT) {
   return createGrowthRecord({
     tenantId,
     module: 'funnels',
-    id: 'funnel_service_001',
+    id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     actorId: ACTOR,
     now: NOW,
     payload: {
@@ -99,7 +99,7 @@ function funnelRecord(tenantId = TENANT) {
 function calendar() {
   return createBookingCalendar({
     tenantId: TENANT,
-    id: 'cal_sales_001',
+    id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     version: 1,
     timeZone: 'UTC',
     weeklyHours: {
@@ -185,7 +185,7 @@ test('V145 fails closed when the funnel has no Atlas lead form', () => {
   data.sourceAsset = createGrowthRecord({
     tenantId: TENANT,
     module: 'websites',
-    id: 'site_no_form_001',
+    id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     actorId: ACTOR,
     now: NOW,
     payload: {
@@ -193,7 +193,7 @@ test('V145 fails closed when the funnel has no Atlas lead form', () => {
       slug: 'no-form',
       title: 'No form',
       description: 'No form.',
-      blocks: [{ id: 'hero', type: 'hero', heading: 'Hello', body: 'No form.' }],
+      blocks: [{ id: 'hero', type: 'hero', heading: 'Hello', body: 'No form.', items: [], buttonLabel: null, buttonUrl: null }],
       seo: { indexable: false, title: 'No form', description: 'No form.' }
     }
   });
