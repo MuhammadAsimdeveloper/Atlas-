@@ -165,6 +165,12 @@ export class PostgresWorkflowExecutionStore{
       const next=apply(current);
       if(next===current) return current;
       if(next.version!==current.version+1) throw createAuthError(500,'workflow_execution_version_invalid');
+      if(kind==='approve' && next.status==='queued'){
+        const idempotencyKey=digest({tenantId,executionId:next.executionId,graphChecksum:next.graphChecksum,version:next.version,reason:'approval'});
+        await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7)',[
+          tenantId,crypto.randomUUID(),'workflow.execute',JSON.stringify({kind:'workflow_execution',id:next.executionId,version:next.version}),idempotencyKey,null,8
+        ]);
+      }
       const updated=await client.query(`UPDATE atlas_workflow_executions SET status=$4,current_node_id=$5,state=$6::jsonb,state_checksum=$7,checksum=$7,last_error_code=$8,retry_at=$9,version=$10,finished_at=$11,canceled_by=$12,updated_at=$13
         WHERE tenant_id=$1 AND execution_id=$2 AND workflow_id=$3 AND version=$14`,
         [tenantId,executionId,workflowId,next.status,next.currentNodeId,JSON.stringify(next),next.checksum,next.lastErrorCode,next.retryAt,next.version,next.endedAt,next.canceledByActorId||null,next.updatedAt,current.version]);
