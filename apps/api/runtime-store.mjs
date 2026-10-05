@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
 import { nextScheduleOccurrence, boundedJson, eventDedupKey } from '../../packages/atlas-core/production-frontier.mjs';
 
@@ -343,7 +344,7 @@ export class PostgresRuntimeStore {
 
   async recordRuntimeSlo({ poolId, metric, value, target } = {}) {
     if(!UUID.test(poolId||'')||!['queue_latency_ms','job_duration_ms','error_rate','success_rate','lease_recovery_rate'].includes(metric)||!Number.isFinite(value)||!Number.isFinite(target)) throw new TypeError('runtime_slo_invalid');
-    const {rows}=await this.pool.query('INSERT INTO atlas_runtime_slo_samples(pool_id,metric,value,target) VALUES($1,$2,$3,$4) RETURNING sample_id,observed_at',[poolId,metric,value,target]);
+    const {rows}=await this.pool.query('INSERT INTO atlas_runtime_slo_samples(sample_id,pool_id,metric,value,target) VALUES($1,$2,$3,$4,$5) RETURNING sample_id,observed_at',[randomUUID(),poolId,metric,value,target]);
     return rows[0];
   }
 
