@@ -141,3 +141,38 @@ test('preview rejects an event that does not match the workflow trigger', () => 
     /trigger|event/i
   );
 });
+
+
+test('condition preview selects the matching branch deterministically', () => {
+  const graph = createWorkflowGraph({
+    tenantId,
+    id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    name: 'Branch Preview',
+    nodes: [
+      { id: 'start', type: 'trigger', config: { eventType: 'contact.created' } },
+      { id: 'branch', type: 'condition', config: { cases: [{ id: 'qualified', field: 'event.score', operator: 'gte', value: 70 }], defaultPort: 'default' } },
+      { id: 'qualified', type: 'goal', config: { goal: 'Qualified path' } },
+      { id: 'default', type: 'goal', config: { goal: 'Nurture path' } },
+      { id: 'stop', type: 'stop' }
+    ],
+    edges: [
+      { from: 'start', to: 'branch' },
+      { from: 'branch', to: 'qualified', port: 'qualified' },
+      { from: 'branch', to: 'default', port: 'default' },
+      { from: 'qualified', to: 'stop' },
+      { from: 'default', to: 'stop' }
+    ]
+  });
+
+  const result = simulateWorkflow({
+    graph,
+    tenantId,
+    executionId: 'exec-preview-branch',
+    event: { type: 'contact.created', score: 85 },
+    now: Date.parse('2026-10-05T09:00:00Z')
+  });
+
+  assert.equal(result.status, 'completed');
+  assert.deepEqual(result.steps.map(step => step.nodeId), ['start', 'branch', 'qualified', 'stop']);
+  assert.equal(result.steps[1].branch, 'qualified');
+});
