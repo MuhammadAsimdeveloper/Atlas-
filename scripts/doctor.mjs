@@ -11,10 +11,10 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '144.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '145.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
-  for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143']) {
+  for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143','144']) {
     const migration = await read(`infra/postgres/FINAL-MIGRATION-V${version}.sql`);
     check(`V${version} frontier migration`, migration.includes('BEGIN;') && migration.includes('COMMIT;'), `V${version} migration is present and transaction-wrapped.`);
   }
@@ -33,6 +33,9 @@ try {
   check('V141 failover control', distributedFabric.includes('evaluateFailover') && distributedFabric.includes('database_unavailable') && distributedFabric.includes('postgres_fallback'), 'Worker, Redis and database failure states fail closed or recover through durable leases.');
   check('V142 OTLP contract', distributedFabric.includes('buildOtlpSpan') && fabricTest.includes('OTLP spans'), 'OTLP span construction is bounded and tested; a collector remains deployment evidence.');
   check('V143 deployment evidence gate', distributedFabric.includes('deploymentReadiness') && distributedFabric.includes('providerCredentials') && fabricTest.includes('deployment readiness never confuses repository code'), 'Managed infrastructure, credentials, domain and measured drills remain explicit external readiness gates.');
+  const redisClient=await read('packages/atlas-runtime/redis-client.mjs'); const redisClientTest=await read('packages/atlas-runtime/redis-client.test.mjs');
+  const workerRuntimeRedis=await read('apps/worker/runtime.mjs');
+  check('V145 real Redis wakeup', redisClient.includes('class RedisRespClient') && redisClient.includes('BRPOP') && workerRuntimeRedis.includes('redisWakeup') && redisClientTest.includes('rediss://'), 'Native bounded Redis RESP2 client and worker wakeup integration are present; PostgreSQL remains authoritative.');
   const v144=await read('infra/postgres/FINAL-MIGRATION-V144.sql'); const v144Grants=await read('infra/postgres/API-ROLE-GRANTS-V144.sql'); const controlPlane=await read('packages/atlas-runtime/control-plane.mjs'); const controlPlaneTest=await read('packages/atlas-runtime/control-plane.test.mjs');
   check('V144 runtime control-plane integration',v144.includes('atlas_runtime_control_events')&&v144.includes('atlas_runtime_dispatch_records')&&v144Grants.includes('atlas_worker')&&controlPlane.includes('createOtlpHttpExporter')&&controlPlane.includes('buildControlEvent')&&controlPlaneTest.includes('OTLP exporter'),'Durable dispatch state, bounded control events and optional OTLP export are implemented and tested.');
   const v138 = await read('infra/postgres/FINAL-MIGRATION-V138.sql');
@@ -276,3 +279,8 @@ for (const result of checks) process.stdout.write(`${result.passed ? 'PASS' : 'F
 const failed = checks.filter(result => !result.passed).length;
 process.stdout.write(`Atlas doctor: ${checks.length - failed}/${checks.length} checks passed.\n`);
 if (failed) process.exitCode = 1;
+
+  const redisClient=await read('packages/atlas-runtime/redis-client.mjs');
+  const redisClientTest=await read('packages/atlas-runtime/redis-client.test.mjs');
+  const workerRuntime=await read('apps/worker/runtime.mjs');
+  check('V145 real Redis wakeup',redisClient.includes('class RedisRespClient')&&redisClient.includes('BRPOP')&&workerRuntime.includes('redisWakeup')&&redisClientTest.includes('rediss://'),'Native Redis RESP2 client and worker wakeup integration are present; PostgreSQL remains authoritative.');

@@ -4,6 +4,8 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createPostgresPoolConfig } from '../api/database-config.mjs';
 import { PostgresRuntimeStore } from '../api/runtime-store.mjs';
 import { AtlasQueueWorker } from './runtime.mjs';
+import { RedisRespClient } from '../../packages/atlas-runtime/redis-client.mjs';
+import { RedisTransport } from '../../packages/atlas-runtime/distributed-fabric.mjs';
 
 const env = process.env;
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -30,6 +32,8 @@ pool.on('error', () => process.stderr.write('Atlas worker database pool error.\n
 
 const store = new PostgresRuntimeStore(pool);
 await store.assertSafeWorkerRole();
+const redisClient = env.ATLAS_REDIS_URL ? new RedisRespClient({ url: env.ATLAS_REDIS_URL, connectTimeoutMs: Number(env.ATLAS_REDIS_CONNECT_TIMEOUT_MS || 3000) }) : null;
+const redisWakeup = redisClient ? new RedisTransport({ client: redisClient, namespace: env.ATLAS_REDIS_NAMESPACE || 'atlas' }) : null;
 const worker = new AtlasQueueWorker({
   store,
   workerId: env.ATLAS_WORKER_ID || `worker-${randomUUID()}`,
@@ -39,7 +43,8 @@ const worker = new AtlasQueueWorker({
   leaseSeconds: Number(env.ATLAS_WORKER_LEASE_SECONDS || 60),
   pollMs: Number(env.ATLAS_WORKER_POLL_MS || 1000),
   runtimePoolId: env.ATLAS_RUNTIME_POOL_ID || null,
-  sloEvaluationIntervalMs: Number(env.ATLAS_SLO_EVALUATION_INTERVAL_MS || 30000)
+  sloEvaluationIntervalMs: Number(env.ATLAS_SLO_EVALUATION_INTERVAL_MS || 30000),
+  redisWakeup
 });
 
 let stopping = false;
@@ -55,5 +60,6 @@ try {
   process.stdout.write(`Atlas queue worker ${worker.workerId} started with ${Object.keys(jobHandlers).length} job and ${Object.keys(eventHandlers).length} outbox handlers.\n`);
   await worker.run();
 } finally {
+  redisClient?.disconnect?.();
   await pool.end();
 }
