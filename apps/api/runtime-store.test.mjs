@@ -20,7 +20,7 @@ async function database() {
   const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1])-Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
   for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
   await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
-  for (const grant of ['API-ROLE-GRANTS-V112.sql','API-ROLE-GRANTS-V114.sql','API-ROLE-GRANTS-V115.sql','API-ROLE-GRANTS-V119.sql','API-ROLE-GRANTS-V120.sql']) await db.exec(await readFile(path.join(migrationDirectory,grant),'utf8'));
+  for (const grant of ['API-ROLE-GRANTS-V112.sql','API-ROLE-GRANTS-V114.sql','API-ROLE-GRANTS-V115.sql','API-ROLE-GRANTS-V119.sql','API-ROLE-GRANTS-V120.sql','API-ROLE-GRANTS-V136.sql','API-ROLE-GRANTS-V137.sql','API-ROLE-GRANTS-V138.sql']) await db.exec(await readFile(path.join(migrationDirectory,grant),'utf8'));
   await db.exec(`INSERT INTO atlas_auth_users(user_id,email,display_name,password_hash,email_verified_at) VALUES
     ('${actorA}','owner-a@runtime.test','Owner A','scrypt$test',now()),
     ('${actorB}','owner-b@runtime.test','Owner B','scrypt$test',now()),
@@ -172,6 +172,26 @@ test('V120 workflow execution access is lease-bound and mediated by the worker a
     assert.match(eventId, /^[0-9a-f-]{36}$/i);
 
     assert.equal(await worker.getWorkflowExecutionForJob({ ...job, tenant_id: tenantB }, 'worker-v120'), null);
+  } finally {
+    try { await db.exec('RESET ROLE'); } catch {}
+    await db.close();
+  }
+});
+
+
+test('V138 runtime capacity is globally bounded, lease-owned and recoverable', async () => {
+  const { db,pool } = await database();
+  try {
+    await db.exec('SET ROLE atlas_worker;');
+    await db.query("INSERT INTO atlas_runtime_pools(pool_id,mode,desired_workers,max_concurrency,enabled) VALUES ('pool-cap','postgres',2,2,true)");
+    const worker = new PostgresRuntimeStore(pool);
+    assert.equal(await worker.acquireRuntimeCapacity('pool-cap','worker-a',2,60),2);
+    assert.equal(await worker.acquireRuntimeCapacity('pool-cap','worker-b',2,60),0);
+    assert.deepEqual((await worker.getRuntimeCapacitySnapshot('pool-cap')).available_slots,0);
+    assert.equal(await worker.releaseRuntimeCapacity('pool-cap','worker-a',1),1);
+    assert.equal(await worker.acquireRuntimeCapacity('pool-cap','worker-b',2,60),1);
+    assert.equal(await worker.releaseRuntimeCapacity('pool-cap','worker-a',1),0);
+    assert.equal(await worker.releaseRuntimeCapacity('pool-cap','worker-b',1),0);
   } finally {
     try { await db.exec('RESET ROLE'); } catch {}
     await db.close();
