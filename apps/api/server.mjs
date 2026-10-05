@@ -9,11 +9,13 @@ import { PostgresAuthStore } from './postgres-auth-store.mjs';
 import { PostgresGrowthStore } from './growth-store.mjs';
 import { PostgresWorkflowExecutionStore } from './workflow-execution-store.mjs';
 import { securityHeaders, validateHealthToken } from './security.mjs';
+import { PostgresCapabilityStore } from './capability-store.mjs';
+import { createCapabilityApi } from './capability-routes.mjs';
 
 const port = Number(process.env.PORT || 8080);
 const env = process.env;
 const runtime = env.NODE_ENV || 'development';
-const release = env.ATLAS_RELEASE || 'V119';
+const release = env.ATLAS_RELEASE || 'V122';
 const webAssets = new Map([
   ['/', ['../command-center/auth.html', 'text/html; charset=utf-8']],
   ['/login', ['../command-center/auth.html', 'text/html; charset=utf-8']],
@@ -71,6 +73,8 @@ let authApi = null;
 let growthStore = null;
 let workflowExecutionStore = null;
 let growthApi = null;
+let capabilityStore = null;
+let capabilityApi = null;
 if (env.ATLAS_DATABASE_URL) {
   const { Pool } = await import('pg');
   pool = new Pool(await createPostgresPoolConfig(env, { application_name: `atlas-api-${release.toLowerCase()}` }));
@@ -81,6 +85,8 @@ if (env.ATLAS_DATABASE_URL) {
   workflowExecutionStore = new PostgresWorkflowExecutionStore(pool);
   authApi = createAuthApi({ store: authStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
   growthApi = createGrowthApi({ store: growthStore, executionStore: workflowExecutionStore, authStore, env });
+  capabilityStore = new PostgresCapabilityStore(pool);
+  capabilityApi = createCapabilityApi({ store: capabilityStore, authStore, env });
 }
 
 const server = createServer(async (req, res) => {
@@ -103,6 +109,10 @@ const server = createServer(async (req, res) => {
   }
   if (growthApi) {
     const handled = await growthApi.handle(req, res);
+    if (handled) return;
+  }
+  if (capabilityApi) {
+    const handled = await capabilityApi.handle(req, res);
     if (handled) return;
   }
   if (url.pathname.startsWith('/api/')) return json(res, authApi ? 404 : 503, { error: authApi ? 'not_found' : 'database_required' });
