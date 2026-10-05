@@ -1,6 +1,5 @@
 -- Atlas V126: durable unified communications/inbox layer on the V125 provider runtime.
 BEGIN;
-DO $worker_role$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='atlas_worker') THEN CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS; END IF; END $worker_role$;
 CREATE TABLE IF NOT EXISTS atlas_v126_inbox_events(
  tenant_id uuid NOT NULL REFERENCES atlas_organizations(tenant_id) ON DELETE CASCADE,
  event_id uuid NOT NULL DEFAULT gen_random_uuid(),
