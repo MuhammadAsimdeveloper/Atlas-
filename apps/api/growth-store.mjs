@@ -90,6 +90,30 @@ export class PostgresGrowthStore {
     });
   }
 
+  async getActivationChecklist({ actorId, tenantId }) {
+    return this.#transaction(async client => {
+      await this.#scope(client, { actorId, tenantId }, { module: 'workflows' });
+      const { rows } = await client.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE module_key='contacts' AND state <> 'archived')::int AS contacts,
+          COUNT(*) FILTER (WHERE module_key='leads' AND state <> 'archived')::int AS leads,
+          COUNT(*) FILTER (WHERE module_key='workflows' AND state='published')::int AS published_workflows,
+          COUNT(*) FILTER (WHERE module_key='workflows' AND state='draft')::int AS draft_workflows
+        FROM atlas_growth_items
+        WHERE tenant_id=$1
+      `, [tenantId]);
+      const counts = rows[0] || {};
+      const steps = [
+        { id: 'capture_lead', title: 'Capture your first lead', status: Number(counts.leads || 0) > 0 ? 'complete' : 'ready', evidence: { leads: Number(counts.leads || 0) } },
+        { id: 'publish_workflow', title: 'Publish the Lead → Follow-up workflow', status: Number(counts.published_workflows || 0) > 0 ? 'complete' : Number(counts.draft_workflows || 0) > 0 ? 'ready' : 'blocked', evidence: { publishedWorkflows: Number(counts.published_workflows || 0), draftWorkflows: Number(counts.draft_workflows || 0) } },
+        { id: 'connect_provider', title: 'Connect an approved delivery/provider channel', status: 'blocked', reason: 'No provider adapter is claimed live by Atlas until credentials, callbacks and end-to-end delivery are verified.' },
+        { id: 'run_outcome', title: 'Run one workflow and inspect the outcome', status: Number(counts.published_workflows || 0) > 0 ? 'ready' : 'blocked', reason: Number(counts.published_workflows || 0) > 0 ? 'A published workflow is available; production execution remains feature-gated until a reviewed handler is installed.' : 'Publish the flagship workflow first.' }
+      ];
+      const next = steps.find(step => step.status === 'ready') || steps.find(step => step.status === 'blocked') || steps[steps.length - 1];
+      return { workspace: { tenantId }, counts: { contacts: Number(counts.contacts || 0), leads: Number(counts.leads || 0), publishedWorkflows: Number(counts.published_workflows || 0), draftWorkflows: Number(counts.draft_workflows || 0) }, steps, nextAction: next?.id || null };
+    });
+  }
+
   async getWorkflowCatalog({ actorId, tenantId }) {
     return this.#transaction(async client => {
       await this.#scope(client, { actorId, tenantId }, { module: 'workflows' });

@@ -95,6 +95,21 @@ function nextNodeFor(execution, nodeId, port = 'next') {
     : null;
 }
 
+function waitResumeAt(node, finishedAt) {
+  if (node.type === 'delay') {
+    const delayMs = Number(node.config?.delayMs);
+    if (!Number.isSafeInteger(delayMs) || delayMs < 1_000 || delayMs > 30 * 24 * 60 * 60_000) throw new Error('Workflow delay must be between 1 second and 30 days');
+    return finishedAt + delayMs;
+  }
+  if (node.type === 'wait_until') {
+    const resumeAt = timestamp(node.config?.resumeAt, 'resumeAt');
+    if (resumeAt <= finishedAt) throw new Error('Workflow wait-until time must be in the future');
+    if (resumeAt - finishedAt > 30 * 24 * 60 * 60_000) throw new Error('Workflow wait-until cannot exceed 30 days');
+    return resumeAt;
+  }
+  return null;
+}
+
 function appendStep(execution, step) {
   if (execution.steps.length >= 500) throw new Error('Workflow execution step history exceeds 500 steps');
   return [...execution.steps, deepFreeze(step)];
@@ -134,6 +149,7 @@ export function createWorkflowExecution({
     steps: [],
     approval: null,
     retryAt: null,
+    resumeAt: null,
     lastErrorCode: null,
     startedAt: new Date(started).toISOString(),
     endedAt: null,
@@ -182,15 +198,48 @@ export function completeWorkflowStep({
     errorCode: null
   };
   const steps = appendStep(execution, step);
+  const resumeAtMs = waitResumeAt(node, finishedAt);
+  if (resumeAtMs !== null) {
+    return transition(execution, {
+      status: 'waiting',
+      currentNodeId: nodeId,
+      retryAt: null,
+      resumeAt: new Date(resumeAtMs).toISOString(),
+      lastErrorCode: null,
+      steps,
+      endedAt: null
+    });
+  }
   const nextNodeId = node.type === 'stop' ? null : nextNodeFor(execution, nodeId, step.selectedPort);
   const completed = !nextNodeId;
   return transition(execution, {
     status: completed ? 'completed' : 'queued',
     currentNodeId: nextNodeId,
     retryAt: null,
+    resumeAt: null,
     lastErrorCode: null,
     steps,
     endedAt: completed ? new Date(finishedAt).toISOString() : null
+  });
+}
+
+export function resumeWorkflowExecution({ execution, now = Date.now() } = {}) {
+  assertMutable(execution);
+  if (execution.status !== 'waiting') throw new Error('Workflow execution is not waiting');
+  if (!execution.resumeAt) throw new Error('Workflow execution has no resume time');
+  const current = timestamp(now, 'now');
+  const resumeAt = timestamp(execution.resumeAt, 'resumeAt');
+  if (current < resumeAt) return execution;
+  const node = nodeFor(execution, execution.currentNodeId);
+  const nextNodeId = node.type === 'stop' ? null : nextNodeFor(execution, node.id, 'next');
+  const completed = !nextNodeId;
+  const resumedAt = new Date(current).toISOString();
+  return transition(execution, {
+    status: completed ? 'completed' : 'queued',
+    currentNodeId: nextNodeId,
+    resumeAt: null,
+    endedAt: completed ? resumedAt : null,
+    updatedAt: resumedAt
   });
 }
 

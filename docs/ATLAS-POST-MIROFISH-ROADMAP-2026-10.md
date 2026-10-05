@@ -8,7 +8,7 @@ The roadmap deliberately favors **depth of one complete customer outcome** over 
 
 ## Baseline
 
-The repository README and master roadmap identify V120 as the current documented release baseline.
+The repository README and master roadmap identify V121 as the current documented release baseline.
 
 Important repository truth:
 

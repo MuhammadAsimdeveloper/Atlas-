@@ -34,11 +34,12 @@ async function fixture({workflowState='published'}={}) {
     async create(data){calls.push(['create',data]);executions.set(executionId,{executionId,tenantId,status:'queued',version:1,currentNodeId:'start',workflowVersion:3});return executions.get(executionId);},
     async list(data){calls.push(['list',data]);return {items:[...executions.values()]};},
     async get(data){calls.push(['get',data]);return executions.get(data.executionId)||null;},
+    async getActivationChecklist(data){calls.push(['activation',data]);return {workspace:{tenantId},steps:[{id:'capture_lead',status:'complete'},{id:'publish_workflow',status:'ready'},{id:'connect_provider',status:'blocked'}],nextAction:'publish_workflow'};},
     async cancel(data){calls.push(['cancel',data]);return {...executions.get(data.executionId),status:'canceled',version:2};},
     async approve(data){calls.push(['approve',data]);return {...executions.get(data.executionId),status:'queued',version:2};},
     async replay(data){calls.push(['replay',data]);return {executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',status:'queued',workflowVersion:3};}
   };
-  const growthStore={async get(data){calls.push(['workflowGet',data]);return workflowRecord(workflowState);}};
+  const growthStore={async get(data){calls.push(['workflowGet',data]);return workflowRecord(workflowState);},async getActivationChecklist(data){calls.push(['activation',data]);return {workspace:{tenantId},steps:[{id:'capture_lead',status:'complete'},{id:'publish_workflow',status:'ready'},{id:'connect_provider',status:'blocked'}],nextAction:'publish_workflow'};}};
   const env={NODE_ENV:'development',ATLAS_PLATFORM_OWNER_EMAIL:'khan@example.net',ATLAS_WORKFLOW_EXECUTION_ENABLED:'true',ATLAS_WORKFLOW_EXECUTION_HANDLER_READY:'true'};
   const api=createGrowthApi({store:growthStore,executionStore,authStore,env});
   const server=createServer(async(req,res)=>{if(!(await api.handle(req,res))){res.writeHead(404);res.end();}});
@@ -93,4 +94,32 @@ test('execution cancellation, approval and replay stay tenant-scoped and require
     assert.equal(response.status,202);
     assert.equal(api.calls.at(-1)[1].tenantId,tenantId);
   }finally{await api.close();}
+});
+
+
+test('execution history accepts bounded filters for operator triage', async () => {
+  const api = await fixture();
+  try {
+    const response = await fetch(api.base + '/api/v1/growth/workflows/' + workflowId + '/executions?limit=25&status=retryable&triggerEventType=contact.created&errorCode=provider_timeout', { headers: { cookie: api.headers.cookie } });
+    assert.equal(response.status, 200);
+    const call = api.calls.find(([kind]) => kind === 'list');
+    assert.equal(call[1].limit, 25);
+    assert.equal(call[1].status, 'retryable');
+    assert.equal(call[1].triggerEventType, 'contact.created');
+    assert.equal(call[1].errorCode, 'provider_timeout');
+  } finally { await api.close(); }
+});
+
+
+test('activation checklist exposes the first customer outcome without claiming provider connectivity', async () => {
+  const api = await fixture();
+  try {
+    const response = await fetch(api.base + '/api/v1/growth/activation', { headers: { cookie: api.headers.cookie } });
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.steps.find(step => step.id === 'connect_provider').status, 'blocked');
+    assert.equal(body.nextAction, 'publish_workflow');
+    assert.equal(api.calls.at(-1)[0], 'activation');
+    assert.equal(api.calls.at(-1)[1].tenantId, tenantId);
+  } finally { await api.close(); }
 });

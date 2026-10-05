@@ -23,6 +23,7 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run doctor
+      - run: npm run mirofish:check
       - run: npm run docs:check
       - run: npm run seo:check
       - run: npm run build:site
@@ -35,7 +36,7 @@ jobs:
       - name: Upload launch-safe preview artifact
         uses: actions/upload-artifact@v4
         with:
-          name: atlas-v120-static-preview-node-${{ matrix.node }}
+          name: atlas-v121-static-preview-node-${{ matrix.node }}
           path: dist/atlas-site
           if-no-files-found: error
           retention-days: 14
