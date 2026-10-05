@@ -1,6 +1,6 @@
 # Atlas master roadmap and verified implementation status
 
-This status describes repository behavior at V120. `DONE` means the listed bounded capability is implemented and tested in this source release. `PARTIAL` means real implementation exists but the requested feature family is incomplete. `BLOCKED BY EXTERNAL DEPENDENCY` means source contracts may exist, but end-to-end operation requires deployment, provider credentials, or missing product services.
+This status describes repository behavior at V121. `DONE` means the listed bounded capability is implemented and tested in this source release. `PARTIAL` means real implementation exists but the requested feature family is incomplete. `BLOCKED BY EXTERNAL DEPENDENCY` means source contracts may exist, but end-to-end operation requires deployment, provider credentials, or missing product services.
 
 | Phase | Status | Verified scope and outstanding work |
 |---|---|---|
@@ -22,7 +22,7 @@ This status describes repository behavior at V120. `DONE` means the listed bound
 
 V117 is the first post-MiroFish implementation slice. It adds a tenant-authenticated workflow preview runtime that reuses the existing checksummed graph and approval contracts. Preview mode can traverse native nodes, branch conditions, pause on approvals, and represent adapter/model work as simulated steps without performing external side effects.
 
-V119 now provides durable execution history, replay state, approval/cancel controls and an atomic queue handoff. The production workflow engine remains **PARTIAL** because provider handlers, live event ingress, durable waits/resume and the final execution inspector are still future work.
+V119 now provides durable execution history, replay state, approval/cancel controls and an atomic queue handoff. V121 adds bounded durable delay/wait-until resume, execution triage filters, and a tenant-scoped activation checklist built around the first-outcome journey. The production workflow engine remains **PARTIAL** because provider handlers, live event ingress, durable waits/resume and the final execution inspector are still future work.
 
 See [V117 Workflow Preview](V117-WORKFLOW-PREVIEW.md), [V119 Durable Workflow Engine](V119-DURABLE-WORKFLOW-ENGINE.md), [post-MiroFish roadmap](ATLAS-POST-MIROFISH-ROADMAP-2026-10.md) and [flagship workflow plan](ATLAS-KILLER-WORKFLOW-PLAN.md).
 
