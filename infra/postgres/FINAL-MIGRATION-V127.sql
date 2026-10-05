@@ -19,6 +19,6 @@ BEGIN
   RETURN v_job_id;
 END;
 $v127$;
-REVOKE ALL ON FUNCTION atlas_v127_schedule_workflow_resume(uuid,uuid,text,text,timestamptz,text,integer) FROM PUBLIC,atlas_app;
+REVOKE ALL ON FUNCTION atlas_v127_schedule_workflow_resume(uuid,uuid,text,text,timestamptz,text,integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION atlas_v127_schedule_workflow_resume(uuid,uuid,text,text,timestamptz,text,integer) TO atlas_worker;
 COMMIT;
