@@ -95,6 +95,7 @@ export class PostgresGrowthStore {
       await this.#scope(client, { actorId, tenantId }, { module: 'workflows' });
       return {
         executionAvailable: false,
+        previewAvailable: true,
         triggers: Object.values(WORKFLOW_TRIGGER_CATALOG),
         nodes: Object.values(WORKFLOW_NODE_CATALOG)
       };
