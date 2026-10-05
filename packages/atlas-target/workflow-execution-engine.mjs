@@ -42,7 +42,7 @@ function timestamp(value, label, fallback = null) {
 
 function reference(value, label) {
   const result = boundedText(value, label, 180);
-  if (!REF_KEY.test(result) || /^(password|secret|token|credential|authorization|cookie|raw[_-]?body|message[_-]?body|transcript)$/i.test(result)) {
+  if ((!UUID.test(result) && !REF_KEY.test(result)) || /^(password|secret|token|credential|authorization|cookie|raw[_-]?body|message[_-]?body|transcript)$/i.test(result)) {
     throw new Error(label + ' must be an opaque reference');
   }
   return result;
