@@ -1,8 +1,6 @@
 name: Atlas production evidence
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 permissions:
   contents: read
 jobs:
