@@ -33,3 +33,9 @@
 .workflow-history-main strong { text-transform: capitalize; }
 .workflow-history-main span, .workflow-history-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-history-row small { max-width: 60%; }
+
+
+.growth-activation-card { margin: 0 0 1rem; padding: 1rem 1.15rem; border: 1px solid var(--border, #d9dee8); border-radius: 14px; background: var(--surface, #fff); }
+.growth-activation-steps { display: grid; gap: .6rem; }
+.growth-activation-step { display: grid; grid-template-columns: 1fr auto; gap: .35rem .75rem; align-items: center; padding: .7rem .8rem; border-radius: 10px; background: var(--surface-muted, #f6f7f9); }
+.growth-activation-step .field-help { grid-column: 1 / -1; margin: 0; }
