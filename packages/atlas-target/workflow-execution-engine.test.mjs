@@ -91,8 +91,14 @@ test('approval requests pause execution and approval resumes the exact node', ()
     triggerEventRef: 'event_2026_0003',
     createdByActorId: '99999999-9999-4999-8999-999999999999'
   });
-  const waiting = requestWorkflowApproval({
+  const advanced = completeWorkflowStep({
     execution: first,
+    nodeId: 'start',
+    attempt: 1,
+    now: '2026-10-05T10:00:00Z'
+  });
+  const waiting = requestWorkflowApproval({
+    execution: advanced,
     nodeId: 'task',
     requestedByActorId: '99999999-9999-4999-8999-999999999999',
     now: '2026-10-05T10:00:00Z',
@@ -133,12 +139,21 @@ test('step failure retries within the pinned execution and dead-letters after th
   assert.equal(failed.status, 'retryable');
   assert.equal(failed.retryAt, '2026-10-05T10:00:00.500Z');
 
+  const failedAgain = failWorkflowStep({
+    execution: failed,
+    nodeId: 'start',
+    attempt: 2,
+    errorCode: 'provider_timeout',
+    now: '2026-10-05T10:00:01Z'
+  });
+  assert.equal(failedAgain.status, 'retryable');
+
   const terminal = failWorkflowStep({
-    execution: { ...failed, steps: failed.steps.map(step => ({ ...step, attempt: 3 })) },
+    execution: failedAgain,
     nodeId: 'start',
     attempt: 3,
     errorCode: 'provider_timeout',
-    now: '2026-10-05T10:01:00Z'
+    now: '2026-10-05T10:00:02Z'
   });
   assert.equal(terminal.status, 'dead_letter');
   assert.equal(terminal.lastErrorCode, 'provider_timeout');
