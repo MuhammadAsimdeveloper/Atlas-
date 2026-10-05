@@ -12,7 +12,7 @@ const adapters=await read('apps/worker/provider-adapters.mjs');
 const integration=await read('apps/worker/integration-runtime.mjs');
 const security=await read('apps/api/security.mjs');
 const ci=await read('.github/workflows/ci.yml');
-check('release metadata is aligned',pkg.version==='144.0.0'&&env.includes('ATLAS_RELEASE=V144'),'Package and environment release identifiers agree.');
+check('release metadata is aligned',pkg.version==='145.0.0'&&env.includes('ATLAS_RELEASE=V145'),'Package and environment release identifiers agree.');
 check('production secrets are explicit',['ATLAS_DATABASE_URL','ATLAS_SESSION_SECRET','ATLAS_PLATFORM_OWNER_EMAIL','ATLAS_HEALTH_TOKEN','ATLAS_INBOX_CONTENT_MODULE','ATLAS_WEBHOOK_SECRET_RESOLVER_MODULE','ATLAS_WORKFLOW_EVENT_INGRESS_ENABLED'].every(k=>env.includes(k)),'Critical production configuration keys are declared.');
 check('provider runtime is fail-closed',adapters.includes('assertSafeProviderUrl')&&adapters.includes('validateProviderAdapter')&&integration.includes('executeWithRetry'),'Provider calls require validated destinations and bounded retries.');
 check('API security boundary is wired',api.includes('securityHeaders')&&security.includes('enforceRateLimit')&&security.includes('clientIdentity')&&api.includes('ATLAS_TRUST_PROXY'),'API security headers, rate limiting and trusted-proxy client identity are wired.');

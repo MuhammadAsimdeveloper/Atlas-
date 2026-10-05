@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '144.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '145.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143']) {
@@ -267,6 +267,11 @@ try {
   check('P130 durable scheduler', scheduler.includes('createScheduled') && frontierStore.includes('atlas_v130_claim_workflow_schedules') && v130.includes('FOR UPDATE SKIP LOCKED') && v130.includes('SECURITY DEFINER'), 'Due schedules are atomically claimed, pinned to immutable workflow versions and converted into durable executions.');
   check('P133 governed action catalog', v133.includes('communication.email') && v133.includes('automation.webhook') && frontierRoutes.includes('/api/v1/growth/actions/catalog'), 'Core provider capabilities are seeded into the governed action catalog and tenant binding API.');
   check('P136 restricted runtime telemetry', workerRuntime.includes('runtimePoolId') && frontierStore.includes('recordRuntimeHeartbeat') && v136.includes('atlas_worker'), 'Workers can emit pool heartbeats/SLO evidence without customer-table access.');
+  const journey = await read('packages/atlas-journey/index.mjs');
+  const journeyTests = await read('packages/atlas-journey/index.test.mjs');
+  const journeyPlan = await read('docs/ATLAS-DEVELOPMENT-PLAN-V145-V153-2026-10.md');
+  const journeyDoc = await read('docs/V145-LEAD-TO-BOOKING.md');
+  check('V145 cross-product journey', journey.includes('runLeadToBookingJourney') && journey.includes('createGrowthRecord') && journey.includes('scoreLeadQualification') && journey.includes('bookAppointment') && journey.includes('voiceIntent'), journeyTests.includes('flagship journey connects') && journeyDoc.includes('Funnel/website lead form') && journeyPlan.includes('V145 — Cross-product Lead-to-Booking Control Plane'), 'Funnel capture, CRM, qualification, follow-up planning, calendar booking, pipeline updates, voice intent and redacted reporting are composed in one tenant-bound journey.');
 
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
