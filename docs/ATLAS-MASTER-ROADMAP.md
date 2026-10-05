@@ -22,7 +22,7 @@ This status describes repository behavior at V119. `DONE` means the listed bound
 
 V117 is the first post-MiroFish implementation slice. It adds a tenant-authenticated workflow preview runtime that reuses the existing checksummed graph and approval contracts. Preview mode can traverse native nodes, branch conditions, pause on approvals, and represent adapter/model work as simulated steps without performing external side effects.
 
-V119 now provides durable execution history, replay state and operator control APIs. The production workflow engine remains **PARTIAL** because provider handlers, live event ingress, durable waits/resume and the final execution inspector are still future work.
+V119 now provides durable execution history, replay state, approval/cancel controls and an atomic queue handoff. The production workflow engine remains **PARTIAL** because provider handlers, live event ingress, durable waits/resume and the final execution inspector are still future work.
 
 See [V117 Workflow Preview](V117-WORKFLOW-PREVIEW.md), [V119 Durable Workflow Engine](V119-DURABLE-WORKFLOW-ENGINE.md), [post-MiroFish roadmap](ATLAS-POST-MIROFISH-ROADMAP-2026-10.md) and [flagship workflow plan](ATLAS-KILLER-WORKFLOW-PLAN.md).
 
@@ -32,4 +32,4 @@ Only the configured, verified Atlas platform-owner identity receives global auth
 
 ## Current execution boundary
 
-V115 queue/scheduler state is persistent PostgreSQL data, V117 adds safe preview, and V119 adds durable execution state/control. There are still no bundled business handlers, so a deployment must supply and review the `workflow.execute` handler before enabling live workflow starts. A deployment must supply and review a handler module before enabling the Compose `workers` profile. See [Execution Engine](EXECUTION-ENGINE.md) for contracts and limits, [V116 Workflow Studio](V116-WORKFLOW-STUDIO.md) for authoring scope, [Production Architecture](PRODUCTION-ARCHITECTURE.md) for deployment dependencies, and [n8n architecture review](N8N-ARCHITECTURE-REVIEW-2026-10.md) for the workflow capability gap list.
+V115 queue/scheduler state is persistent PostgreSQL data, V117 adds safe preview, and V119 adds durable execution state/control plus a feature-gated `workflow.execute` queue handoff. There are still no bundled business handlers, so a deployment must supply and review the `workflow.execute` handler before enabling live workflow starts. A deployment must supply and review a handler module before enabling the Compose `workers` profile. See [Execution Engine](EXECUTION-ENGINE.md) for contracts and limits, [V116 Workflow Studio](V116-WORKFLOW-STUDIO.md) for authoring scope, [Production Architecture](PRODUCTION-ARCHITECTURE.md) for deployment dependencies, and [n8n architecture review](N8N-ARCHITECTURE-REVIEW-2026-10.md) for the workflow capability gap list.
