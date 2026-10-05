@@ -17,7 +17,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     const migrationDirectory = path.join(root, 'infra/postgres');
     await db.exec('CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;');
   const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
-    assert.equal(files.at(-1), 'FINAL-MIGRATION-V144.sql');
+    assert.equal(files.at(-1), 'FINAL-MIGRATION-V150.sql');
     for (const file of files) { try { await db.exec(await readFile(path.join(migrationDirectory,file),'utf8')); } catch (error) { throw new Error(`${file}: ${error.message}`); } }
     const automationTable = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_v127_automation_events'::regclass");
     assert.equal(automationTable.rows[0].relrowsecurity,true);
@@ -52,12 +52,23 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V136.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V137.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V138.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V144.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V146.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V147.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V148.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V149.sql'), 'utf8'));
+    await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V150.sql'), 'utf8'));
 
     const sloPolicies = await db.query("SELECT count(*)::integer AS count FROM atlas_runtime_slo_policies WHERE enabled=true");
     assert.equal(sloPolicies.rows[0].count, 5, 'V137 seeds bounded runtime SLO policies');
     const sloFunction = await db.query("SELECT proname FROM pg_proc WHERE proname='atlas_v137_evaluate_runtime_slo'");
     assert.equal(sloFunction.rowCount, 1, 'V137 SLO evaluator is present');
     const workerTelemetry = await db.query("SELECT has_function_privilege('atlas_worker','atlas_v137_evaluate_runtime_slo(text,text,uuid)','EXECUTE') AS can_evaluate,has_table_privilege('atlas_worker','atlas_runtime_alerts','SELECT') AS can_read_alerts");
+    const operationalObjects = await db.query("SELECT table_name FROM information_schema.tables WHERE table_name IN ('atlas_runtime_scaler_leases','atlas_runtime_scaling_decisions','atlas_runtime_alert_deliveries','atlas_provider_action_reconciliations','atlas_runtime_recovery_drill_steps','atlas_runtime_evidence_reports') ORDER BY table_name");
+    assert.equal(operationalObjects.rows.length,6,'V146-V150 durable operational tables are present');
+    const operationalFunctions = await db.query("SELECT proname FROM pg_proc WHERE proname IN ('atlas_v146_acquire_scaler_lease','atlas_v148_start_provider_action','atlas_v148_record_provider_outcome')");
+    assert.equal(operationalFunctions.rows.length,3,'V146/V148 operational RPCs are present');
+
     assert.equal(workerTelemetry.rows[0].can_evaluate, true);
     assert.equal(workerTelemetry.rows[0].can_read_alerts, true);
 
