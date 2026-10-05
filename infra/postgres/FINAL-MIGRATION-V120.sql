@@ -151,7 +151,7 @@ CREATE OR REPLACE FUNCTION atlas_v120_append_execution_event_for_job(
   p_details_ref JSONB,
   p_created_at TIMESTAMPTZ
 ) RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
-DECLARE execution_ref TEXT; event_id UUID;
+DECLARE execution_ref TEXT; v_event_id UUID;
 BEGIN
   IF p_tenant_id IS NULL OR p_job_id IS NULL OR p_worker_id IS NULL OR p_worker_id !~ '^[a-zA-Z0-9_.:-]{1,120}$'
      OR p_event_type !~ '^[a-z][a-z0-9_.-]{0,79}$'
@@ -177,8 +177,8 @@ BEGIN
     tenant_id,event_id,execution_id,actor_id,event_type,node_id,attempt,status,details_ref,created_at
   ) VALUES(
     p_tenant_id::text,gen_random_uuid(),execution_ref,p_actor_id,p_event_type,p_node_id,p_attempt,p_status,p_details_ref,COALESCE(p_created_at,now())
-  ) RETURNING event_id INTO event_id;
-  RETURN event_id;
+  ) RETURNING event_id INTO v_event_id;
+  RETURN v_event_id;
 END;
 $$;
 
