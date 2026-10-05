@@ -54,6 +54,7 @@ test('V119 persists a pinned workflow execution and atomically queues its execut
     const execution=await store.create({actorId:actorA,tenantId:tenantA,workflow,triggerEventRef:eventRef,executionId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',now:'2026-10-05T10:00:00Z'});
     assert.equal(execution.status,'queued');
     assert.equal(execution.workflowVersion,5);
+    await db.query("SELECT set_config('app.tenant_id',$1,false)",[tenantA]);
     const job=await db.query("SELECT job_type,payload_ref::text AS payload,status FROM atlas_runtime_jobs WHERE tenant_id=$1 AND job_id=$2",[tenantA,execution.executionId]);
     assert.equal(job.rows[0].job_type,'workflow.execute');
     assert.equal(job.rows[0].status,'queued');
@@ -77,6 +78,7 @@ test('V119 execution control actions are optimistic and cross-tenant lookups fai
     assert.equal(canceled.status,'canceled');
     await assert.rejects(store.cancel({actorId:actorA,tenantId:tenantA,workflowId,executionId:execution.executionId,expectedVersion:1}),/changed|conflict/i);
     await assert.rejects(store.get({actorId:actorB,tenantId:tenantB,workflowId,executionId:execution.executionId}),/not_found|organization/i);
+    await db.query("SELECT set_config('app.tenant_id',$1,false)",[tenantA]);
     const audit=await db.query("SELECT event_type,status FROM atlas_workflow_execution_events WHERE tenant_id=$1 AND execution_id=$2 ORDER BY created_at,event_id",[tenantA,execution.executionId]);
     assert.deepEqual(audit.rows.map(row=>row.event_type),['execution.created','execution.cancel']);
   }finally{await db.close();}
