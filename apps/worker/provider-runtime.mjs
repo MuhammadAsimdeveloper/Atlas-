@@ -47,6 +47,7 @@ export function createProviderRuntime({connectionStore,secretResolver,fetchImpl=
  if(typeof secretResolver!=='function')throw new TypeError('A production secret resolver is required.');
  return Object.freeze({execute:async({node,job,context})=>{
    const cfg=object(node.config||{},'node.config'),capabilityId=text(cfg.capabilityId,'capabilityId',120);
+   if(cfg.consent!==true||cfg.approved!==true)throw Object.assign(new Error('Provider action requires explicit consent and approval.'),{code:'provider_consent_required'});
    if(context.attempt>1)throw Object.assign(new Error('Provider action retry requires reconciliation because the configured adapter cannot guarantee exactly-once delivery.'),{code:'provider_retry_unsafe'});
    if(!PROVIDER_ACTIONS.has(capabilityId))throw Object.assign(new Error('Unsupported provider capability.'),{code:'provider_capability_unsupported'});
    const connectionRef=ref(cfg.connectionRef,'connectionRef');
