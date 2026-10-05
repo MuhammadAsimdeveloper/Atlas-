@@ -182,8 +182,8 @@ test('V120 workflow execution access is lease-bound and mediated by the worker a
 test('V138 runtime capacity is globally bounded, lease-owned and recoverable', async () => {
   const { db,pool } = await database();
   try {
-    await db.exec('SET ROLE atlas_worker;');
     await db.query("INSERT INTO atlas_runtime_pools(pool_id,mode,desired_workers,max_concurrency,enabled) VALUES ('pool-cap','postgres',2,2,true)");
+    await db.exec('SET ROLE atlas_worker;');
     const worker = new PostgresRuntimeStore(pool);
     assert.equal(await worker.acquireRuntimeCapacity('pool-cap','worker-a',2,60),2);
     assert.equal(await worker.acquireRuntimeCapacity('pool-cap','worker-b',2,60),0);
