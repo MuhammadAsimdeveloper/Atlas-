@@ -358,6 +358,24 @@ export class PostgresRuntimeStore {
     return rows[0];
   }
 
+  async listRuntimeSloPolicies() {
+    const { rows } = await this.pool.query('SELECT policy_id,metric,window_seconds,target,allowed_bad_ratio,warning_bad_ratio,critical_bad_ratio,enabled FROM atlas_runtime_slo_policies WHERE enabled=true ORDER BY policy_id');
+    return rows;
+  }
+
+  async evaluateRuntimeSlo({ poolId, policyId, evaluationId = randomUUID() } = {}) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '') || !/^[A-Za-z0-9_.:-]{1,120}$/.test(policyId || '') || !UUID.test(evaluationId || '')) throw new TypeError('runtime_slo_evaluation_invalid');
+    const { rows } = await this.pool.query('SELECT * FROM atlas_v137_evaluate_runtime_slo($1,$2,$3)', [policyId, poolId, evaluationId]);
+    return rows[0] || null;
+  }
+
+  async listRuntimeAlerts({ poolId = null, status = 'open', limit = 100 } = {}) {
+    if (poolId !== null && !/^[A-Za-z0-9_.:-]{1,120}$/.test(poolId || '')) throw new TypeError('runtime_alert_pool_invalid');
+    if (!['open','acknowledged','resolved'].includes(status) || !Number.isInteger(limit) || limit < 1 || limit > 500) throw new TypeError('runtime_alert_filter_invalid');
+    const { rows } = await this.pool.query('SELECT alert_id,fingerprint,policy_id,pool_id,severity,status,current_value,threshold,first_seen_at,last_seen_at,acknowledged_at,resolved_at FROM atlas_runtime_alerts WHERE ($1::text IS NULL OR pool_id=$1) AND status=$2 ORDER BY last_seen_at DESC LIMIT $3', [poolId,status,limit]);
+    return rows;
+  }
+
   async claimWorkflowSchedules(limit=100) {
     if(!Number.isInteger(limit)||limit<1||limit>500) throw new TypeError('schedule_claim_invalid');
     const {rows}=await this.pool.query('SELECT * FROM atlas_v130_claim_workflow_schedules($1)',[limit]);
