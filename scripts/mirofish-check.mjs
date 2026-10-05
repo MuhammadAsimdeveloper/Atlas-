@@ -157,11 +157,9 @@ scenarios.push(['cross-tenant payload injection', () => {
 
 scenarios.push(['workflow replay identity', () => {
   const first = runLeadToBookingJourney(baseInput());
-  const input = baseInput();
-  input.journeyId = baseInput().journeyId;
-  const second = runLeadToBookingJourney(input);
-  return { same: first.idempotencyKey === second.idempotencyKey };
-}, result => result.same === true]);
+  const second = runLeadToBookingJourney(baseInput());
+  return { ...second, same: first.idempotencyKey === second.idempotencyKey, replaySameCommand: first.idempotencyKey === second.idempotencyKey && first.contact.id === second.contact.id && first.lead.id === second.lead.id };
+}, result => result.same === true && result.replaySameCommand === true]);
 
 scenarios.push(['public SEO refuses insecure origin', () => {
   const result = assessSeoReadiness({
