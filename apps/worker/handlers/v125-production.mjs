@@ -21,10 +21,16 @@ export const jobHandlers=Object.freeze({'workflow.execute':async(_payloadRef,con
  return executeWorkflowJob({
   store,job:{tenant_id:context.tenantId,job_id:context.jobId},workerId:context.workerId,
   signal:context.signal,
+  verifyExternalAction:async({node,job,workerId})=>{
+   const connectionRef=node.config?.connectionRef;
+   if(typeof connectionRef!=='string')return false;
+   const connection=await store.getProviderConnectionForWorker(job,workerId,connectionRef);
+   return connection?.status==='verified'&&connection?.tenant_id===job.tenant_id;
+  },
   resolveAction:async({node,execution,tenantId,jobId,signal})=>{
    const cap=node.config?.capabilityId;
    if(node.requiresAdapter===true||typeof cap==='string'&&/^(communication\.|automation\.webhook|service\.jobber)/.test(cap))
-    return providerRuntime.execute({node,job:{tenant_id:tenantId,job_id:jobId},context:{workerId:context.workerId,idempotencyKey:context.idempotencyKey,signal,execution}});
+    return providerRuntime.execute({node,job:{tenant_id:tenantId,job_id:jobId},context:{workerId:context.workerId,idempotencyKey:context.idempotencyKey,attempt:context.attempt,signal,execution}});
    if(node.type==='stop'||node.type==='noop'||node.type==='set_field'||node.type==='condition'||node.type==='branch')return {selectedPort:node.config?.selectedPort||'next'};
    throw Object.assign(new Error('No production action handler is registered for this workflow node.'),{code:'workflow_action_unavailable'});
   }
