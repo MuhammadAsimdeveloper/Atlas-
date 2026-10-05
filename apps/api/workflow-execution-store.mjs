@@ -28,11 +28,11 @@ export class PostgresWorkflowExecutionStore{
 
   async #scope(client,{actorId,tenantId},{write=false}={}){
     if(!UUID.test(actorId||'')||!UUID.test(tenantId||'')) throw createAuthError(409,'workspace_required');
+    await client.query("SELECT set_config('app.actor_id',$1,true)",[actorId]);
     const membership=await client.query(`SELECT m.role_key,m.custom_role_id FROM atlas_organization_memberships m
       JOIN atlas_organizations o ON o.tenant_id=m.tenant_id
       WHERE m.tenant_id=$1 AND m.user_id=$2 AND m.status='active' AND o.status='active'`,[tenantId,actorId]);
     if(!membership.rowCount) throw createAuthError(404,'organization_not_found');
-    await client.query("SELECT set_config('app.actor_id',$1,true)",[actorId]);
     await client.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);
     if(write && !['owner','admin'].includes(membership.rows[0].role_key)){
       const customRoleId=membership.rows[0].custom_role_id;
