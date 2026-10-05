@@ -123,6 +123,17 @@ export class PostgresRuntimeStore {
     return rows[0]?.updated === true;
   }
 
+  async scheduleWorkflowResumeForWorker(job, workerId, executionId, runAt, kind, executionVersion) {
+    if (!job || !UUID.test(job.tenant_id || '') || !UUID.test(job.job_id || '') || !UUID.test(executionId || '') || !/^[a-zA-Z0-9_.:-]{1,120}$/.test(workerId || '') || !['wait','retry'].includes(kind) || !Number.isSafeInteger(executionVersion) || executionVersion < 1 || !Number.isFinite(Date.parse(runAt))) {
+      throw new TypeError('Worker workflow resume identity is invalid.');
+    }
+    const { rows } = await this.pool.query(
+      'SELECT atlas_v127_schedule_workflow_resume($1,$2,$3,$4,$5,$6,$7) AS job_id',
+      [job.tenant_id, job.job_id, workerId, executionId, runAt, kind, executionVersion]
+    );
+    return rows[0]?.job_id || null;
+  }
+
   async getWorkflowExecutionForJob(job, workerId) {
     const { rows } = await this.pool.query('SELECT * FROM atlas_v120_get_execution_for_job($1,$2,$3)', [job.tenant_id, job.job_id, workerId]);
     return rows[0] || null;
