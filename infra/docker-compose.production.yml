@@ -62,6 +62,7 @@ services:
       ATLAS_WORKER_CONCURRENCY: "${ATLAS_WORKER_CONCURRENCY:-4}"
       ATLAS_WORKER_LEASE_SECONDS: "${ATLAS_WORKER_LEASE_SECONDS:-60}"
       ATLAS_WORKER_POLL_MS: "${ATLAS_WORKER_POLL_MS:-1000}"
+      ATLAS_RUNTIME_POOL_ID: "${ATLAS_RUNTIME_POOL_ID:-}"
       ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
     volumes:
       - "${ATLAS_WORKER_SECRETS_PATH:?Mount a reviewed local secret resolver directory}:/app/apps/worker/secrets:ro"
