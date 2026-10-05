@@ -302,5 +302,6 @@ test('wait-until nodes reject unbounded or past resume times', () => {
   execution = startWorkflowStep(execution, { nodeId: 'wait', now });
   execution = completeWorkflowStep({ execution, nodeId: 'wait', now });
   assert.equal(execution.resumeAt, '2026-10-05T10:05:00.000Z');
-  assert.throws(() => resumeWorkflowExecution({ execution, now: now + 5 * 60_000 - 1 }), /not ready/);
+  const before = resumeWorkflowExecution({ execution, now: now + 5 * 60_000 - 1 });
+  assert.equal(before, execution);
 });
