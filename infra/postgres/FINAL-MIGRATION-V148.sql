@@ -42,7 +42,7 @@ CREATE OR REPLACE FUNCTION atlas_v148_start_provider_action(
   p_action_key TEXT,
   p_idempotency_key TEXT
 ) RETURNS TABLE(state TEXT,provider_ref TEXT,reconciliation_id TEXT,attempt_count INTEGER)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public
+LANGUAGE plpgsql SET search_path=pg_catalog,public
 AS $$
 BEGIN
   IF NOT EXISTS(
@@ -77,7 +77,7 @@ CREATE OR REPLACE FUNCTION atlas_v148_record_provider_outcome(
   p_error_code TEXT DEFAULT NULL,
   p_resolution_code TEXT DEFAULT NULL
 ) RETURNS BOOLEAN
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public
+LANGUAGE plpgsql SET search_path=pg_catalog,public
 AS $$
 DECLARE changed BOOLEAN;
 BEGIN
