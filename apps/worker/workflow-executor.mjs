@@ -27,7 +27,7 @@ export async function executeWorkflowJob({store,job,workerId,resolveAction=async
  try{
    const capabilityId=typeof node.config?.capabilityId==='string'?node.config.capabilityId:null;
    const providerStatus=node.config?.providerStatus;
-   if(capabilityId && !externalSideEffectAllowed({capabilityId,providerStatus,consent:node.config?.consent===true,approved:node.config?.approved===true})){
+   if(node.requiresAdapter && (!capabilityId || !externalSideEffectAllowed({capabilityId,providerStatus,consent:node.config?.consent===true,approved:node.config?.approved===true}))){
      throw Object.assign(new Error('External side effect is not verified for this node.'),{code:'provider_not_verified'});
    }
    const result=await resolveAction(Object.freeze({node,execution,tenantId:job.tenant_id,jobId:job.job_id,signal:undefined}));
