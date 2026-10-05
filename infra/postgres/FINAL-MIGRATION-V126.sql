@@ -59,7 +59,7 @@ LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,public AS $
 DECLARE v_id uuid; v_created boolean:=false;
 BEGIN
  IF session_user <> 'atlas_app' THEN RAISE EXCEPTION 'api_role_required'; END IF;
- IF NOT EXISTS(SELECT 1 FROM atlas_v122_conversations c WHERE c.tenant_id=p_tenant_id AND c.conversation_id=p_conversation_id AND (p_connection_id IS NULL OR c.provider_connection_id=p_connection_id)) THEN RAISE EXCEPTION 'conversation_not_found'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM atlas_v122_conversations c WHERE c.tenant_id=p_tenant_id AND c.conversation_id=p_conversation_id AND c.channel=p_channel AND c.provider_connection_id=p_connection_id) THEN RAISE EXCEPTION 'conversation_not_found'; END IF;
  SELECT m.message_id INTO v_id FROM atlas_v122_messages m WHERE m.tenant_id=p_tenant_id AND m.idempotency_key=p_idempotency_key FOR UPDATE;
  IF v_id IS NOT NULL THEN RETURN QUERY SELECT v_id,p_conversation_id,false; RETURN; END IF;
  INSERT INTO atlas_v122_messages(tenant_id,message_id,conversation_id,direction,sender_ref,recipient_ref,body_ref,delivery_status,idempotency_key,content_ref,subject,provider_status,updated_at)
