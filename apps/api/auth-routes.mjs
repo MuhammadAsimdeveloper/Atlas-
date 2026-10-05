@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { isIP } from 'node:net';
 import {
   AUTH_ROLE_KEYS, csrfCookieName, sessionCookieName, createAuthError, generateOpaqueToken,
   hashIp, hashOpaqueToken, hashPassword, hashRateKey, isAllowedOrigin, normalizeDisplayName,
@@ -7,6 +6,7 @@ import {
   serializeClearedAuthCookies, validateCustomRole, verifyCsrf, verifyPassword
 } from './auth-contracts.mjs';
 import { resolveAtlasAuthority } from '../../packages/atlas-core/authority.mjs';
+import { clientIdentity, securityHeaders } from './security.mjs';
 
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
 const TOKEN_MILLIS = 30 * 60 * 1000;
@@ -14,14 +14,7 @@ const INVITE_MILLIS = 7 * 24 * 60 * 60 * 1000;
 const MAX_BODY_BYTES = 16 * 1024;
 
 function sendJson(res, status, body, headers = {}, env = process.env) {
-  res.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store',
-    'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer',
-    'permissions-policy': 'camera=(), microphone=(), geolocation=()',
-    'content-security-policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
-    ...(env.NODE_ENV === 'production' ? { 'strict-transport-security': 'max-age=31536000; includeSubDomains' } : {}),
-    ...headers
-  });
+  res.writeHead(status, { ...securityHeaders(env), ...headers, 'cache-control': 'no-store', 'content-type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(body));
   return true;
 }
@@ -43,15 +36,6 @@ async function readJson(req) {
   } catch {
     throw createAuthError(400, 'invalid_json');
   }
-}
-
-function clientIdentity(req, env) {
-  if (env.ATLAS_TRUST_PROXY === 'true') {
-    const candidate = typeof req.headers['x-real-ip'] === 'string' ? req.headers['x-real-ip'].trim() : '';
-    if (candidate.length <= 64 && isIP(candidate) !== 0) return candidate;
-    if (env.NODE_ENV === 'production') throw createAuthError(503, 'trusted_client_ip_unavailable', 'The trusted edge did not provide a valid client IP.');
-  }
-  return String(req.socket?.remoteAddress || 'unknown').slice(0, 64);
 }
 
 function requireToken(value) {
