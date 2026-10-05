@@ -1,3 +1,13 @@
+# Atlas Business Operating System
+
+## V146–V150 — Operational completion frontier
+
+Atlas now includes the repository-side runtime controls for autoscaling actuation, SLO alert delivery, provider outcome reconciliation, executable recovery drills and machine-verifiable deployment evidence.
+
+**Launch truth:** these controls are deployable code, not proof that external infrastructure is live. Managed PostgreSQL/Redis, KMS, WAF/CDN, real provider credentials, OTLP collectors, domain/DNS/TLS, backups/PITR, restore/load/failover measurements and independent security/compliance evidence still have to be produced by the deployment environment.
+
+See [V146–V150 operational completion plan](docs/V146-V150-OPERATIONAL-COMPLETION-PLAN.md) and [production launch runbook](docs/PRODUCTION-LAUNCH-RUNBOOK.md).
+
 ## V144 — Runtime control-plane integration
 
 V144 closes the repository-side control/observability gap: durable dispatch state is recorded by the worker, bounded runtime control events provide an auditable decision ledger, and optional OTLP HTTP export is best-effort so telemetry can never block customer work.
