@@ -41,7 +41,14 @@ function hash(value) {
 }
 
 function digestPrefix(value, prefix) {
-  return prefix + hash(value).slice(0, 24);
+  const digest = hash(value).slice(0, 32);
+  const versioned = digest.slice(0, 12) + '-4' + digest.slice(13, 16) + '-8' + digest.slice(17, 20) + '-' + digest.slice(20, 32);
+  return prefix + versioned;
+}
+
+function deterministicUuid(value) {
+  const digest = hash(value).slice(0, 32);
+  return digest.slice(0, 8) + '-' + digest.slice(8, 12) + '-4' + digest.slice(13, 16) + '-8' + digest.slice(17, 20) + '-' + digest.slice(20, 32);
 }
 
 function assertGrowth(record, tenantId, module, label) {
@@ -155,8 +162,8 @@ export function runLeadToBookingJourney({
   if (!verifyBookingCalendar(calendar) || calendar.tenantId !== tenantId) throw new Error('Calendar tenant or checksum is invalid');
 
   const idBase = { tenantId, journeyId, sourceRef: submission.sourceRef };
-  const contactId = digestPrefix(idBase, 'contact_');
-  const leadId = digestPrefix(idBase, 'lead_');
+  const contactId = deterministicUuid({ ...idBase, kind: 'contact' });
+  const leadId = deterministicUuid({ ...idBase, kind: 'lead' });
   const idempotencyKey = appointmentIdempotencyKey && HASH.test(appointmentIdempotencyKey)
     ? appointmentIdempotencyKey
     : hash({ tenantId, journeyId, sourceRef: submission.sourceRef });
