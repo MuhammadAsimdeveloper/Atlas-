@@ -1,3 +1,10 @@
+## 138.0.0 — Distributed runtime capacity and backpressure
+- Added durable runtime-pool capacity leases with atomic pool-row arbitration.
+- Added bounded global concurrency enforcement across workers in the same runtime pool.
+- Added lease expiry cleanup and worker-owned slot release.
+- Workers reserve capacity before claiming jobs and release unused reservations before execution.
+- Capacity exhaustion now produces bounded retryable backpressure rather than uncontrolled concurrency.
+
 ## 137.0.0 — Durable observability and SLO control plane
 - Added versioned runtime SLO policies for queue latency, job duration, error rate, success rate and lease recovery.
 - Added durable SLO evaluation snapshots with bounded error-budget state.
