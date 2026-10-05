@@ -94,6 +94,13 @@
 
 # Changelog
 
+## 121.0.0 — Killer Workflow Activation
+- Added bounded durable delay and wait-until workflow states with explicit resume timestamps and due-only resume transitions.
+- Added tenant-scoped activation checklist for the MiroFish-driven first outcome: capture lead, publish workflow, connect a verified provider, and inspect the result.
+- Added bounded execution-history filters for status, trigger event and error code to support operator triage.
+- Added Growth Center activation UI that distinguishes ready, complete and blocked work and never claims an unverified provider is live.
+
+
 ## 120.0.0 — Security Hardening
 - Removed direct workflow execution table privileges from the restricted `atlas_worker` role.
 - Added lease-bound PostgreSQL RPCs and worker adapter methods for durable execution reads, updates and timeline events.
