@@ -34,6 +34,11 @@ function requestForNode({node,connection,job,context}){
  if(channel==='whatsapp')return boundedPayload({to:text(cfg.to,'to',120),body:text(cfg.body,'body',4_096),idempotencyKey:context.idempotencyKey});
  if(channel==='voice')return boundedPayload({to:text(cfg.to,'to',120),twimlUrl:text(cfg.twimlUrl,'twimlUrl',2_000),idempotencyKey:context.idempotencyKey});
  if(capabilityId==='automation.webhook')return boundedPayload({payload:object(cfg.payload||{},'payload'),idempotencyKey:context.idempotencyKey});
+ if(capabilityId==='service.jobber'){
+   const query=text(cfg.query,'query',50_000);
+   if(!/^(query|mutation)\\b/.test(query.trim()))throw Object.assign(new Error('Jobber operation must be an explicit GraphQL query or mutation.'),{code:'provider_request_invalid'});
+   return boundedPayload({query,variables:object(cfg.variables||{},'variables'),idempotencyKey:context.idempotencyKey});
+ }
  throw Object.assign(new Error('Workflow node capability is not a supported provider action.'),{code:'provider_capability_unsupported'});
 }
 
@@ -51,7 +56,11 @@ export function createProviderRuntime({connectionStore,secretResolver,fetchImpl=
    const credentialRef=ref(connection.credential_ref,'credential_ref');
    const secret=await secretResolver({tenantId:job.tenant_id,connectionId:connection.connection_id,credentialRef});
    if(typeof secret!=='string'||secret.length<8||secret.length>4096)throw Object.assign(new Error('Provider credential could not be resolved.'),{code:'provider_secret_unavailable'});
-   const result=await executeProviderAction({adapter:adapterFor({connection,secret,fetchImpl}),request:requestForNode({node,connection,job,context}),signal:context.signal});
+   const request=requestForNode({node,connection,job,context});
+   const adapter=adapterFor({connection,secret,fetchImpl});
+   const result=connection.provider_key==='jobber.graphql'
+     ? Object.freeze({status:'sent',providerRef:context.idempotencyKey,dataRef:await adapter.query(request,{signal:context.signal})})
+     : await executeProviderAction({adapter,request,signal:context.signal});
    logger.info?.('Atlas provider action completed.',{tenantId:job.tenant_id,jobId:job.job_id,connectionId:connection.connection_id,provider:connection.provider_key,status:result.status});
    return Object.freeze({selectedPort:cfg.successPort||'next',resultRef:{kind:'provider_action',id:result.providerRef||context.idempotencyKey,version:1},providerRef:result.providerRef||null,status:result.status});
  }});
