@@ -36,7 +36,7 @@ function requestForNode({node,connection,job,context}){
  if(capabilityId==='automation.webhook')return boundedPayload({payload:object(cfg.payload||{},'payload'),idempotencyKey:context.idempotencyKey});
  if(capabilityId==='service.jobber'){
    const query=text(cfg.query,'query',50_000);
-   if(!/^(query|mutation)\\b/.test(query.trim()))throw Object.assign(new Error('Jobber operation must be an explicit GraphQL query or mutation.'),{code:'provider_request_invalid'});
+   if(!/^(query|mutation)\b/.test(query.trim()))throw Object.assign(new Error('Jobber operation must be an explicit GraphQL query or mutation.'),{code:'provider_request_invalid'});
    return boundedPayload({query,variables:object(cfg.variables||{},'variables'),idempotencyKey:context.idempotencyKey});
  }
  throw Object.assign(new Error('Workflow node capability is not a supported provider action.'),{code:'provider_capability_unsupported'});
