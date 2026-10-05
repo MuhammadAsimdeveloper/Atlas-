@@ -23,7 +23,7 @@ export async function runWorkflowScheduler({ runtimeStore, growthStore, executio
         if(error?.code==='workflow_execution_already_exists') execution={executionId,status:'already_exists'};
         else throw error;
       }
-      const nextRunAt=nextScheduleOccurrence(schedule,new Date(schedule.due_at));
+      const nextRunAt=schedule.schedule_kind==='calendar' ? new Date(schedule.due_at).toISOString() : nextScheduleOccurrence(schedule,new Date(schedule.due_at));
       await runtimeStore.finalizeWorkflowSchedule({tenantId:schedule.tenant_id,scheduleId:schedule.schedule_id,nextRunAt,state:schedule.schedule_kind==='calendar'?'completed':'active'});
       results.push({scheduleId:schedule.schedule_id,executionId,status:execution.status,nextRunAt});
     }catch(error){
