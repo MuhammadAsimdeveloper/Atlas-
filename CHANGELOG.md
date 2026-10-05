@@ -1,3 +1,13 @@
+## 136.0.0 — P129–P136 production frontier foundation
+- Added execution inspector diagnostics and replay request persistence.
+- Added cron/interval/calendar schedule definitions with timezone and DST policy.
+- Added event predicates, branches and deduplication policy storage.
+- Added connector installation lifecycle and health evidence without storing credentials.
+- Added governed action catalog and tenant capability bindings.
+- Added AI workforce session and sensitive-tool approval state.
+- Added environment promotion and rollback evidence structures.
+- Added distributed runtime pool, worker heartbeat and SLO sample structures.
+
 ## 128.0.0 — Durable workflow wake/resume control
 - Added a database-backed wake scheduler for due `waiting` and `retryable` workflow executions.
 - Added idempotent reference-only `workflow.execute` wake jobs and worker integration.

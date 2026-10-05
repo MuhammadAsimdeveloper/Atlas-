@@ -5,6 +5,7 @@ import { resolveAtlasAuthority } from '../../packages/atlas-core/authority.mjs';
 import { paddlePlanCatalog, verifyPaddleFreeTrialPrice, createPaddleCheckout, createPaddlePortalSession, normalizePaddleBillingEvent, paddleBodySha256, verifyPaddleSignature } from './paddle-billing.mjs';
 import { simulateWorkflow } from '../../packages/atlas-target/workflow-simulator.mjs';
 import { enforceRateLimit, securityHeaders } from './security.mjs';
+import { createPromotionManifest, routeEvent } from '../../packages/atlas-core/production-frontier.mjs';
 
 const MAX_BODY_BYTES = 110_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -177,7 +178,77 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
         if (typeof store.getWorkflowCatalog !== 'function') throw createAuthError(503, 'workflow_catalog_unavailable');
         return send(res, 200, await store.getWorkflowCatalog(who), env);
       }
-      const executionMatch = path.match(/^\/api\/v1\/growth\/workflows\/([0-9a-f-]{36})\/executions(?:\/([0-9a-f-]{36})(?:\/(cancel|approve|replay))?)?$/i);
+
+      if (path === '/api/v1/growth/executions/inspect' && req.method === 'GET') {
+        const executionId=url.searchParams.get('executionId');
+        if(!executionId) throw createAuthError(400,'execution_id_required');
+        if(typeof runtimeStore?.getExecutionInspector!=='function') throw createAuthError(503,'execution_inspector_unavailable');
+        return send(res,200,await runtimeStore.getExecutionInspector({...who,executionId,limit:Number(url.searchParams.get('limit')||200)}),env);
+      }
+      if (path === '/api/v1/growth/executions/replay' && req.method === 'POST') {
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['replayId','sourceExecutionId','sourceVersion','targetWorkflowVersion','reason']);
+        return send(res,202,{replayId:await runtimeStore.requestExecutionReplay({...who,...body})},env);
+      }
+      if (path === '/api/v1/growth/schedules' && req.method === 'POST') {
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['scheduleId','workflowId','workflowVersion','scheduleKind','expression','timezone','dstPolicy','nextRunAt']);
+        return send(res,201,{scheduleId:await runtimeStore.createWorkflowSchedule({...who,...body})},env);
+      }
+      if (path === '/api/v1/growth/event-routes' && req.method === 'GET') return send(res,200,{routes:await runtimeStore.listWorkflowEventRoutes({...who,eventType:url.searchParams.get('eventType')||null,limit:Number(url.searchParams.get('limit')||100)})},env);
+      if (path === '/api/v1/growth/event-routes' && req.method === 'POST') {
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['routeId','workflowId','workflowVersion','eventType','priority','predicate','branchKey','dedupWindowSeconds']);
+        return send(res,201,{routeId:await runtimeStore.createWorkflowEventRoute({...who,...body})},env);
+      }
+      if (path === '/api/v1/growth/connectors' && req.method === 'GET') return send(res,200,{installations:await runtimeStore.listConnectorInstallations({...who,status:url.searchParams.get('status')||null,limit:Number(url.searchParams.get('limit')||100)})},env);
+      if (path === '/api/v1/growth/connectors' && req.method === 'POST') {
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['installationId','connectorKey','externalAccountRef','credentialRef','scopesHash','tokenExpiresAt','status']);
+        return send(res,201,{installationId:await runtimeStore.upsertConnectorInstallation({...who,...body})},env);
+      }
+      const connectorHealth=path.match(/^\/api\/v1\/growth\/connectors\/([0-9a-f-]{36})\/health$/i);
+      if(connectorHealth && req.method==='POST'){
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['status','code','detailsRef']);
+        return send(res,201,{eventId:await runtimeStore.recordConnectorHealth({...who,installationId:connectorHealth[1],...body})},env);
+      }
+      if (path === '/api/v1/growth/actions/catalog' && req.method === 'GET') return send(res,200,{actions:await runtimeStore.listActionCatalog({...who,connectorKey:url.searchParams.get('connectorKey')||null,limit:Number(url.searchParams.get('limit')||200)})},env);
+      if (path === '/api/v1/growth/actions/bind' && req.method === 'POST') {
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['actionKey','enabled','installationId']);
+        return send(res,201,{actionKey:await runtimeStore.bindTenantAction({...who,...body})},env);
+      }
+      if (path === '/api/v1/growth/agents/sessions' && req.method === 'POST') {
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['sessionId','agentReleaseRef','channel','customerRef','memoryScope']);
+        return send(res,201,{sessionId:await runtimeStore.createAgentSession({...who,...body})},env);
+      }
+      if (path === '/api/v1/growth/agents/approvals' && req.method === 'POST') {
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['approvalId','sessionId','actionKey']);
+        return send(res,201,{approvalId:await runtimeStore.requestAgentToolApproval({...who,...body})},env);
+      }
+      const agentSessionMatch=path.match(/^\/api\/v1\/growth\/agents\/sessions\/([0-9a-f-]{36})$/i);
+      if(agentSessionMatch && req.method==='POST'){
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['status']);
+        return send(res,200,{session:await runtimeStore.transitionAgentSession({...who,sessionId:agentSessionMatch[1],status:body.status})},env);
+      }
+      const approvalMatch=path.match(/^\/api\/v1\/growth\/agents\/approvals\/([0-9a-f-]{36})$/i);
+      if(approvalMatch && req.method==='POST'){
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['status']);
+        return send(res,200,{approvalId:await runtimeStore.decideAgentToolApproval({...who,approvalId:approvalMatch[1],status:body.status})},env);
+      }
+      if (path === '/api/v1/growth/promotions/manifest' && req.method === 'POST') {
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['workflowId','workflowVersion','connectorBindings','actionBindings']);
+        const workflow=await store.getWorkflowVersionForScheduler({tenantId:who.tenantId,workflowId:body.workflowId,workflowVersion:body.workflowVersion});
+        const result=createPromotionManifest({workflowId:body.workflowId,version:body.workflowVersion,payload:workflow.payload,connectorBindings:Array.isArray(body.connectorBindings)?body.connectorBindings:[],actionBindings:Array.isArray(body.actionBindings)?body.actionBindings:[]});
+        return send(res,200,{manifestSha256:result.sha256,manifest:result.manifest},env);
+      }
+      if (path === '/api/v1/growth/environments' && req.method === 'GET') return send(res,200,{environments:await runtimeStore.listWorkflowEnvironments(who)},env);
+      if (path === '/api/v1/growth/promotions' && req.method === 'POST') {
+        await requireMutation(req,who.session); const body=await readJson(req); exact(body,['promotionId','workflowId','sourceEnvironmentId','targetEnvironmentId','sourceVersion','targetVersion','manifestSha256']);
+        return send(res,201,{promotionId:await runtimeStore.createWorkflowPromotion({...who,...body})},env);
+      }
+      const promotionMatch=path.match(/^\/api\/v1\/growth\/promotions\/([0-9a-f-]{36})\/(approve|rollback)$/i);
+      if(promotionMatch && req.method==='POST'){
+        await requireMutation(req,who.session); const body=await readJson(req);
+        if(promotionMatch[2]==='approve'){ exact(body,['approve']); return send(res,200,{promotion:await runtimeStore.approveWorkflowPromotion({...who,promotionId:promotionMatch[1],approve:body.approve})},env); }
+        exact(body,['fromVersion','toVersion','reason']); return send(res,201,{rollbackId:await runtimeStore.rollbackWorkflowPromotion({...who,promotionId:promotionMatch[1],...body})},env);
+      }
+            const executionMatch = path.match(/^\/api\/v1\/growth\/workflows\/([0-9a-f-]{36})\/executions(?:\/([0-9a-f-]{36})(?:\/(cancel|approve|replay))?)?$/i);
       if (executionMatch) {
         if (typeof executionStore?.get !== 'function') throw createAuthError(503, 'workflow_execution_unavailable');
         const workflowId = executionMatch[1];

@@ -13,7 +13,7 @@ function handlerMap(value, label) {
 }
 
 export class AtlasQueueWorker {
-  constructor({ store, workerId, jobHandlers, eventHandlers = {}, concurrency = 4, leaseSeconds = 60, pollMs = 1000, logger = console } = {}) {
+  constructor({ store, workerId, jobHandlers, eventHandlers = {}, concurrency = 4, leaseSeconds = 60, pollMs = 1000, runtimePoolId = null, logger = console } = {}) {
     if (!store || !/^[a-zA-Z0-9_.:-]{1,120}$/.test(workerId || '')) throw new TypeError('A queue store and bounded worker ID are required.');
     if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) throw new TypeError('Worker concurrency must be between 1 and 32.');
     if (!Number.isInteger(leaseSeconds) || leaseSeconds < 15 || leaseSeconds > 900) throw new TypeError('Worker lease must be between 15 and 900 seconds.');
@@ -25,6 +25,7 @@ export class AtlasQueueWorker {
     this.concurrency = concurrency;
     this.leaseSeconds = leaseSeconds;
     this.pollMs = pollMs;
+    this.runtimePoolId = runtimePoolId;
     this.logger = logger;
     this.stopping = false;
     this.wake = null;
@@ -34,6 +35,9 @@ export class AtlasQueueWorker {
   }
 
   async runOnce() {
+    if (this.runtimePoolId && typeof this.store.recordRuntimeHeartbeat === 'function') {
+      try { await this.store.recordRuntimeHeartbeat({ poolId:this.runtimePoolId, workerId:this.workerId, queueDepth:Number((await this.store.counts())?.queued_jobs || 0), activeJobs:this.active.size }); } catch (error) { this.logger.warn?.(`Atlas runtime heartbeat failed (${error?.message || 'unknown'}).`); }
+    }
     await this.store.reapJobs(100);
     if (this.jobHandlers.size) {
       await this.store.tickSchedules(100);
