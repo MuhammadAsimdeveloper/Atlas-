@@ -1,4 +1,7 @@
 name: Atlas CI
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -6,6 +9,7 @@ on:
     branches: [main]
 jobs:
   test:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -31,7 +35,7 @@ jobs:
       - name: Upload launch-safe preview artifact
         uses: actions/upload-artifact@v4
         with:
-          name: atlas-v115-static-preview-node-${{ matrix.node }}
+          name: atlas-v120-static-preview-node-${{ matrix.node }}
           path: dist/atlas-site
           if-no-files-found: error
           retention-days: 14
