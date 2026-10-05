@@ -12,7 +12,7 @@ const adapters=await read('apps/worker/provider-adapters.mjs');
 const integration=await read('apps/worker/integration-runtime.mjs');
 const security=await read('apps/api/security.mjs');
 const ci=await read('.github/workflows/ci.yml');
-check('release metadata is aligned',pkg.version==='145.0.0'&&env.includes('ATLAS_RELEASE=V145'),'Package and environment release identifiers agree.');
+check('release metadata is aligned',pkg.version==='150.0.0'&&env.includes('ATLAS_RELEASE=V150'),'Package and environment release identifiers agree.');
 check('production secrets are explicit',['ATLAS_DATABASE_URL','ATLAS_SESSION_SECRET','ATLAS_PLATFORM_OWNER_EMAIL','ATLAS_HEALTH_TOKEN','ATLAS_INBOX_CONTENT_MODULE','ATLAS_WEBHOOK_SECRET_RESOLVER_MODULE','ATLAS_WORKFLOW_EVENT_INGRESS_ENABLED'].every(k=>env.includes(k)),'Critical production configuration keys are declared.');
 check('provider runtime is fail-closed',adapters.includes('assertSafeProviderUrl')&&adapters.includes('validateProviderAdapter')&&integration.includes('executeWithRetry'),'Provider calls require validated destinations and bounded retries.');
 check('API security boundary is wired',api.includes('securityHeaders')&&security.includes('enforceRateLimit')&&security.includes('clientIdentity')&&api.includes('ATLAS_TRUST_PROXY'),'API security headers, rate limiting and trusted-proxy client identity are wired.');
@@ -24,6 +24,11 @@ check('V144 runtime control-plane is wired',controlPlane.includes('createOtlpHtt
 check('V139-V143 distributed fabric is wired',fabric.includes('RedisTransport')&&fabric.includes('computeScaleDecision')&&fabric.includes('evaluateFailover')&&fabric.includes('buildOtlpSpan')&&fabric.includes('deploymentReadiness'),'Distributed dispatch, autoscaling, failover, OTLP and deployment gates are present without claiming external infrastructure is live.');
 
 check('CI has bounded permissions',ci.includes('permissions:')&&ci.includes('contents: read'),'CI uses explicit least-privilege permissions.');
+const evidence=await read('packages/atlas-runtime/deployment-evidence.mjs');
+const autoscaler=await read('packages/atlas-runtime/autoscaler.mjs');
+const reconciler=await read('packages/atlas-runtime/provider-reconciliation.mjs');
+const drills=await read('packages/atlas-runtime/recovery-drills.mjs');
+check('V146-V150 operational completion is wired', autoscaler.includes('AutoscalerController') && evidence.includes('buildEvidenceReport') && reconciler.includes('ProviderReconciler') && drills.includes('RecoveryDrillRunner'), 'Autoscaling, evidence gating, reconciliation and recovery tooling are present.');
 const failed=checks.filter(x=>!x.ok);
 for(const c of checks)console.log((c.ok?'PASS':'FAIL')+' '+c.name+' — '+c.detail);
 if(failed.length)process.exit(1);
