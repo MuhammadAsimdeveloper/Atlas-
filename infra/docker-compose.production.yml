@@ -10,8 +10,6 @@ services:
       ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
       ATLAS_WORKER_DATABASE_URL: null
       ATLAS_WORKER_HANDLERS_MODULE: null
-      ATLAS_INBOX_CONTENT_MODULE: null
-      ATLAS_WEBHOOK_SECRET_RESOLVER_MODULE: null
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
