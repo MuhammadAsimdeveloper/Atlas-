@@ -173,7 +173,7 @@ scenarios.push(['public SEO refuses insecure origin', () => {
       https: false,
       structuredDataTypes: []
     });
-    return { blocked: result.status === 'blocked' || result.https === false || result.ready === false };
+    return { blocked: Array.isArray(result.issues) && result.issues.some(issue => /HTTPS/i.test(issue)) };
 }, result => result.blocked === true]);
 
 scenarios.push(['agent destructive action needs approval', () => ({
