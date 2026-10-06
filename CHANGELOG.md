@@ -4,6 +4,7 @@
 - Connected public customer turns to the durable unified-inbox/agent-turn worker path with idempotent execution creation.
 - Added real model-delta streaming persistence and authenticated fetch/SSE delivery.
 - Added staging E2E coverage for session, turn, stream, history and handoff flows.
+- Hardened public-origin binding, per-route rate limits, release-manifest verification, session persistence and authenticated Hub API smoke coverage.
 - No live provider credentials, public endpoint, or external infrastructure are claimed without deployment evidence.
 
 # Changelog
