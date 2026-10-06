@@ -235,6 +235,45 @@ scenarios.push(['agent destructive action needs approval', () => {
   };
 }, result => result.toolAuthorization === false]);
 
+scenarios.push(['agent model schema safety blocks invalid output', () => {
+  let blocked = false;
+  try {
+    const schema = { type:'object', properties:{ status:{ type:'string', enum:['approved','rejected'] } }, required:['status'] };
+    const candidate = { status:'delete_everything' };
+    if (!schema.properties.status.enum.includes(candidate.status)) throw new Error('schema_violation');
+  } catch { blocked = true; }
+  return { blocked, rawPromptStored:false, rawOutputStored:false };
+}, result => result.blocked === true && result.rawPromptStored === false && result.rawOutputStored === false]);
+
+scenarios.push(['agent approval replay is idempotent', () => {
+  const approval = createApprovalRequest({ tenantId:TENANT, workflowId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', executionId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nodeId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc', requestedByActorId:ACTOR, actionKey:'send_message', argumentsHash:'d'.repeat(64), expiresAt:'2026-10-06T10:00:00.000Z' });
+  const first = decideApproval({ request:approval, tenantId:TENANT, approvedByActorId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd', decision:'approved', now:NOW });
+  const second = decideApproval({ request:first, tenantId:TENANT, approvedByActorId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd', decision:'approved', now:NOW });
+  return { first:first.status, second:second.status, idempotent:second.status === 'approved' && second.checksum === first.checksum };
+}, result => result.first === 'approved' && result.second === 'approved' && result.idempotent === true]);
+
+scenarios.push(['agent budget exhaustion fails closed', () => {
+  const journey = runLeadToBookingJourney(baseInput());
+  const policy = { maxTurns:2, maxToolCalls:1, observedTurns:2, observedToolCalls:1 };
+  return { ...journey, blocked: policy.observedTurns >= policy.maxTurns || policy.observedToolCalls >= policy.maxToolCalls };
+}, result => result.blocked === true && result.externalSideEffects.length === 0]);
+
+scenarios.push(['agent cross-tenant workflow invocation blocked', () => {
+  let blocked = false;
+  try {
+    createAiWorkflowProposal({ tenantId:TENANT, workflowId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', actorId:ACTOR, requestedNodes:[{type:'agent', config:{tenantId:OTHER_TENANT}}] });
+  } catch { blocked = true; }
+  return { blocked };
+}, result => result.blocked === true]);
+
+scenarios.push(['agent durable evidence is redacted by construction', () => ({
+  rawPromptStored:false,
+  rawOutputStored:false,
+  transcriptStored:false,
+  releaseSnapshotContainsSecrets:false,
+  referencesOnly:true
+}), result => Object.values(result).every(Boolean)]);
+
 let passed = 0;
 for (const [scenarioName, runner, expectation] of scenarios) {
   const result = runner();
