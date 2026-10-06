@@ -129,6 +129,17 @@ export function planAgentTurn({
   const current = timestamp(now,'now');
   const snapshot = {
     tenantId, sessionId, turnId, releaseId:agentRelease.releaseId, releaseVersion:agentRelease.version,
+    releaseSnapshot: {
+      tenantId: agentRelease.tenantId,
+      agentId: agentRelease.agentId,
+      releaseId: agentRelease.releaseId,
+      version: agentRelease.version,
+      status: agentRelease.status,
+      allowedTools: agentRelease.allowedTools,
+      modelPolicy: agentRelease.modelPolicy,
+      systemPromptHash: agentRelease.systemPromptHash,
+      checksum: agentRelease.checksum
+    },
     promptHash, toolCalls:normalizedTools, approvalRefs:approvals, workflowInvocationRef,
     journeyContext, rawPromptStored:false, plannedAt:new Date(current).toISOString()
   };
