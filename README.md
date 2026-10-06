@@ -1,8 +1,20 @@
-# Atlas Business Operating System — V152
+# Atlas Business Operating System — V153
 
 V151 is the current repository release. It extends the AI execution frontier with a tenant-grounded customer-support Copilot, hardened voice-agent turns, a deterministic n8n-style node runtime, support-agent evaluation/training artifacts, and governed agent skills. External model, speech, telephony, knowledge-provider and production infrastructure activation remain explicit deployment gates.
 
 See [V148 gap register](docs/ATLAS-GAP-REGISTER-V148-2026-10.md) for the remaining incomplete product and production features.
+
+## V153 — Authenticated Copilot Chat Hub + Public Webchat
+
+- Added an authenticated tenant-scoped Copilot Chat Hub for release configuration, widget installation, human handoffs and agent approvals.
+- Added a public webchat widget using signed, expiring customer-support sessions and exact origin allowlists.
+- Connected customer turns to the existing durable `agent.turn.execute` worker path and unified inbox conversation history.
+- Added real model-delta streaming through a tenant-bound durable stream-event bridge and authenticated fetch/SSE delivery.
+- Added public human-handoff requests and operator handoff/approval queues.
+- Added a staging E2E script covering public session issuance, turn enqueue, authenticated stream, history and handoff.
+- Production truth boundary: the repository still requires a real deployed model provider, reviewed content store, live public HTTPS origin and tenant release manifest before customer traffic is activated.
+
+See [V153 Copilot Chat Hub](docs/V153-COPILOT-CHAT-HUB-2026-10.md).
 
 ## V152 — Customer Support Activation and Voice Streaming
 
