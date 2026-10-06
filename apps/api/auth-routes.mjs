@@ -43,7 +43,7 @@ function requireToken(value) {
   return value;
 }
 
-export function createAuthApi({ store, mailer, env = process.env, clock = () => new Date(), logger = console, secret = env.ATLAS_SESSION_SECRET || 'atlas-development-only-secret-not-for-production' }) {
+export function createAuthApi({ store, runtimeStore = null, mailer, env = process.env, clock = () => new Date(), logger = console, secret = env.ATLAS_SESSION_SECRET || 'atlas-development-only-secret-not-for-production' }) {
   if (!store) throw new TypeError('An authentication store is required.');
   const rate = async (req, route, email, limit, seconds = 900, emailOnly = false) => {
     const key = hashRateKey(secret, route, emailOnly ? 'account' : clientIdentity(req, env), email || '');
@@ -66,7 +66,7 @@ export function createAuthApi({ store, mailer, env = process.env, clock = () => 
   const routeHandler = async (req, res) => {
     const url = new URL(req.url || '/', 'http://' + (req.headers.host || 'localhost'));
     const pathname = url.pathname;
-    if (!pathname.startsWith('/api/v1/auth/') && !['/api/v1/me','/api/v1/organizations','/api/v1/dashboard/summary'].includes(pathname) && !pathname.startsWith('/api/v1/organizations/') && pathname !== '/api/v1/invitations/accept') return false;
+    if (!pathname.startsWith('/api/v1/auth/') && !['/api/v1/me','/api/v1/organizations','/api/v1/dashboard/summary','/api/v1/operations/runtime'].includes(pathname) && !pathname.startsWith('/api/v1/organizations/') && pathname !== '/api/v1/invitations/accept') return false;
     try {
       if (req.method === 'POST' && !isAllowedOrigin(req, env)) throw createAuthError(403, 'origin_not_allowed');
 
@@ -216,6 +216,19 @@ export function createAuthApi({ store, mailer, env = process.env, clock = () => 
         const { session } = await identity(req);
         if (!session.tenantId) throw createAuthError(409, 'organization_required');
         return sendJson(res, 200, await store.getDashboard({ userId: session.user.id, tenantId: session.tenantId }));
+      }
+
+      if (pathname === '/api/v1/operations/runtime' && req.method === 'GET') {
+        const { session } = await identity(req);
+        if (!session.tenantId) throw createAuthError(409, 'organization_required');
+        if (!runtimeStore) throw createAuthError(503, 'runtime_unavailable');
+        const counts = await runtimeStore.counts();
+        return sendJson(res, 200, {
+          release: env.ATLAS_RELEASE || null,
+          distributedWakeup: Boolean(env.ATLAS_REDIS_URL),
+          durableQueue: 'postgresql',
+          counts: Object.fromEntries(Object.entries(counts || {}).map(([k,v]) => [k, Number.isFinite(Number(v)) ? Number(v) : v]))
+        });
       }
 
       const memberMatch = pathname.match(/^\/api\/v1\/organizations\/([0-9a-f-]{36})\/(members|invitations|roles)$/i);
