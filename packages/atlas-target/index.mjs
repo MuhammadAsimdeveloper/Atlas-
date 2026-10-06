@@ -137,6 +137,10 @@ const DIRECT_DESTINATION_FIELD = /^(?:email|phone|phone_number|recipient|recipie
 const NETWORK_LOCATION_FIELD = /^(?:url|uri|host|hostname|endpoint_url|callback_url)$/i;
 const CONFIG_REFERENCE_PHONE = /[+()\s]/;
 
+function isTemplateReference(value) {
+  return typeof value === 'string' && value.length <= 132 && value.endsWith('_PLACEHOLDER');
+}
+
 function opaqueWorkflowReference(value, label) {
   if (typeof value === 'string' && value.length <= 132 && value.endsWith('_PLACEHOLDER') && [...value].every(char => /[A-Z0-9_]/.test(char))) return value;
   const result = reference(value, label);
@@ -228,6 +232,7 @@ function validateWorkflowNodeConfig(type, config) {
   if (['find_availability','book_appointment','reschedule_appointment','cancel_appointment'].includes(type) && typeof config.calendarRef !== 'string') throw new Error(type + ' requires calendarRef');
   if (type === 'invoke_agent' && typeof config.agentReleaseRef !== 'string') throw new Error('invoke_agent requires agentReleaseRef');
   for (const field of NODE_REFERENCE_FIELDS[type] || []) {
+    if (isTemplateReference(config[field])) continue;
     opaqueWorkflowReference(config[field], type + ' ' + field);
   }
   if (['delay','wait_until'].includes(type) && (!Number.isSafeInteger(config.delayMs ?? config.offsetMs) || Math.abs(config.delayMs ?? config.offsetMs) > 365 * 86400000)) throw new Error(type + ' duration is invalid');
