@@ -49,7 +49,7 @@ export function createAgentTurnJobHandler({
     });
     if(!runningUpdated) throw Object.assign(new Error('Agent turn lease/version was lost before execution'),{code:'agent_turn_update_rejected'});
     const runningVersion=execution.version+1;
-    const resolved=await resolveInput({tenantId,inputRef:ref(execution.input_ref,'inputRef'),execution,context});
+    const resolved=await resolveInput({tenantId,inputRef:ref(execution.input_ref,'inputRef'),executionId,execution,context});
     if(!resolved||typeof resolved!=='object') throw Object.assign(new Error('Transient agent input resolver returned no input'),{code:'agent_input_unavailable'});
     const adapter=await getModelAdapter({tenantId,release,execution,context});
     const journey=execution.journey_context ? buildAgentJourneyContext(execution.journey_context) : buildAgentJourneyContext({tenantId,journeyId:'agent-journey-'+execution.execution_id,conversationRef:conversationId});
