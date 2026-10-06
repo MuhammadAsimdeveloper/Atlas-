@@ -144,7 +144,7 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
         if(e.content_ref){const content=await inboxContentStore.getMessageContent({tenantId:claims.tenantId,messageId:executionId,contentRef:e.content_ref});data.delta=content?.text||'';}
         sendEvent(e.event_type,data);
       }
-      const latest=events.at(-1)||null;
+      const latest=(await pool.query('SELECT * FROM atlas_v153_public_execution($1,$2,$3)',[claims.tenantId,claims.sessionId,executionId])).rows[0]||null;
       if(latest?.status==='completed'||latest?.status==='handoff'||latest?.status==='waiting_approval'||latest?.status==='failed'||latest?.status==='canceled'){
         if(latest.status==='completed'){
           const final=(await pool.query("SELECT message_id,content_ref FROM atlas_v122_messages WHERE tenant_id=$1 AND conversation_id=$2 AND direction='outbound' ORDER BY created_at DESC LIMIT 1",[claims.tenantId,conversationId])).rows[0];
