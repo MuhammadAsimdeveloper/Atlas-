@@ -102,7 +102,8 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
     await enforceRateLimit({req,store:authStore,secret,env,route:'copilot.session',limit:30,windowSeconds:60});
     if(typeof b.widgetKey!=='string'||!/^[A-Za-z0-9_-]{32,128}$/.test(b.widgetKey))throw createAuthError(400,'widget_key_invalid');
     const sessionId=randomUUID(),expiresAt=new Date(Date.now()+60*60_000);
-    const result=(await pool.query('SELECT * FROM atlas_v153_create_public_session($1,$2,$3,$4)',[b.widgetKey,sessionId,b.customerRef==null?null:String(b.customerRef),expiresAt])).rows[0];
+    const requestedOrigin=origin(req);
+    const result=(await pool.query('SELECT * FROM atlas_v153_create_public_session($1,$2,$3,$4,$5)',[b.widgetKey,sessionId,b.customerRef==null?null:String(b.customerRef),expiresAt,requestedOrigin])).rows[0];
     if(!result)throw createAuthError(404,'copilot_widget_not_found');
     const allowed=allowOrigin(req,result.allowed_origins,env,{publicRequest:true});
     const claims=createSupportSessionClaims({tenantId:result.tenant_id,agentReleaseRef:result.release_snapshot.releaseId,channel:'webchat',customerRef:b.customerRef==null?null:String(b.customerRef),sessionId,issuedAt:Date.now(),ttlMs:60*60_000});
@@ -119,7 +120,7 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
     const put=await inboxContentStore.putMessageContent({tenantId:turn.tenantId,messageId,channel:'webchat',text:b.message,html:null,attachments:[],metadata:{source:'copilot_public'}});
     if(!put)throw createAuthError(503,'copilot_content_store_unavailable');
     const planId=randomUUID(),executionId=randomUUID(),idempotencyKey=createHash('sha256').update(JSON.stringify({tenantId:turn.tenantId,sessionId:turn.sessionId,clientTurnId:b.clientTurnId,messageHash})).digest('hex');
-    const prepared=(await pool.query('SELECT * FROM atlas_v153_prepare_public_turn($1,(SELECT config_id FROM atlas_v153_copilot_sessions WHERE tenant_id=$1 AND session_id=$2),$2,$3,$4,$5,$6,$7,$8,$9)',[turn.tenantId,turn.sessionId,messageId,contentRef,messageHash,'turn_'+executionId.replaceAll('-',''),planId,executionId,idempotencyKey])).rows[0];
+    const prepared=(await pool.query('SELECT * FROM atlas_v153_prepare_public_turn($1,NULL,$2,$3,$4,$5,$6,$7,$8,$9)',[turn.tenantId,turn.sessionId,messageId,contentRef,messageHash,'turn_'+executionId.replaceAll('-',''),planId,executionId,idempotencyKey])).rows[0];
     if(!prepared)throw createAuthError(409,'copilot_turn_not_prepared');
     return send(res,202,{conversationId:prepared.conversation_id,executionId:prepared.execution_id,planId:prepared.plan_id,jobId:prepared.job_id,status:'queued',streamUrl:'/api/v1/public/copilot/stream?executionId='+prepared.execution_id},env,corsHeaders(o));
   }
@@ -136,17 +137,17 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
     let cursor=0, idle=0;
     const sendEvent=(type,data)=>{res.write('event: '+type+'\ndata: '+JSON.stringify(data)+'\n\n');};
     while(idle<60 && !res.destroyed){
-      const events=(await pool.query("SELECT sequence,event_type,content_ref,content_hash FROM atlas_v153_copilot_stream_events WHERE tenant_id=$1 AND execution_id=$2 AND sequence>$3 ORDER BY sequence ASC LIMIT 50",[claims.tenantId,executionId,cursor])).rows;
+      const events=(await pool.query("SELECT * FROM atlas_v153_public_stream($1,$2,$3,$4)",[claims.tenantId,claims.sessionId,executionId,cursor])).rows;
       for(const e of events){
         cursor=Number(e.sequence);
         let data={sequence:cursor};
         if(e.content_ref){const content=await inboxContentStore.getMessageContent({tenantId:claims.tenantId,messageId:executionId,contentRef:e.content_ref});data.delta=content?.text||'';}
         sendEvent(e.event_type,data);
       }
-      const latest=(await pool.query("SELECT status,result_ref,error_code,version FROM atlas_agent_turn_executions WHERE tenant_id=$1 AND execution_id=$2",[claims.tenantId,executionId])).rows[0];
+      const latest=events.at(-1)||null;
       if(latest?.status==='completed'||latest?.status==='handoff'||latest?.status==='waiting_approval'||latest?.status==='failed'||latest?.status==='canceled'){
         if(latest.status==='completed'){
-          const final=(await pool.query("SELECT content_ref FROM atlas_v122_messages WHERE tenant_id=$1 AND conversation_id=$2 AND direction='outbound' ORDER BY created_at DESC LIMIT 1",[claims.tenantId,conversationId])).rows[0];
+          const final=(await pool.query("SELECT message_id,content_ref FROM atlas_v122_messages WHERE tenant_id=$1 AND conversation_id=$2 AND direction='outbound' ORDER BY created_at DESC LIMIT 1",[claims.tenantId,conversationId])).rows[0];
           if(final?.content_ref){const content=await inboxContentStore.getMessageContent({tenantId:claims.tenantId,messageId:final.message_id||executionId,contentRef:final.content_ref});sendEvent('done',{sequence:cursor,content:content?.text||''});}
         } else sendEvent(latest.status,{sequence:cursor,reason:latest.error_code||null});
         break;
