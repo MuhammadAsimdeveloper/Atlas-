@@ -122,6 +122,7 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
   async function publicTurn(req,res,claims){
     const o=origin(req);
     const b=await readJson(req);exact(b,['message','clientTurnId']);
+    if(typeof b.message!=='string')throw createAuthError(400,'message_invalid');
     if(typeof b.clientTurnId!=='string'||!/^[-A-Za-z0-9_.:]{8,160}$/.test(b.clientTurnId))throw createAuthError(400,'client_turn_id_invalid');
     const messageHash=hashText(b.message);
     const turn=validateSupportTurnInput({claims,sessionId:claims.sessionId,message:b.message,messageHash});
