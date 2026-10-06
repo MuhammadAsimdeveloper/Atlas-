@@ -139,7 +139,7 @@ const CONFIG_REFERENCE_PHONE = /[+()\s]/;
 
 function opaqueWorkflowReference(value, label) {
   const result = reference(value, label);
-  if (/^TEMPLATE_[A-Z0-9_]{1,120}$/.test(result)) return result;
+  if (/^(?:TEMPLATE_[A-Z0-9_]{1,120}|[A-Z][A-Z0-9_]{2,119}_PLACEHOLDER)$/.test(result)) return result;
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result);
   const numericAddress = /^[+\d(). -]+$/.test(result) && (result.match(/\d/g) || []).length >= 7;
   const phoneLike = CONFIG_REFERENCE_PHONE.test(result) && (result.match(/\d/g) || []).length >= 7;
