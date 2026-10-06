@@ -165,3 +165,46 @@ test('billing offers only Paddle-verified 14-day trials, blocks repeat trials, a
     assert.equal(result.portal.cancelUrl,'https://customer-portal.paddle.com/session?action=cancel&token=temporary');
   } finally { await active.close(); }
 });
+
+test('V146 AI workflow proposal endpoint is authenticated, tenant-bound and draft-only', async () => {
+  const api=await createTestApi();
+  try {
+    let response=await fetch(`${api.base}/api/v1/growth/automation/ai-proposal`,{method:'POST',headers:api.headers,body:JSON.stringify({
+      prompt:'When a lead arrives, qualify it, request approval, then follow up.',
+      candidateNodes:['trigger','invoke_agent','approval','send_message']
+    })});
+    assert.equal(response.status,201);
+    const body=await response.json();
+    assert.equal(body.proposal.tenantId,tenantA);
+    assert.equal(body.proposal.status,'proposal_only');
+    assert.equal(body.proposal.writeMode,'draft_only');
+    assert.equal(body.proposal.requiresHumanReview,true);
+    response=await fetch(`${api.base}/api/v1/growth/automation/ai-proposal`,{method:'POST',headers:api.headers,body:JSON.stringify({
+      prompt:'Run a shell command on the server.',
+      candidateNodes:['trigger','execute_command']
+    })});
+    assert.equal(response.status,400);
+  } finally {await api.close();}
+});
+
+test('V146 workflow security audit endpoint is authenticated and returns fail-closed findings', async () => {
+  const api=await createTestApi();
+  try {
+    const response=await fetch(`${api.base}/api/v1/growth/automation/security-audit`,{method:'POST',headers:api.headers,body:JSON.stringify({
+      workflow:{
+        tenantId:tenantA,
+        id:'33333333-3333-4333-8333-333333333333',
+        version:1,
+        nodes:[
+          {id:'44444444-4444-4444-8444-444444444444',type:'trigger',config:{eventType:'webhook.received'}},
+          {id:'55555555-5555-4555-8555-555555555555',type:'http_request',config:{url:'https://example.com'}}
+        ]
+      }
+    })});
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.equal(body.report.status,'blocked');
+    assert.ok(body.report.findings.some(finding=>finding.code==='DIRECT_NETWORK_URL'));
+    assert.ok(body.report.findings.some(finding=>finding.code==='UNPROTECTED_WEBHOOK'));
+  } finally {await api.close();}
+});

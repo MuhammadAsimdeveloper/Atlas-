@@ -6,6 +6,7 @@ import { paddlePlanCatalog, verifyPaddleFreeTrialPrice, createPaddleCheckout, cr
 import { simulateWorkflow } from '../../packages/atlas-target/workflow-simulator.mjs';
 import { enforceRateLimit, securityHeaders } from './security.mjs';
 import { createPromotionManifest, routeEvent } from '../../packages/atlas-core/production-frontier.mjs';
+import { auditWorkflowSecurity, createAiWorkflowProposal } from '../../packages/atlas-automation-fabric/index.mjs';
 
 const MAX_BODY_BYTES = 110_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -177,6 +178,27 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
         if (req.method !== 'GET') return send(res, 405, { error: 'method_not_allowed' }, env, { allow: 'GET' });
         if (typeof store.getWorkflowCatalog !== 'function') throw createAuthError(503, 'workflow_catalog_unavailable');
         return send(res, 200, await store.getWorkflowCatalog(who), env);
+      }
+      if (path === '/api/v1/growth/automation/ai-proposal' && req.method === 'POST') {
+        await requireMutation(req, who.session);
+        const body = await readJson(req);
+        exact(body, ['prompt', 'candidateNodes']);
+        if (typeof body.prompt !== 'string' || body.prompt.length < 3 || body.prompt.length > 4000) throw createAuthError(400, 'invalid_prompt');
+        if (!Array.isArray(body.candidateNodes) || body.candidateNodes.length < 1 || body.candidateNodes.length > 50) throw createAuthError(400, 'invalid_candidate_nodes');
+        try {
+          const proposal = createAiWorkflowProposal({ tenantId: who.tenantId, requestedByActorId: who.actorId, prompt: body.prompt, candidateNodes: body.candidateNodes });
+          return send(res, 201, { proposal }, env);
+        } catch (error) {
+          throw createAuthError(400, 'invalid_ai_workflow_proposal', error?.message || 'The workflow proposal is invalid.');
+        }
+      }
+      if (path === '/api/v1/growth/automation/security-audit' && req.method === 'POST') {
+        await requireMutation(req, who.session);
+        const body = await readJson(req);
+        exact(body, ['workflow']);
+        if (!body.workflow || typeof body.workflow !== 'object' || Array.isArray(body.workflow)) throw createAuthError(400, 'invalid_workflow');
+        const report = auditWorkflowSecurity({ tenantId: who.tenantId, workflow: body.workflow });
+        return send(res, 200, { report }, env);
       }
 
       if (path === '/api/v1/growth/executions/inspect' && req.method === 'GET') {
