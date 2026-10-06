@@ -38,7 +38,9 @@ export const jobHandlers=Object.freeze(process.env.ATLAS_AGENT_TURN_EXECUTION_EN
       getModelAdapter:modelModule.getModelAdapter,
       tools:toolModule.agentTools||{},
       executeTool:toolModule.executeTool,
-      deliverResponse:sinkModule.deliverResponse
+      deliverResponse:sinkModule.deliverResponse,
+      deliverStreamDelta:sinkModule.deliverStreamDelta,
+      deliverStreamTerminal:sinkModule.deliverStreamTerminal
     })
   }
  : productionHandlers);
