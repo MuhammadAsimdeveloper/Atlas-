@@ -13,6 +13,7 @@ import { PostgresCapabilityStore } from './capability-store.mjs';
 import { PostgresRuntimeStore } from './runtime-store.mjs';
 import { createRedisWakeupTransport } from '../../packages/atlas-runtime/redis-client.mjs';
 import { createCapabilityApi } from './capability-routes.mjs';
+import { createCopilotApi } from './copilot-routes.mjs';
 import { loadInboxContentStore } from './inbox-content.mjs';
 import { loadWebhookSecretResolver } from './webhook-secrets.mjs';
 import { runWorkflowScheduler } from './workflow-scheduler.mjs';
@@ -34,7 +35,11 @@ const webAssets = new Map([
   ['/growth.mjs', ['../command-center/growth.mjs', 'text/javascript; charset=utf-8']],
   ['/workflow-studio.mjs', ['../command-center/workflow-studio.mjs', 'text/javascript; charset=utf-8']],
   ['/growth.css', ['../command-center/growth.css', 'text/css; charset=utf-8']],
-  ['/workspace.css', ['../command-center/workspace.css', 'text/css; charset=utf-8']]
+  ['/workspace.css', ['../command-center/workspace.css', 'text/css; charset=utf-8']],
+  ['/copilot.html', ['../command-center/copilot.html', 'text/html; charset=utf-8']],
+  ['/copilot.mjs', ['../command-center/copilot.mjs', 'text/javascript; charset=utf-8']],
+  ['/copilot.css', ['../command-center/copilot.css', 'text/css; charset=utf-8']],
+  ['/copilot-widget.mjs', ['../marketing-site/copilot-widget.mjs', 'text/javascript; charset=utf-8']]
 ]);
 
 function json(res, status, body, headers = {}) {
@@ -84,6 +89,8 @@ let runtimeStore = null;
 let inboxContentStore = null;
 let webhookSecretResolver = null;
 let schedulerTimer = null;
+let redisWakeup = null;
+let copilotApi = null;
 if (env.ATLAS_DATABASE_URL) {
   const { Pool } = await import('pg');
   pool = new Pool(await createPostgresPoolConfig(env, { application_name: `atlas-api-${release.toLowerCase()}` }));
@@ -92,7 +99,7 @@ if (env.ATLAS_DATABASE_URL) {
   if (runtime === 'production') await authStore.assertSafeRuntimeRole();
   growthStore = new PostgresGrowthStore(pool);
   workflowExecutionStore = new PostgresWorkflowExecutionStore(pool);
-  if (env.ATLAS_REDIS_URL) redisWakeup = createRedisWakeupTransport(env.ATLAS_REDIS_URL, env.ATLAS_REDIS_NAMESPACE || 'atlas');
+  redisWakeup = env.ATLAS_REDIS_URL ? createRedisWakeupTransport(env.ATLAS_REDIS_URL, env.ATLAS_REDIS_NAMESPACE || 'atlas') : null;
   runtimeStore = new PostgresRuntimeStore(pool, { dispatchWakeup: redisWakeup });
   authApi = createAuthApi({ store: authStore, runtimeStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
   growthApi = createGrowthApi({ store: growthStore, executionStore: workflowExecutionStore, runtimeStore, authStore, env });
@@ -100,9 +107,10 @@ if (env.ATLAS_DATABASE_URL) {
   inboxContentStore = await loadInboxContentStore(env);
   webhookSecretResolver = await loadWebhookSecretResolver(env);
   capabilityApi = createCapabilityApi({ store: capabilityStore, authStore, env, inboxContentStore, webhookSecretResolver });
+  copilotApi = createCopilotApi({ pool, authStore, runtimeStore, inboxContentStore, env });
   if (env.ATLAS_WORKFLOW_SCHEDULER_ENABLED === 'true') {
     const intervalMs=Math.max(1000,Math.min(60000,Number(env.ATLAS_WORKFLOW_SCHEDULER_INTERVAL_MS||5000)));
-    const tick=()=>void runWorkflowScheduler({runtimeStore,growthStore,executionStore,limit:100}).catch(error=>process.stderr.write(`Atlas workflow scheduler failed: ${error?.message||'unknown'}\\n`));
+    const tick=()=>void runWorkflowScheduler({runtimeStore,growthStore,executionStore:workflowExecutionStore,limit:100}).catch(error=>process.stderr.write(`Atlas workflow scheduler failed: ${error?.message||'unknown'}\\n`));
     schedulerTimer=setInterval(tick,intervalMs); schedulerTimer.unref?.(); tick();
   }
 }
@@ -133,6 +141,10 @@ const server = createServer(async (req, res) => {
     const handled = await capabilityApi.handle(req, res);
     if (handled) return;
   }
+  if (copilotApi) {
+    const handled = await copilotApi.handle(req, res);
+    if (handled) return;
+  }
   if (url.pathname.startsWith('/api/')) return json(res, authApi ? 404 : 503, { error: authApi ? 'not_found' : 'database_required' });
   if ((req.method === 'GET' || req.method === 'HEAD') && webAssets.has(url.pathname)) {
     const [relativePath, contentType] = webAssets.get(url.pathname);
@@ -161,7 +173,7 @@ async function shutdown(signal) {
   process.stdout.write(`Atlas API received ${signal}; closing gracefully.\n`);
   server.close(async () => {
     if(schedulerTimer) clearInterval(schedulerTimer);
-    try { await authStore?.close(); } finally { process.exit(0); }
+    try { await redisWakeup?.close?.(); } finally { try { await authStore?.close(); } finally { process.exit(0); } }
   });
   const timeout = setTimeout(() => process.exit(1), 15_000);
   timeout.unref();
