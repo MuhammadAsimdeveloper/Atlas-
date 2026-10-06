@@ -75,12 +75,15 @@ CREATE OR REPLACE FUNCTION atlas_v148_get_agent_turn_for_job(
   plan_id UUID,
   session_id UUID,
   turn_id TEXT,
+  created_by UUID,
+  conversation_ref TEXT,
   release_id TEXT,
   release_version INTEGER,
   release_snapshot JSONB,
   prompt_hash CHAR(64),
   input_ref TEXT,
   status TEXT,
+  journey_context JSONB,
   result_ref JSONB,
   output_hash CHAR(64),
   tool_calls INTEGER,
@@ -115,12 +118,14 @@ BEGIN
   PERFORM set_config('app.tenant_id', p_tenant_id::text, true);
 
   RETURN QUERY
-  SELECT e.tenant_id,e.execution_id,e.plan_id,e.session_id,e.turn_id,e.release_id,e.release_version,
-         p.release_snapshot,prompt_hash,e.input_ref,e.status,e.result_ref,e.output_hash,e.tool_calls,
+  SELECT e.tenant_id,e.execution_id,e.plan_id,e.session_id,e.turn_id,s.created_by,
+         NULLIF(p.journey_context->>'conversationRef',''),e.release_id,e.release_version,
+         p.release_snapshot,e.prompt_hash,e.input_ref,e.status,p.journey_context,e.result_ref,e.output_hash,e.tool_calls,
          e.input_tokens,e.output_tokens,e.latency_ms,e.waiting_reason,e.error_code,e.idempotency_key,e.version,e.checksum
   FROM public.atlas_agent_turn_executions e
   JOIN public.atlas_agent_turn_plans p
     ON p.tenant_id=e.tenant_id AND p.plan_id=e.plan_id
+  JOIN public.atlas_ai_agent_sessions s ON s.tenant_id=e.tenant_id AND s.session_id=e.session_id
   WHERE e.tenant_id=p_tenant_id AND e.execution_id=execution_ref
   LIMIT 1;
 END;
