@@ -42,11 +42,13 @@ export function createAgentTurnJobHandler({
       runtime,tenantId,conversationId,actorId,sessionId:execution.session_id,now:Date.now(),
       leaseMs:Math.min(300000,Math.max(1000,(release.modelPolicy?.timeoutMs||30000)))
     });
-    await store.updateAgentTurnForWorker({
+    const runningUpdated=await store.updateAgentTurnForWorker({
       tenantId,jobId,workerId,executionId,expectedVersion:execution.version,status:'running',
       resultRef:null,outputHash:null,toolCalls:0,inputTokens:0,outputTokens:0,latencyMs:null,waitingReason:null,errorCode:null,
       checksum:execution.checksum
     });
+    if(!runningUpdated) throw Object.assign(new Error('Agent turn lease/version was lost before execution'),{code:'agent_turn_update_rejected'});
+    const runningVersion=execution.version+1;
     const resolved=await resolveInput({tenantId,inputRef:ref(execution.input_ref,'inputRef'),execution,context});
     if(!resolved||typeof resolved!=='object') throw Object.assign(new Error('Transient agent input resolver returned no input'),{code:'agent_input_unavailable'});
     const adapter=await getModelAdapter({tenantId,release,execution,context});
@@ -62,7 +64,7 @@ export function createAgentTurnJobHandler({
     const status = result.status==='needs_approval' ? 'waiting_approval' : result.status==='handoff' ? 'handoff' : result.status==='canceled' ? 'canceled' : result.status==='completed' ? 'completed' : 'failed';
     const checksum=execution.checksum;
     const updated=await store.updateAgentTurnForWorker({
-      tenantId,jobId,workerId,executionId,expectedVersion:execution.version,status,
+      tenantId,jobId,workerId,executionId,expectedVersion:runningVersion,status,
       resultRef:outputRef||result.handoff||result.redacted?.pendingTool ? (outputRef||{kind:result.status==='handoff'?'agent_handoff':'agent_result',id:result.handoff?.handoffId||execution.execution_id,version:1}) : null,
       outputHash:redacted?.model?.outputHash||null,toolCalls:redacted.toolCalls||0,
       inputTokens:redacted?.model?.usage?.inputTokens||redacted?.usage?.inputTokens||0,
