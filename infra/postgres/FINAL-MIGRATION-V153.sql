@@ -181,9 +181,9 @@ BEGIN
   ) ON CONFLICT(tenant_id,idempotency_key) DO NOTHING;
 
   INSERT INTO public.atlas_agent_turn_plans(
-    tenant_id,plan_id,session_id,turn_id,agent_id,release_id,release_version,release_snapshot,prompt_hash,tool_plan,approval_refs,workflow_invocation_ref,journey_context,idempotency_key,status,checksum
+    tenant_id,plan_id,session_id,turn_id,agent_id,release_id,release_version,prompt_hash,tool_plan,approval_refs,workflow_invocation_ref,journey_context,idempotency_key,status,checksum
   ) VALUES(
-    p_tenant_id,p_plan_id,p_session_id,p_turn_id,v_agent_id,v_release_id,v_version,v_snapshot,p_prompt_hash,'[]','[]',NULL,
+    p_tenant_id,p_plan_id,p_session_id,p_turn_id,v_agent_id,v_release_id,v_version,p_prompt_hash,'[]','[]',NULL,
     jsonb_build_object('tenantId',p_tenant_id::text,'journeyId','copilot-'||p_session_id::text,'conversationRef', 'inbox:conversation:'||v_conversation::text),
     p_idempotency_key,'planned',
     encode(digest(p_tenant_id::text||':'||p_session_id::text||':'||p_turn_id||':'||p_prompt_hash,'sha256'),'hex')
