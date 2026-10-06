@@ -213,7 +213,7 @@ scenarios.push(['n8n protected production promotion', () => {
   const journey = runLeadToBookingJourney(baseInput());
   const dev = createWorkflowEnvironment({ tenantId: TENANT, id: '33333333-3333-4333-8333-333333333333', name: 'Development', stage: 'development', protected: false, branchRef: 'development' });
   const prod = createWorkflowEnvironment({ tenantId: TENANT, id: '44444444-4444-4444-8444-444444444444', name: 'Production', stage: 'production', protected: true, branchRef: 'production' });
-  return { ...journey, promotion: planEnvironmentPromotion({ tenantId: TENANT, source: dev, target: prod, workflowId: journey.lead.payload.pipelineId, workflowVersion: 1, manifestSha256: 'a'.repeat(64), approvedByActorId: '55555555-5555-4555-8555-555555555555', sourceChangedAfterApproval: false }) };
+  return { ...journey, promotion: planEnvironmentPromotion({ tenantId: TENANT, source: dev, target: prod, workflowId: journey.lead.payload.pipelineId, workflowVersion: 1, manifestSha256: 'a'.repeat(64), approvedByActorId: '55555555-5555-4555-8555-555555555555', approvalRef: 'approval-ref-146', sourceChangedAfterApproval: false }) };
 }, result => result.promotion.status === 'ready']);
 
 scenarios.push(['n8n MCP capability isolation', () => {
