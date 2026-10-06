@@ -6,7 +6,7 @@ const REF=/^[A-Za-z0-9][A-Za-z0-9_.:/@-]{2,240}$/;
 const HASH=/^[a-f0-9]{64}$/;
 const INTENTS=new Set(['faq','account','billing','booking','technical','sales','privacy','complaint','handoff','unknown']);
 const CHANNELS=new Set(['webchat','email','sms','whatsapp','voice']);
-const FORBIDDEN_OUTPUT=/(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|private[_-]?key|authorization:\s*bearer)/i;
+const FORBIDDEN_OUTPUT=/(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|private[_-]?key|authorization:\s*bearer|\bbearer\s+[A-Za-z0-9._~+/=-]{12,})/i;
 
 const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
 const sha=v=>crypto.createHash('sha256').update(JSON.stringify(canonical(v))).digest('hex');
