@@ -7,6 +7,7 @@ import { buildSite } from './build-site.mjs';
 import { validatePublicOrigin } from './seo.mjs';
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+process.env.ATLAS_SECURITY_CONTACT ||= 'mailto:security@atlas-preview.com';
 await mkdir(path.join(workspaceRoot, 'dist'), { recursive: true });
 const temporaryRoot = await mkdtemp(path.join(workspaceRoot, 'dist', 'atlas-seo-check-'));
 let assertions = 0;
