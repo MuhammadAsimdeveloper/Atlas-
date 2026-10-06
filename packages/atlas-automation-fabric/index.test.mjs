@@ -252,3 +252,19 @@ test('V148 AI workflow authoring plan becomes preview-ready when required facts 
   assert.equal(plan.productionMutation,false);
   assert.ok(plan.diffRef.startsWith('draft_'));
 });
+
+test('V148 safe data mapping supports allowlisted transforms and forbids code/network paths', async () => {
+  const { validateDataMapping, applyDataMapping } = await import('./safe-data-mapping.mjs');
+  const mapping=validateDataMapping({mapping:[
+    {source:'input.customer.email',target:'contact.email',transform:'lowercase'},
+    {source:'input.customer.tags',target:'contact.tags_text',transform:'join',args:[' | ']},
+    {source:'input.customer.score',target:'lead.score',transform:'number'}
+  ]});
+  const output=applyDataMapping({mapping,context:{input:{customer:{email:'Lead@Example.COM',tags:['a','b'],score:'42'}}}});
+  assert.equal(output.contact.email,'lead@example.com');
+  assert.equal(output.contact.tags_text,'a | b');
+  assert.equal(output.lead.score,42);
+  assert.throws(()=>validateDataMapping({mapping:[{source:'input.secret.token',target:'contact.token',transform:'identity'}]}),/reserved|allowlisted/i);
+  assert.throws(()=>validateDataMapping({mapping:[{source:'input.customer.name',target:'contact.name',transform:'eval'}]}),/unsupported/i);
+  assert.throws(()=>validateDataMapping({mapping:[{source:'input.customer.name',target:'contact.name',transform:'identity'},{source:'input.customer.email',target:'contact.name',transform:'identity'}]}),/unique/i);
+});
