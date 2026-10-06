@@ -150,6 +150,10 @@ BEGIN
   BEGIN v_agent_id := (v_snapshot->>'agentId')::uuid; EXCEPTION WHEN invalid_text_representation THEN RAISE EXCEPTION 'copilot_release_agent_invalid'; END;
   v_release_id := v_snapshot->>'releaseId';
   v_version := (v_snapshot->>'version')::integer;
+  SELECT e.execution_id INTO v_existing
+  FROM public.atlas_agent_turn_executions e
+  WHERE e.tenant_id=p_tenant_id AND e.idempotency_key=p_idempotency_key
+  LIMIT 1;
 
   INSERT INTO public.atlas_ai_agent_sessions(tenant_id,session_id,agent_release_ref,channel,customer_ref,memory_scope,created_by)
   VALUES(
