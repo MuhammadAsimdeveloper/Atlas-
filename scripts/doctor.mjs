@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '151.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '152.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   const nodeRuntime = await read('packages/atlas-automation-fabric/node-runtime.mjs');
   const nodeRuntimeTests = await read('packages/atlas-automation-fabric/node-runtime.test.mjs');
   const supportRuntime = await read('packages/atlas-copilot/support-runtime.mjs');
@@ -21,6 +21,17 @@ try {
   check('V151 hardened n8n node runtime', nodeRuntime.includes('executeN8nNode') && nodeRuntime.includes('loop_over_items') && nodeRuntime.includes('split_out') && nodeRuntime.includes('edit_fields') && nodeRuntime.includes('stop_and_error') && !nodeRuntime.includes('execute_command') && nodeRuntimeTests.includes('V151'), 'n8n-style collection, branching, waiting and execution-data nodes have bounded deterministic runtime handlers; connector/AI side effects fail closed.');
   check('V151 customer support Copilot', supportRuntime.includes('runCustomerSupportTurn') && supportRuntime.includes('createSupportTrainingExample') && supportRuntime.includes('buildSupportTrainingPack') && supportRuntime.includes('groundingRefs') && supportRuntime.includes('rawMessageStored:false') && supportTests.includes('V151'), 'Customer support Copilot uses tenant knowledge grounding, confidence/handoff policy and a redacted evaluation curriculum without storing raw transcripts.');
   check('V151 hardened AI voice agent', voiceTurn.includes('authorizeVoiceConnection') && voiceTurn.includes('AI_DISCLOSURE_REQUIRED') && voiceTurn.includes('VOICE_CONSENT_REQUIRED') && voiceTurn.includes('runVoiceAgentTurn') && voiceTurnTests.includes('V151'), 'Voice agents require disclosure/consent, bound transfers and interruption budgets, and keep transcripts reference-only.');
+  const supportSession = await read('packages/atlas-copilot/support-session.mjs');
+  const supportSessionTests = await read('packages/atlas-copilot/support-session.test.mjs');
+  const voiceStream = await read('packages/atlas-agent-fabric/voice-stream-gateway.mjs');
+  const voiceStreamTests = await read('packages/atlas-agent-fabric/voice-stream-gateway.test.mjs');
+  const openAiAdapter = await read('apps/worker/model-adapters/openai-compatible.mjs');
+  const agentInput = await read('apps/worker/agent-input/inbox.mjs');
+  const responseSink = await read('apps/worker/response-sinks/inbox.mjs');
+  const agentHandler = await read('apps/worker/agent-turn-handler.mjs');
+  check('V152 support session gateway', supportSession.includes('issueSupportSessionToken') && supportSession.includes('timingSafeEqual') && supportSession.includes('rawMessageStored:false') && supportSessionTests.includes('V152'), 'Customer-facing support sessions are signed, tenant/release bound, expiring and hash-bound; durable turn envelopes contain no raw message.');
+  check('V152 real model/inbox execution bridge', openAiAdapter.includes('getModelAdapter') && openAiAdapter.includes('/v1/chat/completions') && openAiAdapter.includes('stream:true') && agentInput.includes('getMessageContent') && responseSink.includes('createAgentResponseForWorker') && agentHandler.includes('createAgentTurnJobHandler'), 'The reviewed worker bridge has an allowlisted OpenAI-compatible model adapter, inbox content resolver, streamed inference and response sink.');
+  check('V152 bounded voice streaming gateway', voiceStream.includes('createVoiceStreamSession') && voiceStream.includes('acceptVoiceAudioFrame') && voiceStream.includes('audioStored:false') && voiceStream.includes('MAX_FRAME_BYTES') && voiceStreamTests.includes('V152'), 'Voice media frames are tenant/session scoped, codec/size/time bounded and represented durably by hashes rather than audio payloads.');
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143']) {
