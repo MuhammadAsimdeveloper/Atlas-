@@ -63,7 +63,7 @@ export function createAgentTurnJobHandler({
       onDelta: deliverStreamDelta ? async delta => { const seq=(context.__agentStreamSequence=(context.__agentStreamSequence||0)+1); await deliverStreamDelta({tenantId,execution,delta,sequence:seq,context}); } : null
     });
     const redacted=result.redacted||{};
-    if(deliverStreamTerminal) await deliverStreamTerminal({tenantId,execution,status:result.status,sequence:context.__agentStreamSequence||0,context});
+    if(deliverStreamTerminal) await deliverStreamTerminal({tenantId,execution,status:result.status,sequence:(context.__agentStreamSequence||0)+1,context});
     const outputRef=result.output==null ? null : await deliverResponse({tenantId,execution,output:result.output,channel:resolved.channel,redacted,context});
     const status = result.status==='needs_approval' ? 'waiting_approval' : result.status==='handoff' ? 'handoff' : result.status==='canceled' ? 'canceled' : result.status==='completed' ? 'completed' : 'failed';
     const checksum=execution.checksum;
