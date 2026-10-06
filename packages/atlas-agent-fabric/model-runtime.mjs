@@ -62,7 +62,7 @@ export function createModelRequest({
   outputSchema = null, now = Date.now(), ...extra
 } = {}) {
   rejectSecrets(extra, 'modelRequest');
-  if (Object.keys(extra).length) throw new TypeError('Unexpected model request fields are not allowed');
+  if (Object.keys(extra).length) throw new TypeError('Unexpected model request fields are not allowed: ' + Object.keys(extra).sort().join(','));
   ref(tenantId, 'tenantId'); ref(sessionId, 'sessionId'); ref(turnId, 'turnId'); ref(inputRef, 'inputRef');
   if (!agentRelease || agentRelease.tenantId !== tenantId || typeof agentRelease.releaseId !== 'string') throw new Error('Agent release is not tenant-bound');
   hash(promptHash, 'promptHash');
