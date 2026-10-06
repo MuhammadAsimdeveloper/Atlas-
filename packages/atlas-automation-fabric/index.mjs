@@ -10,6 +10,7 @@ const HASH = /^[a-f0-9]{64}$/;
 const ERROR = /^[a-z][a-z0-9_.-]{0,79}$/;
 const SECRET_KEY = /(password|secret|token|api[_-]?key|authorization|cookie|private[_-]?key|client[_-]?secret)/i;
 const DIRECT_TARGET_KEY = /^(url|uri|endpoint|host|destination|callbackUrl|redirectUrl)$/i;
+const EXECUTABLE_MARKERS = Object.freeze(['require(', 'child_process', 'process.', 'eval(', 'Function(', 'import(', 'fetch(', 'axios(', 'XMLHttpRequest']);
 
 export const N8N_PARITY_FEATURES = Object.freeze([
   'manual_trigger','webhook_trigger','schedule_trigger','form_trigger','chat_trigger',
