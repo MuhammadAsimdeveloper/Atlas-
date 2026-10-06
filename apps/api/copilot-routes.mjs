@@ -117,8 +117,7 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
     const messageHash=hashText(b.message);
     const turn=validateSupportTurnInput({claims,sessionId:claims.sessionId,message:b.message,messageHash});
     const messageId=randomUUID(),contentRef='copilot-input:'+messageId;
-    const put=await inboxContentStore.putMessageContent({tenantId:turn.tenantId,messageId,channel:'webchat',text:b.message,html:null,attachments:[],metadata:{source:'copilot_public'}});
-    if(!put)throw createAuthError(503,'copilot_content_store_unavailable');
+    await inboxContentStore.putMessageContent({tenantId:turn.tenantId,messageId,channel:'webchat',text:b.message,html:null,attachments:[],metadata:{source:'copilot_public'}});
     const planId=randomUUID(),executionId=randomUUID(),idempotencyKey=createHash('sha256').update(JSON.stringify({tenantId:turn.tenantId,sessionId:turn.sessionId,clientTurnId:b.clientTurnId,messageHash})).digest('hex');
     const prepared=(await pool.query('SELECT * FROM atlas_v153_prepare_public_turn($1,NULL,$2,$3,$4,$5,$6,$7,$8,$9)',[turn.tenantId,turn.sessionId,messageId,contentRef,messageHash,'turn_'+executionId.replaceAll('-',''),planId,executionId,idempotencyKey])).rows[0];
     if(!prepared)throw createAuthError(409,'copilot_turn_not_prepared');
