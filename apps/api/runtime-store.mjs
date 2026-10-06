@@ -378,6 +378,12 @@ export class PostgresRuntimeStore {
     return rows[0] || null;
   }
 
+  async appendAgentStreamEvent({ tenantId, jobId, workerId, executionId, sequence, eventType, contentRef=null, contentHash=null }) {
+    if(!UUID.test(tenantId||'')||!UUID.test(jobId||'')||!UUID.test(executionId||'')||!workerId||!/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId)||!Number.isSafeInteger(sequence)||sequence<1||!['delta','done','error'].includes(eventType)) throw new Error('Worker agent stream event invalid');
+    const {rows}=await this.pool.query('SELECT atlas_v153_append_stream_event($1,$2,$3,$4,$5,$6,$7,$8) AS appended',[tenantId,executionId,jobId,workerId,sequence,eventType,contentRef,contentHash]);
+    return Boolean(rows[0]?.appended);
+  }
+
   async getAgentTurnForWorker({ tenantId, jobId, workerId }) {
     if(!UUID.test(tenantId||'')||!UUID.test(jobId||'')||!workerId||!/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId)) throw new Error('worker agent turn reference invalid');
     const {rows}=await this.pool.query('SELECT * FROM atlas_v148_get_agent_turn_for_job($1,$2,$3)',[tenantId,jobId,workerId]);
