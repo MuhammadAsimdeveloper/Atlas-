@@ -1,6 +1,6 @@
 # Atlas Business Operating System — V153
 
-V151 is the current repository release. It extends the AI execution frontier with a tenant-grounded customer-support Copilot, hardened voice-agent turns, a deterministic n8n-style node runtime, support-agent evaluation/training artifacts, and governed agent skills. External model, speech, telephony, knowledge-provider and production infrastructure activation remain explicit deployment gates.
+V153 is the current repository release. It extends the AI execution frontier with the authenticated Copilot Chat Hub, public webchat, tenant-bound streaming, unified-inbox conversation history, human handoff and approval queues. External model, speech, telephony, knowledge-provider and production infrastructure activation remain explicit deployment gates.
 
 See [V148 gap register](docs/ATLAS-GAP-REGISTER-V148-2026-10.md) for the remaining incomplete product and production features.
 
