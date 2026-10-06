@@ -132,10 +132,10 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
     if(!state.length)throw createAuthError(404,'copilot_execution_not_found');
     const conversationId=state[0].conversation_id;
     const headers={...securityHeaders(env),...corsHeaders(o),'content-type':'text/event-stream; charset=utf-8','cache-control':'no-cache, no-store','connection':'keep-alive','x-accel-buffering':'no'};
-    res.writeHead(200,headers);
+    req.setTimeout?.(0); res.socket?.setTimeout?.(0); res.writeHead(200,headers);
     let cursor=0, idle=0;
     const sendEvent=(type,data)=>{res.write('event: '+type+'\ndata: '+JSON.stringify(data)+'\n\n');};
-    while(idle<60 && !res.destroyed){
+    while(idle<480 && !res.destroyed){
       const events=(await pool.query("SELECT * FROM atlas_v153_public_stream($1,$2,$3,$4)",[claims.tenantId,claims.sessionId,executionId,cursor])).rows;
       for(const e of events){
         cursor=Number(e.sequence);
