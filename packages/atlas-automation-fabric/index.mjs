@@ -56,6 +56,16 @@ function boundedText(value, label, max = 240) {
 function assertPlainObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) throw new TypeError(label + ' must be a plain object');
 }
+function isTemplatePlaceholder(value) {
+  return typeof value === 'string' && value.length <= 132 && value.endsWith('_PLACEHOLDER') && [...value].every(char => /[A-Z0-9_]/.test(char));
+}
+
+function sanitizeTemplateGraph(value) {
+  if (Array.isArray(value)) return value.map(sanitizeTemplateGraph);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, sanitizeTemplateGraph(child)]));
+  if (isTemplatePlaceholder(value)) return '11111111-1111-4111-8111-111111111111';
+  return value;
+}
 
 function scanUnsafe(value, path = 'config', findings = []) {
   if (value == null) return findings;
@@ -199,10 +209,11 @@ export function planEnvironmentPromotion({ tenantId, source, target, workflowId,
 export function createWorkflowTemplate({ tenantId, id, name, version, graph } = {}) {
   ref(tenantId, 'tenantId'); ref(id, 'templateId'); boundedText(name, 'name', 120); int(version, 'version', 1, 100000);
   if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) throw new TypeError('template graph is required');
-  const normalized = createWorkflowGraph({ tenantId, id, version, name, nodes:graph.nodes, edges:graph.edges });
+  const validationGraph = sanitizeTemplateGraph(graph);
+  const normalized = createWorkflowGraph({ tenantId, id, version, name, nodes:validationGraph.nodes, edges:validationGraph.edges });
   if (!verifyWorkflowGraph(normalized)) throw new Error('template graph checksum invalid');
-  const stripped = JSON.parse(JSON.stringify(normalized));
-  return freeze({ tenantId, id, name, version, graph:stripped, manifestSha256:sha256({ tenantId, id, version, graph:normalized.checksum }) });
+  const rawTemplateGraph = JSON.parse(JSON.stringify(graph));
+  return freeze({ tenantId, id, name, version, graph:rawTemplateGraph, manifestSha256:sha256({ tenantId, id, version, graph:normalized.checksum }) });
 }
 
 export function instantiateWorkflowTemplate({ template, tenantId, workflowId, substitutions = {} } = {}) {
