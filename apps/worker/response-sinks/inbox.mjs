@@ -47,9 +47,16 @@ export async function deliverStreamDelta({tenantId,execution,delta,sequence,cont
   const contentHash=createHash('sha256').update(text).digest('hex');
   await workerStore.appendAgentStreamEvent({tenantId,jobId:ref(context.jobId,'jobId'),workerId:ref(context.workerId,'workerId'),executionId,sequence,eventType:'delta',contentRef,contentHash});
 }
-export async function deliverStreamTerminal({tenantId,execution,status,sequence,context}={}) {
+export async function deliverStreamTerminal({tenantId,execution,status,sequence,output=null,context}={}) {
   ref(tenantId,'tenantId'); const executionId=ref(execution?.execution_id||execution?.executionId,'executionId');
   const workerStore=context?.workerStore;
   if(!workerStore||typeof workerStore.appendAgentStreamEvent!=='function') throw Object.assign(new Error('Agent stream worker store is unavailable'),{code:'agent_stream_store_unavailable'});
-  await workerStore.appendAgentStreamEvent({tenantId,jobId:ref(context.jobId,'jobId'),workerId:ref(context.workerId,'workerId'),executionId,sequence,eventType:status==='failed'?'error':'done',contentRef:null,contentHash:null});
+  let contentRef=null,contentHash=null;
+  if(output!=null){
+    const text=bounded(output,'agent terminal output');
+    contentRef='agent-stream-final:'+executionId;
+    await store.putMessageContent({tenantId,messageId:executionId,channel:'webchat',text,html:null,attachments:[],metadata:{source:'atlas_agent_stream_terminal',executionRef:executionId}});
+    contentHash=createHash('sha256').update(text).digest('hex');
+  }
+  await workerStore.appendAgentStreamEvent({tenantId,jobId:ref(context.jobId,'jobId'),workerId:ref(context.workerId,'workerId'),executionId,sequence,eventType:status==='failed'?'error':'done',contentRef,contentHash});
 }
