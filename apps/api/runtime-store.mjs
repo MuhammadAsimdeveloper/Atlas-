@@ -396,7 +396,10 @@ export class PostgresRuntimeStore {
   async requestAgentToolApproval({ actorId, tenantId, approvalId, sessionId, actionKey }) {
     if(!UUID.test(approvalId||'')||!UUID.test(sessionId||'')||typeof actionKey!=='string'||!/^[a-z][a-z0-9_.:-]+$/.test(actionKey)) throw createAuthError(400,'agent_approval_invalid');
     return this.#tenantTransaction({actorId,tenantId},async client=>{
-      await client.query('INSERT INTO atlas_agent_tool_approvals(tenant_id,approval_id,session_id,action_key) VALUES($1,$2,$3,$4)',[tenantId,approvalId,sessionId,actionKey]);
+      const { rows } = await client.query('INSERT INTO atlas_agent_tool_approvals(tenant_id,approval_id,session_id,action_key) VALUES($1,$2,$3,$4) ON CONFLICT(tenant_id,approval_id) DO NOTHING RETURNING approval_id',[tenantId,approvalId,sessionId,actionKey]);
+      if(rows.length) return approvalId;
+      const { rows: existing } = await client.query('SELECT approval_id,session_id,action_key FROM atlas_agent_tool_approvals WHERE tenant_id=$1 AND approval_id=$2',[tenantId,approvalId]);
+      if(!existing.length || existing[0].session_id!==sessionId || existing[0].action_key!==actionKey) throw createAuthError(409,'agent_approval_identity_conflict');
       return approvalId;
     });
   }
@@ -405,8 +408,11 @@ export class PostgresRuntimeStore {
     if(!UUID.test(approvalId||'')||!['approved','denied','expired'].includes(status)) throw createAuthError(400,'agent_approval_invalid');
     return this.#tenantTransaction({actorId,tenantId},async client=>{
       const {rows}=await client.query('UPDATE atlas_agent_tool_approvals SET status=$3,decided_at=now(),decided_by=$4 WHERE tenant_id=$1 AND approval_id=$2 AND status=\'pending\' RETURNING approval_id',[tenantId,approvalId,status,actorId]);
-      if(!rows.length) throw createAuthError(404,'agent_approval_not_found');
-      return approvalId;
+      if(rows.length) return approvalId;
+      const { rows: existing } = await client.query('SELECT approval_id,status FROM atlas_agent_tool_approvals WHERE tenant_id=$1 AND approval_id=$2',[tenantId,approvalId]);
+      if(!existing.length) throw createAuthError(404,'agent_approval_not_found');
+      if(existing[0].status===status) return approvalId;
+      throw createAuthError(409,'agent_approval_already_decided');
     });
   }
 
