@@ -115,9 +115,10 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
   async function publicOrigin(req,claims){
     const requested=origin(req);
     if(!requested&&env.NODE_ENV==='production')throw createAuthError(403,'origin_required');
-    const {rows}=await pool.query("SELECT c.allowed_origins FROM atlas_v153_copilot_sessions s JOIN atlas_v153_copilot_configs c ON c.tenant_id=s.tenant_id AND c.config_id=s.config_id WHERE s.tenant_id=$1 AND s.session_id=$2 AND s.revoked_at IS NULL AND s.expires_at>now() AND c.status='active'",[claims.tenantId,claims.sessionId]);
-    if(!rows.length)throw createAuthError(404,'copilot_session_not_found');
-    return allowOrigin(req,rows[0].allowed_origins,env,{publicRequest:true});
+    const {rows}=await pool.query('SELECT atlas_v153_public_origin($1,$2) AS allowed_origins',[claims.tenantId,claims.sessionId]);
+    const allowed=rows[0]?.allowed_origins;
+    if(!allowed)throw createAuthError(404,'copilot_session_not_found');
+    return allowOrigin(req,allowed,env,{publicRequest:true});
   }
   async function publicSession(req,res){
     const b=await readJson(req);exact(b,['widgetKey','customerRef']);
