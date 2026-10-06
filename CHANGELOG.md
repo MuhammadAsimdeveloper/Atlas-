@@ -1,5 +1,14 @@
 # Changelog
 
+## 152.0.0 — Customer Support Activation and Voice Streaming
+- Added signed, expiring customer-support session tokens bound to tenant, agent release and channel.
+- Added hash-bound customer turn validation and reference-only enqueue envelopes.
+- Connected the documented worker path for inbox input, governed agent execution, OpenAI-compatible model inference and inbox response delivery as the reviewed activation bridge.
+- Added bounded voice streaming session/frame contracts with codec, duration, frame-size, sequence and tenant checks and hash-only evidence.
+- Added V152 release/production gates and regression tests.
+- No live customer widget, provider account, speech stack or external credential is claimed without deployment evidence.
+
+
 ## 151.0.0 — AI Agents, Voice Agents, n8n Runtime and Customer Support Copilot
 - Added bounded deterministic n8n-style runtime handlers for collection, branching, waits, execution metadata and terminal errors.
 - Added tenant-grounded customer-support Copilot runtime with confidence/handoff controls and reference-only evidence.
