@@ -6,6 +6,7 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const HASH=/^[a-f0-9]{64}$/;
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;
 const sha=value=>crypto.createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
+const uuidFromHash=value=>{const hex=sha(value).slice(0,32);return hex.slice(0,8)+'-'+hex.slice(8,12)+'-4'+hex.slice(13,16)+'-8'+hex.slice(17,20)+'-'+hex.slice(20,32);};
 const ref=(value,label)=>{if(typeof value!=='string'||!REF.test(value))throw new TypeError(label+' must be a bounded reference');return value;};
 
 export function mapVoiceOutcomeToWorkflowEvent({ outcome, voiceSessionRef, contactRef, appointmentRef = null } = {}) {
@@ -78,6 +79,7 @@ export function planVoiceAgentJourney({
   return Object.freeze({
     status:'reconciled',
     ...snapshot,
+    outcomeId:uuidFromHash({tenantId,journeyId,voiceSessionRef:voiceSession.id,eventRef,outcome}),
     idempotencyKey:sha({tenantId,journeyId,voiceSessionRef:voiceSession.id,eventRef,outcome}),
     redacted:true
   });
