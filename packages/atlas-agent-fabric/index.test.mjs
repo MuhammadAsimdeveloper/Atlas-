@@ -54,7 +54,7 @@ test('V147 release manifest is tenant/release pinned and stores only prompt hash
   assert.equal(manifest.systemPromptHash,'d'.repeat(64));
   assert.equal('systemPrompt' in manifest,false);
   assert.ok(manifest.checksum.length===64);
-  assert.throws(()=>createAgentReleaseManifest({...manifest,tenantId:OTHER}),/tenant/i);
+  assert.throws(()=>planAgentTurn({tenantId:OTHER,sessionId:'88888888-8888-4888-8888-888888888888',agentRelease:manifest,turnId:'turn_scope_001',promptHash:'e'.repeat(64),toolCalls:[],approvalRefs:[],journeyContext:buildAgentJourneyContext({tenantId:OTHER,journeyId:'journey_scope_001'}),now:NOW}),/tenant|cross-tenant/i);
 });
 
 test('V147 journey context connects CRM, appointment, conversation and voice without accepting customer payload', () => {
