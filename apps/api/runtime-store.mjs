@@ -332,6 +332,15 @@ export class PostgresRuntimeStore {
     });
   }
 
+  async recordVoiceJourneyOutcome({ actorId, tenantId, outcome }) {
+    if(!outcome || !UUID.test(outcome.outcomeId||'') || !UUID.test(outcome.voiceSessionRef||'') || !UUID.test(outcome.contactRef||'') || !UUID.test(outcome.conversationRef||'') || !UUID.test(outcome.workflowId||'') || typeof outcome.journeyId!=='string' || !/^[A-Za-z0-9_.:-]{3,180}$/.test(outcome.journeyId) || !SHA256.test(outcome.idempotencyKey||'') || !/^[a-z_]{3,40}$/.test(outcome.outcome||'' ) || !/^[A-Za-z0-9_.:/@+-]{3,180}$/.test(outcome.eventRef||'')) throw createAuthError(400,'voice_journey_outcome_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      await client.query('INSERT INTO atlas_voice_journey_outcomes(tenant_id,outcome_id,journey_id,voice_session_ref,contact_ref,conversation_ref,lead_ref,appointment_ref,workflow_id,workflow_version,outcome,event_ref,idempotency_key,status,checksum) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT(tenant_id,idempotency_key) DO NOTHING',
+        [tenantId,outcome.outcomeId,outcome.journeyId,outcome.voiceSessionRef,outcome.contactRef,outcome.conversationRef,outcome.leadRef||null,outcome.appointmentRef||null,outcome.workflowId,outcome.workflowVersion,outcome.outcome,outcome.eventRef,outcome.idempotencyKey,'reconciled',sha256(outcome)]);
+      return outcome.outcomeId;
+    });
+  }
+
   async requestAgentToolApproval({ actorId, tenantId, approvalId, sessionId, actionKey }) {
     if(!UUID.test(approvalId||'')||!UUID.test(sessionId||'')||typeof actionKey!=='string'||!/^[a-z][a-z0-9_.:-]+$/.test(actionKey)) throw createAuthError(400,'agent_approval_invalid');
     return this.#tenantTransaction({actorId,tenantId},async client=>{
