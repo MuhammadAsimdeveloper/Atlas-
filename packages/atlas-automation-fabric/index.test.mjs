@@ -16,6 +16,7 @@ import {
   createMcpServerManifest,
   authorizeMcpToolCall,
   createAiWorkflowProposal,
+  createAiWorkflowAuthoringPlan,
   auditWorkflowSecurity
 } from './index.mjs';
 import { WORKFLOW_NODE_CATALOG } from '../atlas-target/workflow-catalog.mjs';
@@ -225,4 +226,29 @@ test('V146 workflow security audit catches risky nodes and unprotected inbound t
   assert.equal(report.status, 'blocked');
   assert.ok(report.findings.some(finding => /url|network/i.test(finding.code)));
   assert.ok(report.findings.some(finding => /approval|financial/i.test(finding.code)));
+});
+
+test('V148 AI workflow authoring plan asks for missing facts before generating a production mutation', () => {
+  const plan=createAiWorkflowAuthoringPlan({
+    tenantId:TENANT,requestedByActorId:ACTOR,
+    businessGoal:'Qualify inbound leads and book qualified meetings.',
+    knownFacts:{},
+    candidateNodes:['trigger','invoke_agent','approval','book_appointment']
+  });
+  assert.equal(plan.status,'needs_clarification');
+  assert.ok(plan.missingFacts.length >= 3);
+  assert.equal(plan.productionMutation,false);
+  assert.equal(plan.proposal.status,'proposal_only');
+});
+test('V148 AI workflow authoring plan becomes preview-ready when required facts are present', () => {
+  const plan=createAiWorkflowAuthoringPlan({
+    tenantId:TENANT,requestedByActorId:ACTOR,
+    businessGoal:'Qualify inbound leads and book qualified meetings.',
+    knownFacts:{trigger:'form.submitted',audience:'new leads',success:'appointment booked',failure:'handoff'},
+    candidateNodes:['trigger','invoke_agent','approval','book_appointment']
+  });
+  assert.equal(plan.status,'ready_for_preview');
+  assert.equal(plan.missingFacts.length,0);
+  assert.equal(plan.productionMutation,false);
+  assert.ok(plan.diffRef.startsWith('draft_'));
 });
