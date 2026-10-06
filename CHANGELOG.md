@@ -1,3 +1,11 @@
+## 147.0.0 — Agent Journey Runtime + Durable Handoffs
+- Added tenant/release-pinned agent release manifests with model-policy bounds and prompt-hash-only storage.
+- Added reference-only agent journey context linking CRM, appointments, conversations, voice sessions and workflow executions.
+- Added deterministic bounded agent turn planning, exact workflow invocation authorization and human handoff contracts.
+- Added durable V147 turn-plan/handoff PostgreSQL tables with forced tenant RLS and API grants.
+- Connected agent planning/handoff to the authenticated Growth API and runtime store.
+- Extended doctor and production activation gates for V147.
+
 ## 146.0.0 — n8n-Inspired Hardened Automation Fabric
 - Added bounded n8n-style workflow capabilities: looping, aggregation, split-out, sorting, duplicate removal, webhook response, error/stop nodes, execution data and chat/form/schedule-oriented catalog entries.
 - Added execution governance for filtering, retry planning, protected environments, versioned templates, exact human approvals, capability-scoped MCP tools, AI workflow proposals and workflow security audits.
