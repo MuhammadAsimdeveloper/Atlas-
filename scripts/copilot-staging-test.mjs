@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 const base=String(process.env.ATLAS_STAGING_ORIGIN||'').replace(/\/$/,'');
 const widgetKey=String(process.env.ATLAS_STAGING_WIDGET_KEY||'');
-const origin=String(process.env.ATLAS_STAGING_WIDGET_ORIGIN||base);
+const origin=String(process.env.ATLAS_STAGING_WIDGET_ORIGIN||base);\nconst cookie=String(process.env.ATLAS_STAGING_COOKIE||'');\nconst csrf=String(process.env.ATLAS_STAGING_CSRF||'');
 if(!base||!widgetKey) throw new Error('ATLAS_STAGING_ORIGIN and ATLAS_STAGING_WIDGET_KEY are required');
 async function req(path,options={}){const r=await fetch(base+path,options);const text=await r.text();let body=null;try{body=JSON.parse(text)}catch{}return {r,text,body}}
 const live=await req('/health/live');assert.equal(live.r.status,200);assert.equal(live.body.status,'ok');
@@ -13,4 +13,4 @@ const stream=await req('/api/v1/public/copilot/stream?executionId='+encodeURICom
 assert.equal(stream.r.status,200,stream.text);assert.ok(stream.text.includes('event: '));assert.ok(stream.text.includes('data: '));
 const history=await req('/api/v1/public/copilot/history',{headers:{origin,authorization:'Bearer '+token}});assert.equal(history.r.status,200,history.text);assert.ok(Array.isArray(history.body.items));
 const handoff=await req('/api/v1/public/copilot/handoff',{method:'POST',headers:{origin,authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({reason:'caller_requested_human'})});assert.equal(handoff.r.status,201,handoff.text);
-console.log('COPILOT_STAGING_E2E_OK');
+if(cookie){const q=await req('/api/v1/platform/copilot/handoffs',{headers:{cookie,'origin':base}});assert.equal(q.r.status,200,q.text);const a=await req('/api/v1/platform/copilot/approvals',{headers:{cookie,'origin':base}});assert.equal(a.r.status,200,a.text);}\nconsole.log('COPILOT_STAGING_E2E_OK');
