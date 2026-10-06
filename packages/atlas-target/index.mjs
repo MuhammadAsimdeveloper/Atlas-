@@ -205,7 +205,7 @@ const NODE_REFERENCE_FIELDS = Object.freeze({
   record_conversion:['conversionRef','connectionRef'], affiliate_action:['affiliateRef','connectionRef'], update_affiliate:['affiliateRef','connectionRef'], manage_affiliate_campaign:['affiliateRef','campaignRef','connectionRef'], grant_course_access:['memberRef','offerRef'],
   revoke_course_access:['memberRef','offerRef'], set_community_access:['memberRef','groupRef'], ivr_transfer_call:['callSessionRef','routeRef'],
   ivr_gather_input:['callSessionRef'], ivr_play_message:['callSessionRef','contentRef'], ivr_transfer_call:['callSessionRef','routeRef'], ivr_connect_call:['callSessionRef','routeRef'], ivr_end_call:['callSessionRef'], record_voicemail:['callSessionRef'],
-  sub_workflow:['workflowReleaseRef']
+  sub_workflow:['workflowReleaseRef'], execute_subworkflow:['workflowReleaseRef'], data_table:['tableRef'], mcp_client:['serverRef','operationRef'], mcp_server_trigger:['serverRef'], chat_trigger:['channelRef'], schedule_trigger:['scheduleRef'], form_trigger:['formRef'], evaluation_trigger:['evaluationRef'], guardrails:['policyRef'], respond_to_webhook:['responseRef']
 });
 
 function validateWorkflowNodeConfig(type, config) {
@@ -232,6 +232,29 @@ function validateWorkflowNodeConfig(type, config) {
   if (type === 'split_batches' && (!Number.isSafeInteger(config.batchSize) || config.batchSize < 1 || config.batchSize > 1000)) throw new Error('split_batches batchSize must be 1-1000');
   if (type === 'rate_limit_batch' && (!Number.isSafeInteger(config.batchSize) || config.batchSize < 1 || config.batchSize > 1000 || !Number.isSafeInteger(config.intervalMs) || config.intervalMs < 100 || config.intervalMs > 86400000)) throw new Error('rate_limit_batch bounds are invalid');
   if (['condition','switch','random_split'].includes(type) && (!Array.isArray(config.cases) || config.cases.length < 1 || config.cases.length > 32)) throw new Error(type + ' requires 1-32 cases');
+  if (type === 'loop_over_items') {
+    if (!Number.isSafeInteger(config.batchSize) || config.batchSize < 1 || config.batchSize > 100) throw new Error('loop_over_items batchSize must be 1-100');
+    if (!Number.isSafeInteger(config.maxItems) || config.maxItems < 1 || config.maxItems > 10000) throw new Error('loop_over_items maxItems must be 1-10000');
+    if (config.maxIterations !== undefined && (!Number.isSafeInteger(config.maxIterations) || config.maxIterations < 1 || config.maxIterations > 10000)) throw new Error('loop_over_items maxIterations must be 1-10000');
+  }
+  if (['aggregate','remove_duplicates','sort','split_out'].includes(type) && config.maxItems !== undefined && (!Number.isSafeInteger(config.maxItems) || config.maxItems < 1 || config.maxItems > 10000)) throw new Error(type + ' maxItems must be 1-10000');
+  if (type === 'respond_to_webhook') {
+    if (!Number.isSafeInteger(config.statusCode) || config.statusCode < 100 || config.statusCode > 599) throw new Error('respond_to_webhook statusCode must be 100-599');
+    opaqueWorkflowReference(config.responseRef, 'respond_to_webhook responseRef');
+  }
+  if (type === 'stop_and_error') {
+    if (typeof config.errorCode !== 'string' || !/^[a-z][a-z0-9_.-]{0,79}$/.test(config.errorCode)) throw new Error('stop_and_error errorCode is invalid');
+    if (typeof config.message !== 'string' || !config.message.trim() || config.message.length > 500 || /[\\r\\n\\u0000]/.test(config.message)) throw new Error('stop_and_error message is invalid');
+  }
+  if (type === 'execution_data') {
+    if (typeof config.key !== 'string' || !/^[a-z][a-z0-9_.-]{0,79}$/.test(config.key)) throw new Error('execution_data key is invalid');
+    if (JSON.stringify(config.value ?? null).length > 1000) throw new Error('execution_data value is too large');
+  }
+  if (type === 'code_transform') {
+    if (typeof config.expression !== 'string' || !config.expression.trim() || config.expression.length > 4000) throw new Error('code_transform requires a bounded expression');
+    if (/(require\\s*\\(|child_process|process\\.|eval\\s*\\(|Function\\s*\\(|fetch\\s*\\(|axios\\s*\\()/i.test(config.expression)) throw new Error('code_transform does not allow executable or network code');
+  }
+  if (type === 'error_trigger' && config.errorCode !== undefined && (typeof config.errorCode !== 'string' || !/^[a-z][a-z0-9_.-]{0,79}$/.test(config.errorCode))) throw new Error('error_trigger errorCode is invalid');
 }
 
 function normalizeNode(node, index) {
