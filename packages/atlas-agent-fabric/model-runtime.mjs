@@ -59,8 +59,10 @@ export function createModelAdapter({ provider, version = 1, infer, stream = null
 
 export function createModelRequest({
   tenantId, agentRelease, sessionId, turnId, promptHash, inputRef, responseMode = 'text',
-  outputSchema = null, now = Date.now()
+  outputSchema = null, now = Date.now(), ...extra
 } = {}) {
+  rejectSecrets(extra, 'modelRequest');
+  if (Object.keys(extra).length) throw new TypeError('Unexpected model request fields are not allowed');
   ref(tenantId, 'tenantId'); ref(sessionId, 'sessionId'); ref(turnId, 'turnId'); ref(inputRef, 'inputRef');
   if (!agentRelease || agentRelease.tenantId !== tenantId || typeof agentRelease.releaseId !== 'string') throw new Error('Agent release is not tenant-bound');
   hash(promptHash, 'promptHash');
@@ -68,7 +70,14 @@ export function createModelRequest({
   if (responseMode === 'structured' && (!outputSchema || typeof outputSchema !== 'object' || Array.isArray(outputSchema))) throw new TypeError('outputSchema required for structured responses');
   const body = {
     tenantId, sessionId, turnId, releaseId: agentRelease.releaseId, releaseVersion: agentRelease.version,
-    modelProvider: agentRelease.modelPolicy?.provider ?? 'model_adapter', promptHash, inputRef, responseMode,
+    modelProvider: agentRelease.modelPolicy?.provider ?? 'model_adapter',
+    modelPolicy: {
+      provider: agentRelease.modelPolicy?.provider ?? 'model_adapter',
+      timeoutMs: agentRelease.modelPolicy?.timeoutMs ?? 30000,
+      maxOutputTokens: agentRelease.modelPolicy?.maxOutputTokens ?? 1200,
+      maxOutputChars: agentRelease.modelPolicy?.maxOutputChars ?? 8000
+    },
+    promptHash, inputRef, responseMode,
     outputSchema: responseMode === 'structured' ? outputSchema : null,
     rawPromptStored: false,
     createdAt: new Date(Number(now)).toISOString()
