@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '145.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '146.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143']) {
@@ -272,6 +272,12 @@ try {
   const journeyPlan = await read('docs/ATLAS-DEVELOPMENT-PLAN-V145-V153-2026-10.md');
   const journeyDoc = await read('docs/V145-LEAD-TO-BOOKING.md');
   check('V145 cross-product journey', journey.includes('runLeadToBookingJourney') && journey.includes('createGrowthRecord') && journey.includes('scoreLeadQualification') && journey.includes('bookAppointment') && journey.includes('voiceIntent'), journeyTests.includes('flagship journey connects') && journeyDoc.includes('Funnel/website lead form') && journeyPlan.includes('V145 — Cross-product Lead-to-Booking Control Plane'), 'Funnel capture, CRM, qualification, follow-up planning, calendar booking, pipeline updates, voice intent and redacted reporting are composed in one tenant-bound journey.');
+  const automationFabric = await read('packages/atlas-automation-fabric/index.mjs');
+  const automationTests = await read('packages/atlas-automation-fabric/index.test.mjs');
+  const automationPlan = await read('docs/ATLAS-N8N-HARDENED-AUTOMATION-PLAN-V146-V160-2026-10.md');
+  const automationAudit = await read('docs/ATLAS-N8N-PARITY-AUDIT-2026-10.md');
+  check('V146 hardened n8n automation fabric', automationFabric.includes('N8N_PARITY_FEATURES') && automationFabric.includes('createAutomationPolicy') && automationFabric.includes('createApprovalRequest') && automationFabric.includes('createWorkflowTemplate') && automationFabric.includes('createMcpServerManifest') && automationFabric.includes('createAiWorkflowProposal') && automationFabric.includes('auditWorkflowSecurity'), automationTests.includes('n8n parity catalog') && automationPlan.includes('V146 — n8n-inspired hardened automation fabric') && automationAudit.includes('n8n Parity + Hardening Audit'), 'n8n-style workflow features are governed by tenant scope, idempotency, approval, protected environments, capability-scoped MCP and security auditing.');
+  check('V146 automation API surfaces', await read('apps/api/growth-routes.mjs').then(x => x.includes('/api/v1/growth/automation/ai-proposal') && x.includes('/api/v1/growth/automation/security-audit')), 'AI workflow proposals and security audits are exposed through the authenticated Growth API without autonomous production mutation.');
 
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
