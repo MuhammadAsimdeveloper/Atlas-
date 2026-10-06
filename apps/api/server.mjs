@@ -94,7 +94,7 @@ if (env.ATLAS_DATABASE_URL) {
   workflowExecutionStore = new PostgresWorkflowExecutionStore(pool);
   if (env.ATLAS_REDIS_URL) redisWakeup = createRedisWakeupTransport(env.ATLAS_REDIS_URL, env.ATLAS_REDIS_NAMESPACE || 'atlas');
   runtimeStore = new PostgresRuntimeStore(pool, { dispatchWakeup: redisWakeup });
-  authApi = createAuthApi({ store: authStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
+  authApi = createAuthApi({ store: authStore, runtimeStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
   growthApi = createGrowthApi({ store: growthStore, executionStore: workflowExecutionStore, runtimeStore, authStore, env });
   capabilityStore = new PostgresCapabilityStore(pool);
   inboxContentStore = await loadInboxContentStore(env);
