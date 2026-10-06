@@ -361,6 +361,18 @@ export class PostgresRuntimeStore {
     });
   }
 
+  async getAgentInputForWorker({ tenantId, jobId, workerId, executionId }) {
+    if(!UUID.test(tenantId||'')||!UUID.test(jobId||'')||!UUID.test(executionId||'')||!workerId||!/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId)) throw new Error('Worker agent input reference invalid');
+    const {rows}=await this.pool.query('SELECT * FROM atlas_v148_get_agent_input_for_job($1,$2,$3,$4)',[tenantId,jobId,workerId,executionId]);
+    return rows[0] || null;
+  }
+
+  async createAgentResponseForWorker({ tenantId, jobId, workerId, executionId, contentRef }) {
+    if(!UUID.test(tenantId||'')||!UUID.test(jobId||'')||!UUID.test(executionId||'')||!workerId||!/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId) || typeof contentRef!=='string' || contentRef.length<3 || contentRef.length>240 || /[\r\n\u0000]/.test(contentRef)) throw new Error('Worker agent response reference invalid');
+    const {rows}=await this.pool.query('SELECT * FROM atlas_v148_create_agent_response_for_job($1,$2,$3,$4,$5)',[tenantId,jobId,workerId,executionId,contentRef]);
+    return rows[0] || null;
+  }
+
   async getAgentTurnForWorker({ tenantId, jobId, workerId }) {
     if(!UUID.test(tenantId||'')||!UUID.test(jobId||'')||!workerId||!/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId)) throw new Error('worker agent turn reference invalid');
     const {rows}=await this.pool.query('SELECT * FROM atlas_v148_get_agent_turn_for_job($1,$2,$3)',[tenantId,jobId,workerId]);
