@@ -7,6 +7,7 @@ const freeze = value => { if (value && typeof value === 'object' && !Object.isFr
 const text = (value, label, max = 180) => { if (typeof value !== 'string' || !value.trim() || value.length > max || /[\r\n\u0000]/.test(value)) throw new Error(label + ' must be bounded text'); return value.trim(); };
 const reference = (value, label) => text(value, label, 180);
 const timestamp = (value, label) => { const parsed = typeof value === 'number' ? value : Date.parse(value); if (!Number.isFinite(parsed)) throw new Error(label + ' must be a valid timestamp'); return parsed; };
+const EXECUTABLE_WORKFLOW_MARKERS = Object.freeze(['require(', 'child_process', 'process.', 'eval(', 'Function(', 'import(', 'fetch(', 'axios(', 'XMLHttpRequest']);
 
 export const CRM_OBJECT_TYPES = Object.freeze(['contact','company','lead','deal','ticket','task','note','appointment','custom']);
 export const CRM_PROPERTY_TYPES = Object.freeze(['text','number','boolean','date','datetime','select','multi_select']);
@@ -252,7 +253,7 @@ function validateWorkflowNodeConfig(type, config) {
   }
   if (type === 'code_transform') {
     if (typeof config.expression !== 'string' || !config.expression.trim() || config.expression.length > 4000) throw new Error('code_transform requires a bounded expression');
-    if (/(require\\s*\\(|child_process|process\\.|eval\\s*\\(|Function\\s*\\(|fetch\\s*\\(|axios\\s*\\()/i.test(config.expression)) throw new Error('code_transform does not allow executable or network code');
+    if (EXECUTABLE_WORKFLOW_MARKERS.some(marker => config.expression.includes(marker))) throw new Error('code_transform does not allow executable or network code');
   }
   if (type === 'error_trigger' && config.errorCode !== undefined && (typeof config.errorCode !== 'string' || !/^[a-z][a-z0-9_.-]{0,79}$/.test(config.errorCode))) throw new Error('error_trigger errorCode is invalid');
 }
