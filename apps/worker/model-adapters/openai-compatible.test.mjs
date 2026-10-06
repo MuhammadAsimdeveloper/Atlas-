@@ -10,7 +10,7 @@ test('OpenAI-compatible SSE splitting retains only the unterminated final line',
   const first=splitSseBuffer('data: {"a":1}\ndata: {"b":');
   assert.deepEqual(first.lines,['data: {"a":1}']);
   assert.equal(first.remainder,'data: {"b":');
-  const second=splitSseBuffer(first.remainder+'}\\n');
+  const second=splitSseBuffer(first.remainder+'}\n');
   assert.deepEqual(second.lines,['data: {"b":}']);
   assert.equal(second.remainder,'');
 });
