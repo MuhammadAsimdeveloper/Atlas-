@@ -273,12 +273,16 @@ scenarios.push(['agent cross-tenant workflow invocation blocked', () => {
 }, result => result.blocked === true]);
 
 scenarios.push(['agent durable evidence is redacted by construction', () => ({
-  rawPromptStored:false,
-  rawOutputStored:false,
-  transcriptStored:false,
-  releaseSnapshotContainsSecrets:false,
-  referencesOnly:true
-}), result => Object.values(result).every(Boolean)]);
+  ...runLeadToBookingJourney(baseInput()),
+  report: { redacted:true },
+  evidence: {
+    rawPromptStored:false,
+    rawOutputStored:false,
+    transcriptStored:false,
+    releaseSnapshotContainsSecrets:false,
+    referencesOnly:true
+  }
+}), result => Object.values(result.evidence).every(Boolean)]);
 
 let passed = 0;
 for (const [scenarioName, runner, expectation] of scenarios) {
