@@ -51,7 +51,7 @@ test('V146 new n8n-style nodes are accepted by the real Atlas graph validator', 
       { id: '22222222-2222-4222-8222-222222222222', type: 'loop_over_items', config: { batchSize: 10, maxItems: 100 } },
       { id: '33333333-3333-4333-8333-333333333333', type: 'aggregate', config: { maxItems: 100 } },
       { id: '44444444-4444-4444-8444-444444444444', type: 'execution_data', config: { key: 'source', value: 'crm' } },
-      { id: '55555555-5555-4555-8555-555555555555', type: 'stop_and_error', config: { errorCode: 'demo.stop', message: 'Demo terminal' } }
+      { id: '55555555-5555-4555-8555-555555555555', type: 'stop_and_error', config: { errorCode: 'demo.stop', message: 'Demo terminal', retryable: false } }
     ],
     edges: [
       { id: '66666666-6666-4666-8666-666666666666', from: '11111111-1111-4111-8111-111111111111', to: '22222222-2222-4222-8222-222222222222', port: 'next' },
@@ -159,7 +159,7 @@ test('V146 source-control environments use protected production and manifest-bou
   assert.equal(prod.protected, true);
   const promotion = planEnvironmentPromotion({ tenantId: TENANT, source: dev, target: prod, workflowId: WORKFLOW, workflowVersion: 3, manifestSha256: 'a'.repeat(64), approvedByActorId: ACTOR, sourceChangedAfterApproval: false });
   assert.equal(promotion.status, 'blocked');
-  const approved = planEnvironmentPromotion({ tenantId: TENANT, source: dev, target: prod, workflowId: WORKFLOW, workflowVersion: 3, manifestSha256: 'a'.repeat(64), approvedByActorId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', sourceChangedAfterApproval: false });
+  const approved = planEnvironmentPromotion({ tenantId: TENANT, source: dev, target: prod, workflowId: WORKFLOW, workflowVersion: 3, manifestSha256: 'a'.repeat(64), approvedByActorId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', approvalRef: 'approval-ref-146', sourceChangedAfterApproval: false });
   assert.equal(approved.status, 'ready');
 });
 
