@@ -1,3 +1,11 @@
+## 146.0.0 — n8n-Inspired Hardened Automation Fabric
+- Added bounded n8n-style workflow capabilities: looping, aggregation, split-out, sorting, duplicate removal, webhook response, error/stop nodes, execution data and chat/form/schedule-oriented catalog entries.
+- Added execution governance for filtering, retry planning, protected environments, versioned templates, exact human approvals, capability-scoped MCP tools, AI workflow proposals and workflow security audits.
+- Added authenticated Growth API surfaces for AI workflow proposal mode and workflow security audit.
+- Kept arbitrary shell/host execution disabled, direct arbitrary network URLs rejected, secret-like workflow configuration rejected, unsafe retries blocked and production promotions protected.
+- Extended doctor and production activation gates to cover V146.
+- Added V146–V160 roadmap and n8n parity audit.
+
 ## 145.0.0 — Cross-product Lead-to-Booking Integration + MiroFish scenarios
 - Added a tenant-scoped orchestration service connecting funnel/web lead capture, CRM contact/lead creation, deterministic qualification, follow-up planning, calendar availability/hold/booking, pipeline stage movement and redacted journey reporting.
 - Added replay-stable idempotency references and fail-closed behavior for missing qualification evidence, invalid source assets and unavailable calendar slots.
