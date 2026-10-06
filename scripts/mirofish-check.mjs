@@ -259,11 +259,11 @@ scenarios.push(['agent budget exhaustion fails closed', () => {
 }, result => result.blocked === true && result.externalSideEffects.length === 0]);
 
 scenarios.push(['agent cross-tenant workflow invocation blocked', () => {
-  let blocked = false;
-  try {
-    createAiWorkflowProposal({ tenantId:TENANT, workflowId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', actorId:ACTOR, requestedNodes:[{type:'agent', config:{tenantId:OTHER_TENANT}}] });
-  } catch { blocked = true; }
-  return { blocked };
+  const security = auditWorkflowSecurity({
+    tenantId:TENANT,
+    workflow:{ tenantId:OTHER_TENANT, id:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', version:1, nodes:[] }
+  });
+  return { blocked:security.status === 'blocked' && security.findings.some(finding => finding.code === 'TENANT_MISMATCH') };
 }, result => result.blocked === true]);
 
 scenarios.push(['agent durable evidence is redacted by construction', () => ({
