@@ -11,6 +11,7 @@ import { PostgresWorkflowExecutionStore } from './workflow-execution-store.mjs';
 import { securityHeaders, validateHealthToken } from './security.mjs';
 import { PostgresCapabilityStore } from './capability-store.mjs';
 import { PostgresRuntimeStore } from './runtime-store.mjs';
+import { createRedisWakeupTransport } from '../../packages/atlas-runtime/redis-client.mjs';
 import { createCapabilityApi } from './capability-routes.mjs';
 import { loadInboxContentStore } from './inbox-content.mjs';
 import { loadWebhookSecretResolver } from './webhook-secrets.mjs';
@@ -91,7 +92,8 @@ if (env.ATLAS_DATABASE_URL) {
   if (runtime === 'production') await authStore.assertSafeRuntimeRole();
   growthStore = new PostgresGrowthStore(pool);
   workflowExecutionStore = new PostgresWorkflowExecutionStore(pool);
-  runtimeStore = new PostgresRuntimeStore(pool);
+  if (env.ATLAS_REDIS_URL) redisWakeup = createRedisWakeupTransport(env.ATLAS_REDIS_URL, env.ATLAS_REDIS_NAMESPACE || 'atlas');
+  runtimeStore = new PostgresRuntimeStore(pool, { dispatchWakeup: redisWakeup });
   authApi = createAuthApi({ store: authStore, mailer: createMailer(env), env, secret: env.ATLAS_SESSION_SECRET });
   growthApi = createGrowthApi({ store: growthStore, executionStore: workflowExecutionStore, runtimeStore, authStore, env });
   capabilityStore = new PostgresCapabilityStore(pool);
