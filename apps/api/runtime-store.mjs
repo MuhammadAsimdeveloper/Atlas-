@@ -8,7 +8,7 @@ const PREFIX = /^[a-f0-9]{56}$/;
 const sha256 = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 export class PostgresRuntimeStore {
-  constructor(pool) { this.pool = pool; }
+  constructor(pool, { dispatchWakeup = null } = {}) { this.pool = pool; this.dispatchWakeup = dispatchWakeup; }
 
   async #tenantTransaction({ actorId, tenantId }, work) {
     if (!UUID.test(actorId || '') || !UUID.test(tenantId || '')) throw createAuthError(409, 'workspace_required');
@@ -42,7 +42,12 @@ export class PostgresRuntimeStore {
     return this.#tenantTransaction({ actorId, tenantId }, async client => {
       const { rows } = await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7) AS job_id',
         [tenantId, jobId, jobType, JSON.stringify(payloadRef), idempotencyKey, runAt, maxAttempts]);
-      return rows[0].job_id;
+      const result = rows[0].job_id;
+      if (this.dispatchWakeup) {
+        try { await this.dispatchWakeup.publish(jobType, { schema:1, tenantId, jobId, jobType, idempotencyKey }); }
+        catch { /* PostgreSQL remains authoritative; Redis is acceleration only. */ }
+      }
+      return result;
     });
   }
 
