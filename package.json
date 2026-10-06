@@ -1,7 +1,7 @@
 {
   "name": "atlas-business-os",
   "private": true,
-  "version": "150.0.0",
+  "version": "151.0.0",
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1",
