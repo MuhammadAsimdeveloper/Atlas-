@@ -304,6 +304,33 @@ export class PostgresRuntimeStore {
     });
   }
 
+  async getAgentSession({ actorId, tenantId, sessionId }) {
+    if(!UUID.test(sessionId||'')) throw createAuthError(400,'agent_session_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query('SELECT session_id,agent_release_ref,status,channel,customer_ref,memory_scope,created_at,updated_at FROM atlas_ai_agent_sessions WHERE tenant_id=$1 AND session_id=$2',[tenantId,sessionId]);
+      if(!rows.length) throw createAuthError(404,'agent_session_not_found');
+      return rows[0];
+    });
+  }
+
+  async recordAgentTurnPlan({ actorId, tenantId, plan }) {
+    if(!plan || !UUID.test(plan.planId||'') || !UUID.test(plan.sessionId||'') || !UUID.test(plan.agentId||'') || typeof plan.releaseId!=='string' || !/^[A-Za-z0-9_.:/@+-]{1,180}$/.test(plan.releaseId) || !Number.isInteger(plan.releaseVersion) || plan.releaseVersion<1 || !SHA256.test(plan.promptHash||'') || !SHA256.test(plan.idempotencyKey||'')) throw createAuthError(400,'agent_turn_plan_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      await client.query('INSERT INTO atlas_agent_turn_plans(tenant_id,plan_id,session_id,turn_id,agent_id,release_id,release_version,prompt_hash,tool_plan,approval_refs,workflow_invocation_ref,journey_context,idempotency_key,status,checksum) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13,$14,$15) ON CONFLICT(tenant_id,idempotency_key) DO NOTHING',
+        [tenantId,plan.planId,plan.sessionId,plan.turnId,plan.agentId,plan.releaseId,plan.releaseVersion,plan.promptHash,JSON.stringify(plan.toolCalls||[]),JSON.stringify(plan.approvalRefs||[]),plan.workflowInvocationRef||null,JSON.stringify(plan.journeyContext||{}),plan.idempotencyKey,'planned',plan.checksum||'']);
+      return plan.planId;
+    });
+  }
+
+  async recordAgentHandoff({ actorId, tenantId, handoff }) {
+    if(!handoff || !UUID.test(handoff.handoffId||'') || !UUID.test(handoff.sessionId||'') || typeof handoff.reason!=='string' || !/^[a-z][a-z0-9_.-]{2,79}$/.test(handoff.reason) || typeof handoff.queueRef!=='string' || !/^[A-Za-z0-9_.:/@+-]{3,180}$/.test(handoff.queueRef)) throw createAuthError(400,'agent_handoff_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      await client.query('INSERT INTO atlas_agent_handoffs(tenant_id,handoff_id,session_id,reason,queue_ref,appointment_ref,status,checksum) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(tenant_id,handoff_id) DO NOTHING',
+        [tenantId,handoff.handoffId,handoff.sessionId,handoff.reason,handoff.queueRef,handoff.appointmentRef||null,'pending',sha256(handoff)]);
+      return handoff.handoffId;
+    });
+  }
+
   async requestAgentToolApproval({ actorId, tenantId, approvalId, sessionId, actionKey }) {
     if(!UUID.test(approvalId||'')||!UUID.test(sessionId||'')||typeof actionKey!=='string'||!/^[a-z][a-z0-9_.:-]+$/.test(actionKey)) throw createAuthError(400,'agent_approval_invalid');
     return this.#tenantTransaction({actorId,tenantId},async client=>{
