@@ -185,8 +185,12 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
         exact(body, ['prompt', 'candidateNodes']);
         if (typeof body.prompt !== 'string' || body.prompt.length < 3 || body.prompt.length > 4000) throw createAuthError(400, 'invalid_prompt');
         if (!Array.isArray(body.candidateNodes) || body.candidateNodes.length < 1 || body.candidateNodes.length > 50) throw createAuthError(400, 'invalid_candidate_nodes');
-        const proposal = createAiWorkflowProposal({ tenantId: who.tenantId, requestedByActorId: who.actorId, prompt: body.prompt, candidateNodes: body.candidateNodes });
-        return send(res, 201, { proposal }, env);
+        try {
+          const proposal = createAiWorkflowProposal({ tenantId: who.tenantId, requestedByActorId: who.actorId, prompt: body.prompt, candidateNodes: body.candidateNodes });
+          return send(res, 201, { proposal }, env);
+        } catch (error) {
+          throw createAuthError(400, 'invalid_ai_workflow_proposal', error?.message || 'The workflow proposal is invalid.');
+        }
       }
       if (path === '/api/v1/growth/automation/security-audit' && req.method === 'POST') {
         await requireMutation(req, who.session);
