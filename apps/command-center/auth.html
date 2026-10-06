@@ -66,6 +66,7 @@
         <button class="nav-item" type="button" data-nav-page="growth" data-module="leads" data-page-title="Opportunities" data-nav-key="leads"><span aria-hidden="true">◇</span><span>Opportunities</span></button>
         <button class="nav-item" type="button" data-nav-page="growth" data-module="tasks" data-page-title="Tasks" data-nav-key="tasks"><span aria-hidden="true">✓</span><span>Tasks</span></button>
         <button class="nav-item" type="button" data-nav-page="growth" data-module="workflows" data-page-title="Automation" data-nav-key="workflows"><span aria-hidden="true">⇢</span><span>Automation</span></button>
+        <button class="nav-item" type="button" data-nav-page="operations" data-page-title="Operations" data-nav-key="operations"><span aria-hidden="true">◌</span><span>Operations</span></button>
         <button class="nav-item" type="button" data-nav-page="growth" data-module="ai-follow-up" data-page-title="AI agents" data-nav-key="ai"><span aria-hidden="true">✦</span><span>AI agents</span></button>
         <button class="nav-item" type="button" data-nav-page="unavailable" data-page-title="Service Desk" data-nav-key="service-desk"><span aria-hidden="true">▣</span><span>Service Desk</span></button>
         <span class="nav-label">Grow</span>
@@ -108,6 +109,16 @@
           </div>
           <p class="truth-note">Records, immutable revisions and workspace access are database-backed. AI runs, message delivery, social publishing and public page hosting remain disabled until their service connections are configured.</p>
         </section>
+      </section>
+      <section id="operations-panel" class="panel-section" hidden aria-labelledby="page-title">
+        <div class="growth-intro"><div><span class="eyebrow">Runtime operations</span><h2>Execution health you can act on.</h2><p>See the durable queue, distributed worker wakeups and current release from the same tenant-authenticated workspace.</p></div><div class="growth-status"><span id="operations-status-dot" class="status-dot"></span><span id="operations-status">Loading…</span></div></div>
+        <div class="metric-grid">
+          <article class="metric-card"><span>Queued jobs</span><strong id="ops-queued">—</strong><small>Durable PostgreSQL queue</small></article>
+          <article class="metric-card"><span>Running jobs</span><strong id="ops-running">—</strong><small>Currently leased</small></article>
+          <article class="metric-card"><span>Dead-letter jobs</span><strong id="ops-dead">—</strong><small>Require operator review</small></article>
+          <article class="metric-card"><span>Redis wakeup</span><strong id="ops-redis">—</strong><small>Acceleration layer</small></article>
+        </div>
+        <div class="content-card"><div class="section-heading"><div><span class="eyebrow">Release evidence</span><h2 id="ops-release">Atlas release</h2></div><button id="operations-refresh" class="button subtle" type="button">Refresh</button></div><div class="two-column"><div><h3>Execution boundary</h3><p class="field-help">PostgreSQL remains authoritative for leases, retries and recovery. Redis only wakes workers faster; losing Redis does not lose durable work.</p></div><div><h3>Operator signal</h3><p id="ops-detail" class="field-help">Loading current queue state…</p></div></div></div>
       </section>
       <section id="conversations-panel" class="panel-section" hidden aria-labelledby="page-title">
         <div class="growth-intro"><div><span class="eyebrow">Unified customer communications</span><h2>One inbox across email, SMS, WhatsApp and voice.</h2><p>Threads are tenant-scoped, provider-backed and safe to hand off. Message content is loaded only through the encrypted content boundary.</p></div><div class="growth-status"><span class="status-dot"></span><span id="inbox-status">Live inbox API</span></div></div>
