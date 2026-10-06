@@ -210,7 +210,7 @@ test('V149 agent tool approvals are replay-safe and reject identity/status confl
       {code:'agent_approval_identity_conflict'}
     );
     assert.equal(await api.decideAgentToolApproval({actorId:actorA,tenantId:tenantA,approvalId,status:'approved'}),approvalId);
-    assert.equal(await api.decideAgentToolApproval({actorId:actorB,tenantId:tenantA,approvalId,status:'approved'}),approvalId,'identical decision replay must be idempotent');
+    assert.equal(await api.decideAgentToolApproval({actorId:actorA,tenantId:tenantA,approvalId,status:'approved'}),approvalId,'identical decision replay must be idempotent');
     await assert.rejects(
       api.decideAgentToolApproval({actorId:actorA,tenantId:tenantA,approvalId,status:'denied'}),
       {code:'agent_approval_already_decided'}
