@@ -16,24 +16,29 @@ async function loadReviewed(dirName,envName){
   return import(pathToFileURL(target).href);
 }
 
+let inputModule=null;
+let modelModule=null;
+let sinkModule=null;
+let toolModule={agentTools:{},executeTool:async()=>{throw Object.assign(new Error('No reviewed agent tool executor is configured.'),{code:'agent_tool_executor_unavailable'});}};
+
 if(process.env.ATLAS_AGENT_TURN_EXECUTION_ENABLED==='true'){
-  const input=await loadReviewed('agent-input','ATLAS_AGENT_INPUT_RESOLVER_MODULE');
-  const model=await loadReviewed('model-adapters','ATLAS_MODEL_ADAPTER_MODULE');
-  const sink=await loadReviewed('response-sinks','ATLAS_AGENT_RESPONSE_SINK_MODULE');
-  const toolModule=process.env.ATLAS_AGENT_TOOL_MODULE ? await loadReviewed('agent-tools','ATLAS_AGENT_TOOL_MODULE') : { agentTools:{}, executeTool:async()=>{ throw Object.assign(new Error('No reviewed agent tool executor is configured.'),{code:'agent_tool_executor_unavailable'}); } };
-  if(typeof input.resolveInput!=='function'||typeof model.getModelAdapter!=='function'||typeof sink.deliverResponse!=='function'||typeof toolModule.executeTool!=='function') throw Object.assign(new Error('Reviewed agent runtime module contract is incomplete.'),{code:'agent_runtime_contract_invalid'});
-  if(!input.resolveInputReady||!model.getModelAdapterReady||!sink.deliverResponseReady) throw Object.assign(new Error('Agent runtime providers must explicitly declare readiness.'),{code:'agent_runtime_not_ready'});
+  inputModule=await loadReviewed('agent-input','ATLAS_AGENT_INPUT_RESOLVER_MODULE');
+  modelModule=await loadReviewed('model-adapters','ATLAS_MODEL_ADAPTER_MODULE');
+  sinkModule=await loadReviewed('response-sinks','ATLAS_AGENT_RESPONSE_SINK_MODULE');
+  if(process.env.ATLAS_AGENT_TOOL_MODULE) toolModule=await loadReviewed('agent-tools','ATLAS_AGENT_TOOL_MODULE');
+  if(typeof inputModule.resolveInput!=='function'||typeof modelModule.getModelAdapter!=='function'||typeof sinkModule.deliverResponse!=='function'||typeof toolModule.executeTool!=='function') throw Object.assign(new Error('Reviewed agent runtime module contract is incomplete.'),{code:'agent_runtime_contract_invalid'});
+  if(!inputModule.resolveInputReady||!modelModule.getModelAdapterReady||!sinkModule.deliverResponseReady) throw Object.assign(new Error('Agent runtime providers must explicitly declare readiness.'),{code:'agent_runtime_not_ready'});
 }
 
 export const jobHandlers=Object.freeze(process.env.ATLAS_AGENT_TURN_EXECUTION_ENABLED==='true'
  ? {
     ...productionHandlers,
     'agent.turn.execute': createAgentTurnJobHandler({
-      resolveInput:(await loadReviewed('agent-input','ATLAS_AGENT_INPUT_RESOLVER_MODULE')).resolveInput,
-      getModelAdapter:(await loadReviewed('model-adapters','ATLAS_MODEL_ADAPTER_MODULE')).getModelAdapter,
-      tools:(await loadReviewed('agent-tools',process.env.ATLAS_AGENT_TOOL_MODULE||'ATLAS_AGENT_TOOL_MODULE')).agentTools||{},
-      executeTool:(await loadReviewed('agent-tools',process.env.ATLAS_AGENT_TOOL_MODULE||'ATLAS_AGENT_TOOL_MODULE')).executeTool,
-      deliverResponse:(await loadReviewed('response-sinks','ATLAS_AGENT_RESPONSE_SINK_MODULE')).deliverResponse
+      resolveInput:inputModule.resolveInput,
+      getModelAdapter:modelModule.getModelAdapter,
+      tools:toolModule.agentTools||{},
+      executeTool:toolModule.executeTool,
+      deliverResponse:sinkModule.deliverResponse
     })
   }
  : productionHandlers);
