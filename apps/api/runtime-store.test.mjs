@@ -215,9 +215,10 @@ test('V149 agent tool approvals are replay-safe and reject identity/status confl
       api.decideAgentToolApproval({actorId:actorA,tenantId:tenantA,approvalId,status:'denied'}),
       {code:'agent_approval_already_decided'}
     );
-    await assert.rejects(
-      api.requestAgentToolApproval({actorId:actorB,tenantId:tenantB,approvalId,sessionId,actionKey:'communications.send'}),
-      {code:'organization_not_found'}
+    assert.equal(
+      await api.requestAgentToolApproval({actorId:actorB,tenantId:tenantB,approvalId,sessionId,actionKey:'communications.send'}),
+      approvalId,
+      'the same opaque approval id is isolated per tenant scope'
     );
   } finally { await db.close(); }
 });
