@@ -92,7 +92,7 @@ export async function invokeModelTurn({ request, adapter, input, signal, onDelta
   rejectSecrets(input);
   const policy = normalizePolicy(request.modelPolicy || { provider: adapter.provider });
   const maxChars = policy.maxOutputChars;
-  const started = Number(now);
+  const started = Date.now();
   const abortController = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; abortController.abort(); }, policy.timeoutMs);
@@ -131,7 +131,7 @@ export async function invokeModelTurn({ request, adapter, input, signal, onDelta
       throw Object.assign(new Error('Model output exceeds response budget'), { code: 'MODEL_OUTPUT_LIMIT' });
     }
     if (request.responseMode === 'structured' && output != null) validateAgentOutput(output, request.outputSchema, { maxBytes: maxChars * 4 });
-    const latencyMs = Math.max(0, Number(now) >= started ? Number(now) - started : Date.now() - started);
+    const latencyMs = Math.max(0, Date.now() - started);
     return freeze({
       status: toolCalls.length ? 'tool_calls' : 'completed',
       output,
