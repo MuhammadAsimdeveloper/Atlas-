@@ -331,7 +331,6 @@ $$;
 REVOKE ALL ON FUNCTION atlas_v148_get_agent_input_for_job(UUID,UUID,TEXT,UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v148_create_agent_response_for_job(UUID,UUID,TEXT,UUID,TEXT) FROM PUBLIC;
 
-COMMIT;
     AND c.conversation_id=NULLIF(REPLACE(e.input_ref,'inbox:conversation:',''),'')::uuid
   JOIN LATERAL (
     SELECT m.message_id,m.sender_ref,m.recipient_ref,m.subject,m.content_ref
@@ -348,16 +347,11 @@ $$;
 
 
 REVOKE ALL ON atlas_agent_turn_executions FROM PUBLIC;
-REVOKE ALL ON FUNCTION atlas_v148_get_agent_turn_for_job(UUID,UUID,TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION atlas_v148_update_agent_turn_for_job(UUID,UUID,TEXT,UUID,INTEGER,TEXT,JSONB,TEXT,INTEGER,INTEGER,INTEGER,INTEGER,TEXT,TEXT,TEXT) FROM PUBLIC;
 
 
 
 
-REVOKE ALL ON FUNCTION atlas_v148_get_agent_input_for_job(UUID,UUID,TEXT,UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION atlas_v148_create_agent_response_for_job(UUID,UUID,TEXT,UUID,TEXT) FROM PUBLIC;
 
-COMMIT;
     AND c.conversation_id=NULLIF(REPLACE(e.input_ref,'inbox:conversation:',''),'')::uuid
   JOIN LATERAL (
     SELECT m.message_id,m.sender_ref,m.recipient_ref,m.subject,m.content_ref
@@ -373,16 +367,11 @@ $$;
 
 
 REVOKE ALL ON atlas_agent_turn_executions FROM PUBLIC;
-REVOKE ALL ON FUNCTION atlas_v148_get_agent_turn_for_job(UUID,UUID,TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION atlas_v148_update_agent_turn_for_job(UUID,UUID,TEXT,UUID,INTEGER,TEXT,JSONB,TEXT,INTEGER,INTEGER,INTEGER,INTEGER,TEXT,TEXT,TEXT) FROM PUBLIC;
 
 
 
 
-REVOKE ALL ON FUNCTION atlas_v148_get_agent_input_for_job(UUID,UUID,TEXT,UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION atlas_v148_create_agent_response_for_job(UUID,UUID,TEXT,UUID,TEXT) FROM PUBLIC;
 
-COMMIT;
     AND c.conversation_id=NULLIF(REPLACE(e.input_ref,'inbox:conversation:',''),'')::uuid
   JOIN LATERAL (
     SELECT m.message_id,m.sender_ref,m.recipient_ref,m.subject,m.content_ref
@@ -399,13 +388,5 @@ $$;
 
 
 REVOKE ALL ON atlas_agent_turn_executions FROM PUBLIC;
-REVOKE ALL ON FUNCTION atlas_v148_get_agent_turn_for_job(UUID,UUID,TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION atlas_v148_update_agent_turn_for_job(UUID,UUID,TEXT,UUID,INTEGER,TEXT,JSONB,TEXT,INTEGER,INTEGER,INTEGER,INTEGER,TEXT,TEXT,TEXT) FROM PUBLIC;
-
-
-
-
-REVOKE ALL ON FUNCTION atlas_v148_get_agent_input_for_job(UUID,UUID,TEXT,UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION atlas_v148_create_agent_response_for_job(UUID,UUID,TEXT,UUID,TEXT) FROM PUBLIC;
 
 COMMIT;
