@@ -151,6 +151,7 @@ const server = createServer(async (req, res) => {
     try {
       const body = await readFile(new URL(relativePath, import.meta.url));
       const headers = { ...securityHeaders(env, { html: contentType.startsWith('text/html') }), 'content-type': contentType, 'content-length': body.length, 'cache-control': contentType.startsWith('text/html') ? 'no-store' : 'public, max-age=300' };
+      if(url.pathname === '/copilot-widget.mjs'){ headers['cross-origin-resource-policy']='cross-origin'; headers['access-control-allow-origin']='*'; headers.vary='Origin'; }
       res.writeHead(200, headers);
       res.end(req.method === 'HEAD' ? undefined : body);
       return;
