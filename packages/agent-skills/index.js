@@ -8,7 +8,10 @@ const BUILTIN_SKILLS = [
   {id:'workflow-operator',name:'Workflow Operator',description:'Inspect, simulate and run approved production workflows.',tools:['workflow.run'],maxRisk:'write',approval:'write'},
   {id:'revenue-analyst',name:'Revenue Analyst',description:'Explain pipeline, revenue, usage and customer health without side effects.',tools:['analytics.funnel','revenue.usage'],maxRisk:'read',approval:'never'},
   {id:'knowledge-operator',name:'Knowledge Operator',description:'Ground answers in tenant knowledge and customer context.',tools:['knowledge.search'],maxRisk:'read',approval:'never'},
-  {id:'customer-operations',name:'Customer Operations',description:'Coordinate CRM, knowledge and workflow actions for customer lifecycle work.',tools:['crm.search','crm.company.search','crm.deals.search','knowledge.search','workflow.run'],maxRisk:'write',approval:'write'}
+  {id:'customer-operations',name:'Customer Operations',description:'Coordinate CRM, knowledge and workflow actions for customer lifecycle work.',tools:['crm.search','crm.company.search','crm.deals.search','knowledge.search','workflow.run'],maxRisk:'write',approval:'write'},
+  {id:'customer-support-agent',name:'Customer Support Agent',description:'Answer tenant customer questions from approved knowledge and hand off uncertain or sensitive requests.',tools:['knowledge.search','support.case.read','support.reply.draft'],maxRisk:'read',approval:'never'},
+  {id:'voice-agent-operator',name:'Voice Agent Operator',description:'Operate governed voice-agent sessions, handoffs and booking workflows without bypassing consent or disclosure.',tools:['knowledge.search','workflow.run'],maxRisk:'write',approval:'write'},
+  {id:'n8n-automation-operator',name:'Automation Operator',description:'Inspect, simulate and propose n8n-style workflows using bounded nodes, mappings, retries and approvals.',tools:['workflow.run'],maxRisk:'write',approval:'write'}
 ];
 const BUILTIN_IDS = new Set(BUILTIN_SKILLS.map(skill => skill.id));
 
