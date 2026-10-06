@@ -59,7 +59,7 @@ class RedisConnection{
         : net.createConnection({host:this.options.host,port:this.options.port});
       const fail=e=>{if(!this.connected)reject(e);for(const w of this.waiters.splice(0))w.reject(e);};
       s.once('error',fail);
-      s.once('connect',()=>resolve(s));
+      s.once(this.options.tls ? 'secureConnect' : 'connect',()=>resolve(s));
     });
     this.connected=true;
     this.socket.on('data',chunk=>this.#onData(chunk));
