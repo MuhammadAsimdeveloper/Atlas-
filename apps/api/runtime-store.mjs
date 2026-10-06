@@ -39,16 +39,16 @@ export class PostgresRuntimeStore {
     if (!UUID.test(jobId || '') || !/^[a-z][a-z0-9_.-]{1,79}$/.test(jobType || '') || !SHA256.test(idempotencyKey || '') || !Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 12) {
       throw createAuthError(400, 'runtime_job_invalid');
     }
-    return this.#tenantTransaction({ actorId, tenantId }, async client => {
+    const result = await this.#tenantTransaction({ actorId, tenantId }, async client => {
       const { rows } = await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7) AS job_id',
         [tenantId, jobId, jobType, JSON.stringify(payloadRef), idempotencyKey, runAt, maxAttempts]);
-      const result = rows[0].job_id;
-      if (this.dispatchWakeup) {
-        try { await this.dispatchWakeup.publish(jobType, { schema:1, tenantId, jobId, jobType, idempotencyKey }); }
-        catch { /* PostgreSQL remains authoritative; Redis is acceleration only. */ }
-      }
-      return result;
+      return rows[0].job_id;
     });
+    if (this.dispatchWakeup) {
+      try { await this.dispatchWakeup.publish(jobType, { schema:1, tenantId, jobId, jobType, idempotencyKey }); }
+      catch { /* PostgreSQL is authoritative; Redis is acceleration only. */ }
+    }
+    return result;
   }
 
   async createSchedule({ actorId, tenantId, scheduleId, jobType, payloadRef, idempotencyPrefix, nextRunAt, intervalSeconds = null, maxAttempts = 5 }) {
