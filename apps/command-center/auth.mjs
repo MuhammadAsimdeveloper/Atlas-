@@ -193,7 +193,7 @@ const unavailableReasons = {
 function openPanel(panel, module = null, title = null, navKey = null, search = null) {
   state.activePanel = panel;
   if (!navKey) navKey = ({overview:'overview',team:'team',settings:'settings',payments:'payments'})[panel] || null;
-  const views = ['overview','conversations','growth','team','settings','unavailable','payments'];
+  const views = ['overview','conversations','operations','growth','team','settings','unavailable','payments'];
   for (const view of views) $(`#${view}-panel`).hidden = view !== panel;
   const defaults = {
     overview: ['Dashboard','Workspace overview','Your workspace at a glance.'],
@@ -202,7 +202,8 @@ function openPanel(panel, module = null, title = null, navKey = null, search = n
     team: ['Team & access','Settings · workspace access','Invite teammates and manage tenant-scoped roles.'],
     settings: ['Settings','Settings · account and location','Manage your account and review what is connected.'],
     unavailable: [title || 'Unavailable','Workspace · service status','This module is not connected to a live workspace service.'],
-    payments: ['Payments','Grow · workspace billing','Review your workspace plan and Paddle subscription setup.']
+    payments: ['Payments','Grow · workspace billing','Review your workspace plan and Paddle subscription setup.'],
+    operations: ['Operations','Workspace · runtime health','Inspect durable execution and distributed worker wakeups.']
   };
   const [pageTitle, crumb, description] = defaults[panel] || defaults.unavailable;
   $('#page-title').textContent = pageTitle;
@@ -213,6 +214,7 @@ function openPanel(panel, module = null, title = null, navKey = null, search = n
   $('#workspace-nav').classList.remove('nav-expanded');
   $('#mobile-nav-toggle').setAttribute('aria-expanded','false');
   if (panel === 'conversations') loadInbox();
+  else if (panel === 'operations') loadOperations();
   else if (panel === 'team') loadTeam();
   else if (panel === 'growth') {
     if (search !== null) $('#growth-search').value = search;
@@ -228,6 +230,28 @@ function openPanel(panel, module = null, title = null, navKey = null, search = n
   }
 }
 
+async function loadOperations() {
+  try {
+    const result = await request('/operations/runtime');
+    const counts = result.counts || {};
+    const queued = Number(counts.queued_jobs || 0);
+    const running = Number(counts.running_jobs || 0);
+    const dead = Number(counts.dead_jobs || counts.dead_letter_jobs || 0);
+    $('#ops-queued').textContent = String(queued);
+    $('#ops-running').textContent = String(running);
+    $('#ops-dead').textContent = String(dead);
+    $('#ops-redis').textContent = result.distributedWakeup ? 'Enabled' : 'Fallback';
+    $('#ops-release').textContent = 'Atlas ' + (result.release || 'unknown');
+    $('#operations-status').textContent = dead > 0 ? 'Attention required' : 'Healthy';
+    $('#ops-detail').textContent = dead > 0
+      ? `${dead} job${dead === 1 ? '' : 's'} are in a dead-letter state and should be reviewed.`
+      : `Queue depth is ${queued}; ${running} job${running === 1 ? '' : 's'} currently hold execution leases.`;
+  } catch (error) {
+    $('#operations-status').textContent = 'Unavailable';
+    $('#ops-detail').textContent = error.message;
+  }
+}
+
 function openNavButton(button) {
   const page = button.dataset.navPage;
   const title = button.dataset.pageTitle || null;
@@ -235,6 +259,7 @@ function openNavButton(button) {
   if (page === 'growth') openPanel('growth',button.dataset.module || 'contacts',title,key);
   else if (page === 'conversations') openPanel('conversations',null,title,key);
   else if (page === 'payments') openPanel('payments',null,'Payments',key);
+  else if (page === 'operations') openPanel('operations',null,title,key);
   else openPanel(page || 'overview',null,title,key);
 }
 
@@ -283,6 +308,7 @@ $('#global-search').addEventListener('keydown', event => {
   openPanel('growth','contacts','Contacts','contacts',query);
 });
 
+$('#operations-refresh').addEventListener('click',loadOperations);
 $('#inbox-refresh').addEventListener('click',loadInbox);
 $('#inbox-status-filter').addEventListener('change',loadInbox);
 $('#inbox-channel-filter').addEventListener('change',loadInbox);
