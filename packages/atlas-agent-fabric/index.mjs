@@ -132,7 +132,7 @@ export function planAgentTurn({
     promptHash, toolCalls:normalizedTools, approvalRefs:approvals, workflowInvocationRef,
     journeyContext, rawPromptStored:false, plannedAt:new Date(current).toISOString()
   };
-  const idempotencyKey=sha(snapshot);
+  const idempotencyKey=sha({tenantId,sessionId,turnId,releaseId:agentRelease.releaseId,releaseVersion:agentRelease.version,promptHash,toolCalls:normalizedTools,approvalRefs:approvals,workflowInvocationRef,contextHash:journeyContext.contextHash});
   return freeze({ ...snapshot, planId:uuidFromHash({tenantId,sessionId,turnId,releaseId:agentRelease.releaseId}), idempotencyKey });
 }
 
