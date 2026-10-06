@@ -72,11 +72,15 @@ export function createAgentReleaseManifest({
   rejectRawObject(modelPolicy, 'modelPolicy');
   if (!modelPolicy || typeof modelPolicy !== 'object' || Array.isArray(modelPolicy)) throw new TypeError('modelPolicy must be an object');
   const provider = modelPolicy.provider == null ? 'model_adapter' : boundedText(modelPolicy.provider, 'model provider', 80);
+  const model = modelPolicy.model == null ? null : boundedText(modelPolicy.model, 'model name', 160);
+  const credentialRef = modelPolicy.credentialRef == null ? null : boundedText(modelPolicy.credentialRef, 'model credentialRef', 180);
   for (const [key,min,max] of [['maxInputTokens',256,32000],['maxOutputTokens',64,12000],['timeoutMs',1000,120000]]) {
     if (!Number.isSafeInteger(modelPolicy[key] ?? (key === 'maxInputTokens' ? 4000 : key === 'maxOutputTokens' ? 1200 : 30000)) || (modelPolicy[key] ?? (key === 'maxInputTokens' ? 4000 : key === 'maxOutputTokens' ? 1200 : 30000)) < min || (modelPolicy[key] ?? (key === 'maxInputTokens' ? 4000 : key === 'maxOutputTokens' ? 1200 : 30000)) > max) throw new TypeError(key + ' is outside policy bounds');
   }
   const normalizedPolicy = {
     provider,
+    model,
+    credentialRef,
     maxInputTokens:modelPolicy.maxInputTokens ?? 4000,
     maxOutputTokens:modelPolicy.maxOutputTokens ?? 1200,
     timeoutMs:modelPolicy.timeoutMs ?? 30000
@@ -129,6 +133,17 @@ export function planAgentTurn({
   const current = timestamp(now,'now');
   const snapshot = {
     tenantId, sessionId, turnId, releaseId:agentRelease.releaseId, releaseVersion:agentRelease.version,
+    releaseSnapshot: {
+      tenantId: agentRelease.tenantId,
+      agentId: agentRelease.agentId,
+      releaseId: agentRelease.releaseId,
+      version: agentRelease.version,
+      status: agentRelease.status,
+      allowedTools: agentRelease.allowedTools,
+      modelPolicy: agentRelease.modelPolicy,
+      systemPromptHash: agentRelease.systemPromptHash,
+      checksum: agentRelease.checksum
+    },
     promptHash, toolCalls:normalizedTools, approvalRefs:approvals, workflowInvocationRef,
     journeyContext, rawPromptStored:false, plannedAt:new Date(current).toISOString()
   };

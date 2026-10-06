@@ -16,6 +16,7 @@ import {
   createMcpServerManifest,
   authorizeMcpToolCall,
   createAiWorkflowProposal,
+  createAiWorkflowAuthoringPlan,
   auditWorkflowSecurity
 } from './index.mjs';
 import { WORKFLOW_NODE_CATALOG } from '../atlas-target/workflow-catalog.mjs';
@@ -225,4 +226,53 @@ test('V146 workflow security audit catches risky nodes and unprotected inbound t
   assert.equal(report.status, 'blocked');
   assert.ok(report.findings.some(finding => /url|network/i.test(finding.code)));
   assert.ok(report.findings.some(finding => /approval|financial/i.test(finding.code)));
+});
+
+test('V148 AI workflow authoring plan asks for missing facts before generating a production mutation', () => {
+  const plan=createAiWorkflowAuthoringPlan({
+    tenantId:TENANT,requestedByActorId:ACTOR,
+    businessGoal:'Qualify inbound leads and book qualified meetings.',
+    knownFacts:{},
+    candidateNodes:['trigger','invoke_agent','approval','book_appointment']
+  });
+  assert.equal(plan.status,'needs_clarification');
+  assert.ok(plan.missingFacts.length >= 3);
+  assert.equal(plan.productionMutation,false);
+  assert.equal(plan.proposal.status,'proposal_only');
+});
+test('V148 AI workflow authoring plan becomes preview-ready when required facts are present', () => {
+  const plan=createAiWorkflowAuthoringPlan({
+    tenantId:TENANT,requestedByActorId:ACTOR,
+    businessGoal:'Qualify inbound leads and book qualified meetings.',
+    knownFacts:{trigger:'form.submitted',audience:'new leads',success:'appointment booked',failure:'handoff'},
+    candidateNodes:['trigger','invoke_agent','approval','book_appointment']
+  });
+  assert.equal(plan.status,'ready_for_preview');
+  assert.equal(plan.missingFacts.length,0);
+  assert.equal(plan.productionMutation,false);
+  assert.ok(plan.diffRef.startsWith('draft_'));
+});
+
+test('V148 safe data mapping supports allowlisted transforms and forbids code/network paths', async () => {
+  const { validateDataMapping, applyDataMapping } = await import('./safe-data-mapping.mjs');
+  const mapping=validateDataMapping({mapping:[
+    {source:'input.customer.email',target:'contact.email',transform:'lowercase'},
+    {source:'input.customer.tags',target:'contact.tags_text',transform:'join',args:[' | ']},
+    {source:'input.customer.score',target:'lead.score',transform:'number'}
+  ]});
+  const output=applyDataMapping({mapping,context:{input:{customer:{email:'Lead@Example.COM',tags:['a','b'],score:'42'}}}});
+  assert.equal(output.contact.email,'lead@example.com');
+  assert.equal(output.contact.tags_text,'a | b');
+  assert.equal(output.lead.score,42);
+  assert.throws(()=>validateDataMapping({mapping:[{source:'input.secret.token',target:'contact.token',transform:'identity'}]}),/reserved|allowlisted/i);
+  assert.throws(()=>validateDataMapping({mapping:[{source:'input.customer.name',target:'contact.name',transform:'eval'}]}),/unsupported/i);
+  assert.throws(()=>validateDataMapping({mapping:[{source:'input.customer.name',target:'contact.name',transform:'identity'},{source:'input.customer.email',target:'contact.name',transform:'identity'}]}),/unique/i);
+});
+
+test('V148 edit-fields workflow node is backed by the safe mapping validator', () => {
+  assert.doesNotThrow(() => createAiWorkflowProposal({
+    tenantId:TENANT, requestedByActorId:ACTOR,
+    prompt:'Normalize a contact email before updating the CRM.',
+    candidateNodes:['edit_fields']
+  }));
 });

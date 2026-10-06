@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '147.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '148.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143']) {
@@ -281,10 +281,24 @@ try {
 
   const agentFabric = await read('packages/atlas-agent-fabric/index.mjs');
   const agentFabricTests = await read('packages/atlas-agent-fabric/index.test.mjs');
+  const agentTurnTests = await read('packages/atlas-agent-fabric/turn-runtime.test.mjs');
+  const agentWorker = await read('apps/worker/agent-turn-handler.mjs');
+  const agentWorkerTests = await read('apps/worker/agent-turn-handler.test.mjs');
   const agentMigration = await read('infra/postgres/FINAL-MIGRATION-V147.sql');
   const agentGrants = await read('infra/postgres/API-ROLE-GRANTS-V147.sql');
   check('V147 agent journey runtime', agentFabric.includes('createAgentReleaseManifest') && agentFabric.includes('planAgentTurn') && agentFabric.includes('authorizeAgentWorkflowInvocation') && agentFabric.includes('createHumanHandoff'), agentFabricTests.includes('V147 agent turn planning') && agentMigration.includes('atlas_agent_turn_plans') && agentMigration.includes('atlas_agent_handoffs') && agentMigration.includes('FORCE ROW LEVEL SECURITY') && agentGrants.includes('atlas_app'), 'Agent release/session context, turn planning, workflow invocation authorization and handoffs are reference-only and persisted under tenant RLS.');
   check('V147 agent API/runtime store', await read('apps/api/growth-routes.mjs').then(x => x.includes('/api/v1/growth/agents/turns/plan') && x.includes('/api/v1/growth/agents/workflow-invocations/authorize') && x.includes('/api/v1/growth/agents/handoffs')) && await read('apps/api/runtime-store.mjs').then(x => x.includes('recordAgentTurnPlan') && x.includes('recordAgentHandoff') && x.includes('getAgentSession')), 'Agent turn plans and handoffs are connected to the authenticated API and durable runtime store.');
+  const v148Model = await read('packages/atlas-agent-fabric/model-runtime.mjs');
+  const v148Turn = await read('packages/atlas-agent-fabric/turn-runtime.mjs');
+  const v148Timeline = await read('packages/atlas-agent-fabric/execution-timeline.mjs');
+  const v148Migration = await read('infra/postgres/FINAL-MIGRATION-V148.sql');
+  const v148Grants = await read('infra/postgres/API-ROLE-GRANTS-V148.sql');
+  const v148Gap = await read('docs/ATLAS-GAP-REGISTER-V148-2026-10.md');
+  const v148Mapping = await read('packages/atlas-automation-fabric/safe-data-mapping.mjs');
+  const v148Automation = await read('packages/atlas-automation-fabric/index.mjs');
+  check('V148 governed agent model runtime', v148Model.includes('createModelAdapter') && v148Model.includes('invokeModelTurn') && v148Model.includes('rawPromptStored: false') && v148Turn.includes('authorizeAgentToolCall') && v148Turn.includes('consumeAgentBudget'), (agentFabricTests.includes('V148') || agentTurnTests.includes('V148')) && agentWorker.includes('createAgentTurnJobHandler') && agentWorkerTests.includes('V148') && v148Migration.includes('atlas_agent_turn_executions') && v148Migration.includes('atlas_v148_get_agent_turn_for_job') && v148Grants.includes('atlas_worker'), 'Agent model inference, bounded streaming, tool approval, tenant isolation and durable worker state are connected with explicit secret/content redaction.');
+  check('V148 agent observability and authoring', v148Timeline.includes('exportAgentTimeline') && v148Turn.includes('appendAgentTimelineEvent') && v148Automation.includes('createAiWorkflowAuthoringPlan') && await read('apps/api/growth-routes.mjs').then(x => x.includes('/api/v1/growth/agents/turns/execute') && x.includes('/api/v1/growth/agents/turns') && x.includes('/api/v1/growth/automation/ai-plan')), v148Gap.includes('V148 delivered') && await read('scripts/mirofish-check.mjs').then(x => x.includes('agent model schema safety') && x.includes('agent durable evidence is redacted')), 'Operator-visible agent debugging and plan-first workflow authoring exist as bounded, draft/feature-gated capabilities without autonomous production mutation.');
+  check('V148 n8n-safe data mapping', v148Mapping.includes('validateDataMapping') && v148Mapping.includes('applyDataMapping') && v148Automation.includes("node.type === 'edit_fields'") && v148Automation.includes('validateDataMapping'), 'Workflow edit-fields mapping is allowlisted, declarative and rejects reserved/code/network paths.');
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
 }

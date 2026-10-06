@@ -197,3 +197,27 @@ test('V138 runtime capacity is globally bounded, lease-owned and recoverable', a
     await db.close();
   }
 });
+
+
+test('V149 agent tool approvals are replay-safe and reject identity/status conflicts', async () => {
+  const { db, api } = await database();
+  const approvalId=randomUUID(), sessionId=randomUUID();
+  try {
+    assert.equal(await api.requestAgentToolApproval({actorId:actorA,tenantId:tenantA,approvalId,sessionId,actionKey:'communications.send'}),approvalId);
+    assert.equal(await api.requestAgentToolApproval({actorId:actorA,tenantId:tenantA,approvalId,sessionId,actionKey:'communications.send'}),approvalId,'identical replay must be idempotent');
+    await assert.rejects(
+      api.requestAgentToolApproval({actorId:actorA,tenantId:tenantA,approvalId,sessionId,actionKey:'finance.charge'}),
+      {code:'agent_approval_identity_conflict'}
+    );
+    assert.equal(await api.decideAgentToolApproval({actorId:actorB,tenantId:tenantA,approvalId,status:'approved'}),approvalId);
+    assert.equal(await api.decideAgentToolApproval({actorId:actorB,tenantId:tenantA,approvalId,status:'approved'}),approvalId,'identical decision replay must be idempotent');
+    await assert.rejects(
+      api.decideAgentToolApproval({actorId:actorB,tenantId:tenantA,approvalId,status:'denied'}),
+      {code:'agent_approval_already_decided'}
+    );
+    await assert.rejects(
+      api.requestAgentToolApproval({actorId:actorB,tenantId:tenantB,approvalId,sessionId,actionKey:'communications.send'}),
+      {code:'organization_not_found'}
+    );
+  } finally { await db.close(); }
+});

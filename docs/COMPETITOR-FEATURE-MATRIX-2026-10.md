@@ -1,6 +1,9 @@
-# HighLevel and n8n feature inventory vs Atlas V126 — 5 October 2026
+# HighLevel and n8n feature inventory vs Atlas V148 — 6 October 2026
 
-This is a current, source-linked inventory of the products' major user-facing and platform capability families, compared with the actual Atlas V116 repository, including authenticated Growth Center, Paddle billing routes, workspace UI, durable queue/scheduler foundation and visual workflow authoring. It is not an exhaustive list of every vendor integration, UI control, plan limit or newly released feature. HighLevel's permission catalog covers 80+ controllable features and its workflow catalogs change; n8n's integration catalog is a changing set of hundreds of first-party/community integrations. Those catalogs are dynamic, so Atlas records the stable product areas and representative operations rather than pretending a static feature list proves connector parity.
+This is a current, source-linked inventory of the products' major user-facing and platform capability families, compared with the actual Atlas V148 repository, including authenticated Growth Center, Paddle billing routes, workspace UI, durable queue/scheduler foundation and visual workflow authoring. It is not an exhaustive list of every vendor integration, UI control, plan limit or newly released feature. HighLevel's permission catalog covers 80+ controllable features and its workflow catalogs change; n8n's integration catalog is a changing set of hundreds of first-party/community integrations. Those catalogs are dynamic, so Atlas records the stable product areas and representative operations rather than pretending a static feature list proves connector parity.
+> **V148 update:** The repository now includes a governed model/agent turn runtime, redacted execution timeline, durable agent-turn execution state and plan-first AI workflow authoring. The feature matrix below intentionally retains historical comparison notes; use the [V148 gap register](ATLAS-GAP-REGISTER-V148-2026-10.md) as the current completion ledger.
+
+
 
 ## How to read Atlas coverage
 
