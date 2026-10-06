@@ -161,8 +161,9 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
   async function publicHistory(req,res,claims){
     const o=origin(req);
     const state=(await pool.query('SELECT * FROM atlas_v153_public_state($1,$2,NULL)',[claims.tenantId,claims.sessionId])).rows;
-    const items=[];
+    const items=[]; const seen=new Set();
     for(const row of state){
+      if(seen.has(row.message_id)) continue; seen.add(row.message_id);
       if(!row.message_id)continue;
       const content=await inboxContentStore.getMessageContent({tenantId:claims.tenantId,messageId:row.message_id,contentRef:row.content_ref});
       items.push({messageId:row.message_id,direction:row.message_direction,createdAt:row.created_at,text:content?.text||'',executionId:row.execution_id||null,status:row.execution_status||null});
