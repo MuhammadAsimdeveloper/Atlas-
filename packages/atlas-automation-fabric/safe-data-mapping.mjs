@@ -7,7 +7,7 @@ const REF= /^[A-Za-z0-9][A-Za-z0-9_.:-]{2,180}$/;
 function bounded(value,label,max=120){if(typeof value!=='string'||!value.trim()||value.length>max||/[\r\n\u0000]/.test(value))throw new TypeError(label+' is invalid');return value.trim();}
 function freeze(value){if(value&&typeof value==='object'&&!Object.isFrozen(value)){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;}
 function pathParts(value,label,pattern){const path=bounded(value,label);if(!pattern.test(path))throw new TypeError(label+' must use an allowlisted path');const parts=path.split('.');if(parts.some(part=>RESERVED.has(part)))throw new TypeError(label+' references a reserved field');return parts;}
-function getPath(root,parts){let value=root;for(const part of parts.slice(1)){if(value==null)return undefined;if(typeof value!=='object')return undefined;value=value[part];}return value;}
+function getPath(root,parts){let value=root?.[parts[0]];for(const part of parts.slice(1)){if(value==null)return undefined;if(typeof value!=='object')return undefined;value=value[part];}return value;}
 function transformValue(value,transform,args=[]){
  switch(transform){
   case 'identity': return value;
