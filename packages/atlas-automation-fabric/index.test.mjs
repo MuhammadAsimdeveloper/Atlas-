@@ -169,7 +169,7 @@ test('V146 workflow templates are tenant-scoped, versioned and scrub customer re
     id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     name: 'Lead nurture',
     version: 2,
-    graph: { nodes: [{ id: 't1', type: 'trigger', config: { eventType: 'form.submitted' } }, { id: 't2', type: 'create_contact', config: { contactRef: 'CUSTOMER_REF_PLACEHOLDER' } }], edges: [{ id: 'e1', from: 't1', to: 't2', port: 'next' }] }
+    graph: { nodes: [{ id: 't1', type: 'trigger', config: { eventType: 'form.submitted' } }, { id: 't2', type: 'execution_data', config: { key: 'customer_ref', value: 'CUSTOMER_REF_PLACEHOLDER' } }], edges: [{ id: 'e1', from: 't1', to: 't2', port: 'next' }] }
   });
   const instance = instantiateWorkflowTemplate({ template, tenantId: TENANT, workflowId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', substitutions: { CUSTOMER_REF_PLACEHOLDER: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' } });
   assert.equal(instance.templateVersion, 2);
