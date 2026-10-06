@@ -16,7 +16,7 @@ export const N8N_PARITY_FEATURES = Object.freeze([
   'manual_trigger','webhook_trigger','schedule_trigger','form_trigger','chat_trigger',
   'if','switch','merge','loop_over_items','split_out','aggregate','filter','sort','remove_duplicates','edit_fields',
   'wait','error_trigger','stop_and_error','no_op','respond_to_webhook',
-  'execute_subworkflow','execution_filters','retry_execution','execution_data','data_table',
+  'execute_subworkflow','sub_workflow','execution_filters','retry_execution','execution_data','data_table',
   'workflow_templates','workflow_sharing','source_control_environments','credential_scoping',
   'ai_workflow_builder','human_in_the_loop','mcp','security_audit','bounded_http','safe_code_transform'
 ]);
@@ -107,7 +107,9 @@ export function validateAutomationNode({ tenantId, node } = {}) {
   if (node.type === 'execute_command') throw new Error('execute_command is disabled in Atlas automation');
   if (!WORKFLOW_NODE_CATALOG[node.type]) throw new Error('Unsupported workflow node: ' + node.type);
   const findings = scanUnsafe(node.config || {});
-  if (node.type === 'http_request' && findings.some(item => item.code === 'DIRECT_NETWORK_TARGET')) throw new Error('http_request requires a connector-scoped operation, not a direct URL');
+  const fieldName = value => value.split('.').at(-1);
+  const networkTargetFinding = Object.keys(node.config || {}).some(key => DIRECT_TARGET_KEY.test(key)) || findings.some(item => item.code === 'DIRECT_NETWORK_TARGET' && DIRECT_TARGET_KEY.test(fieldName(item.path)));
+  if (node.type === 'http_request' && networkTargetFinding) throw new Error('http_request requires a connector-scoped operation, not a direct URL');
   if (node.type === 'code_transform' && findings.some(item => item.code === 'EXECUTABLE_OR_NETWORK_PAYLOAD')) throw new Error('code_transform accepts declarative expressions only');
   if (findings.some(item => item.code === 'SECRET_LIKE_FIELD')) throw new Error('Workflow config contains secret-like fields');
   if (node.type === 'loop_over_items') {
@@ -182,13 +184,13 @@ export function createWorkflowEnvironment({ tenantId, id, name, stage, protected
   return freeze({ ...body, checksum:sha256(body) });
 }
 
-export function planEnvironmentPromotion({ tenantId, source, target, workflowId, workflowVersion, manifestSha256, approvedByActorId, sourceChangedAfterApproval = true } = {}) {
+export function planEnvironmentPromotion({ tenantId, source, target, workflowId, workflowVersion, manifestSha256, approvedByActorId, approvalRef = null, sourceChangedAfterApproval = true } = {}) {
   ref(tenantId, 'tenantId'); ref(workflowId, 'workflowId');
   if (!source || !target || source.tenantId !== tenantId || target.tenantId !== tenantId) return { status:'blocked', code:'TENANT_MISMATCH' };
   if (source.stage === 'production') return { status:'blocked', code:'INVALID_SOURCE_STAGE' };
   if (target.stage !== 'production' || target.protected !== true) return { status:'blocked', code:'PRODUCTION_TARGET_MUST_BE_PROTECTED' };
   if (!HASH.test(manifestSha256 || '')) return { status:'blocked', code:'MANIFEST_REQUIRED' };
-  if (!approvedByActorId || approvedByActorId === tenantId || approvedByActorId === source.ownerActorId) return { status:'blocked', code:'APPROVAL_REQUIRED' };
+  if (!approvedByActorId || approvedByActorId === tenantId || approvedByActorId === source.ownerActorId || !approvalRef || typeof approvalRef !== 'string' || approvalRef.length < 8 || approvalRef.length > 180) return { status:'blocked', code:'APPROVAL_REQUIRED' };
   if (sourceChangedAfterApproval) return { status:'blocked', code:'SOURCE_CHANGED_AFTER_APPROVAL' };
   const body = { tenantId, workflowId, workflowVersion, sourceEnvironmentId:source.id, targetEnvironmentId:target.id, manifestSha256, approvedByActorId };
   return freeze({ status:'ready', promotionId:'promotion_' + sha256(body).slice(0,24), ...body, checksum:sha256(body) });
@@ -281,7 +283,7 @@ export function auditWorkflowSecurity({ tenantId, workflow } = {}) {
   for (const node of workflow?.nodes || []) {
     if (node.type === 'http_request' && node.config?.url) findings.push({ code:'DIRECT_NETWORK_URL', severity:'critical', nodeId:node.id });
     if (node.risk === 'financial' || node.risk === 'destructive' || node.requiresApproval) {
-      if (node.config?.approvalRequired !== true && node.requiresApproval !== true) findings.push({ code:'HIGH_RISK_APPROVAL_MISSING', severity:'high', nodeId:node.id });
+      if (node.config?.approvalPolicyRef == null) findings.push({ code:'HIGH_RISK_APPROVAL_MISSING', severity:'high', nodeId:node.id });
     }
     if (node.type === 'trigger' && node.config?.eventType === 'webhook.received' && node.config?.verificationMode !== 'signed') {
       findings.push({ code:'UNPROTECTED_WEBHOOK', severity:'high', nodeId:node.id });
