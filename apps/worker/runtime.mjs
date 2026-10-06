@@ -157,6 +157,8 @@ export class AtlasQueueWorker {
     }
   }
 
+  wakeNow() { this.wake?.(); }
+
   async run() {
     if (!this.jobHandlers.size && !this.eventHandlers.size) throw new Error('No Atlas execution or outbox handlers are registered; worker refuses to claim work.');
     while (!this.stopping) {
