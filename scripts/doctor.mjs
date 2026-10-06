@@ -11,7 +11,16 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '150.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '151.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  const nodeRuntime = await read('packages/atlas-automation-fabric/node-runtime.mjs');
+  const nodeRuntimeTests = await read('packages/atlas-automation-fabric/node-runtime.test.mjs');
+  const supportRuntime = await read('packages/atlas-copilot/support-runtime.mjs');
+  const supportTests = await read('packages/atlas-copilot/support-runtime.test.mjs');
+  const voiceTurn = await read('packages/atlas-agent-fabric/voice-turn-runtime.mjs');
+  const voiceTurnTests = await read('packages/atlas-agent-fabric/voice-turn-runtime.test.mjs');
+  check('V151 hardened n8n node runtime', nodeRuntime.includes('executeN8nNode') && nodeRuntime.includes('loop_over_items') && nodeRuntime.includes('split_out') && nodeRuntime.includes('edit_fields') && nodeRuntime.includes('stop_and_error') && !nodeRuntime.includes('execute_command') && nodeRuntimeTests.includes('V151'), 'n8n-style collection, branching, waiting and execution-data nodes have bounded deterministic runtime handlers; connector/AI side effects fail closed.');
+  check('V151 customer support Copilot', supportRuntime.includes('runCustomerSupportTurn') && supportRuntime.includes('createSupportTrainingExample') && supportRuntime.includes('buildSupportTrainingPack') && supportRuntime.includes('groundingRefs') && supportRuntime.includes('rawMessageStored:false') && supportTests.includes('V151'), 'Customer support Copilot uses tenant knowledge grounding, confidence/handoff policy and a redacted evaluation curriculum without storing raw transcripts.');
+  check('V151 hardened AI voice agent', voiceTurn.includes('authorizeVoiceConnection') && voiceTurn.includes('AI_DISCLOSURE_REQUIRED') && voiceTurn.includes('VOICE_CONSENT_REQUIRED') && voiceTurn.includes('runVoiceAgentTurn') && voiceTurnTests.includes('V151'), 'Voice agents require disclosure/consent, bound transfers and interruption budgets, and keep transcripts reference-only.');
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143']) {
