@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import {
   authorizeAgentToolCall,
   consumeAgentBudget,
@@ -5,7 +6,6 @@ import {
   validateAgentOutput
 } from '../atlas-target/index.mjs';
 import {
-  createAgentReleaseManifest,
   buildAgentJourneyContext,
   createHumanHandoff
 } from './index.mjs';
@@ -34,7 +34,7 @@ function rejectSecrets(value, path = 'runtimeInput') {
 function releaseValid(release, tenantId) {
   if (!release || release.tenantId !== tenantId || typeof release.checksum !== 'string') return false;
   const { checksum, ...body } = release;
-  const actual = require('node:crypto').createHash('sha256').update(JSON.stringify(canonical(body))).digest('hex');
+  const actual = crypto.createHash('sha256').update(JSON.stringify(canonical(body))).digest('hex');
   return actual === checksum;
 }
 function canonical(value) {
@@ -42,7 +42,7 @@ function canonical(value) {
   if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(k => [k, canonical(value[k])]));
   return value;
 }
-function sha(value) { return require('node:crypto').createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex'); }
+function sha(value) { return crypto.createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex'); }
 
 export async function runAgentTurn({
   tenantId, actorId, release, session, runtime = null, turnId, promptHash, runtimeInput,
