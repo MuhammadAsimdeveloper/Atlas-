@@ -40,8 +40,8 @@ function rejectSecrets(value, path = 'input') {
 function requestChecksum(body) { return sha(body); }
 function verifyRequest(request) {
   if (!request || typeof request !== 'object' || typeof request.checksum !== 'string') return false;
-  const { checksum, ...body } = request;
-  return HASH.test(checksum) && requestChecksum(body) === checksum;
+  const { checksum, idempotencyKey, ...body } = request;
+  return HASH.test(checksum) && HASH.test(idempotencyKey) && sha(body) === checksum && sha(body) === sha(Object.fromEntries(Object.entries(request).filter(([key]) => !['checksum','idempotencyKey'].includes(key))));
 }
 function normalizePolicy(policy = {}) {
   const maxOutputChars = policy.maxOutputChars ?? Math.min(Math.max((policy.maxOutputTokens ?? 1200) * 4, 256), 20000);
