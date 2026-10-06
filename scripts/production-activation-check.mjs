@@ -12,7 +12,7 @@ const adapters=await read('apps/worker/provider-adapters.mjs');
 const integration=await read('apps/worker/integration-runtime.mjs');
 const security=await read('apps/api/security.mjs');
 const ci=await read('.github/workflows/ci.yml');
-check('release metadata is aligned',pkg.version==='147.0.0'&&env.includes('ATLAS_RELEASE=V147'),'Package and environment release identifiers agree.');
+check('release metadata is aligned',pkg.version==='148.0.0'&&env.includes('ATLAS_RELEASE=V148'),'Package and environment release identifiers agree.');
 check('production secrets are explicit',['ATLAS_DATABASE_URL','ATLAS_SESSION_SECRET','ATLAS_PLATFORM_OWNER_EMAIL','ATLAS_HEALTH_TOKEN','ATLAS_INBOX_CONTENT_MODULE','ATLAS_WEBHOOK_SECRET_RESOLVER_MODULE','ATLAS_WORKFLOW_EVENT_INGRESS_ENABLED'].every(k=>env.includes(k)),'Critical production configuration keys are declared.');
 check('provider runtime is fail-closed',adapters.includes('assertSafeProviderUrl')&&adapters.includes('validateProviderAdapter')&&integration.includes('executeWithRetry'),'Provider calls require validated destinations and bounded retries.');
 check('API security boundary is wired',api.includes('securityHeaders')&&security.includes('enforceRateLimit')&&security.includes('clientIdentity')&&api.includes('ATLAS_TRUST_PROXY'),'API security headers, rate limiting and trusted-proxy client identity are wired.');
@@ -25,6 +25,9 @@ const automation=await read('packages/atlas-automation-fabric/index.mjs');
 check('V146 hardened automation fabric is wired',automation.includes('createAutomationPolicy')&&automation.includes('createApprovalRequest')&&automation.includes('auditWorkflowSecurity')&&automation.includes('createMcpServerManifest'),'n8n-inspired automation features are governed by bounded execution, approvals, MCP capabilities and workflow security audit contracts.');
 const agentFabric=await read('packages/atlas-agent-fabric/index.mjs');
 check('V147 agent journey runtime is wired',agentFabric.includes('planAgentTurn')&&agentFabric.includes('createHumanHandoff')&&agentFabric.includes('authorizeAgentWorkflowInvocation'),'Agent turns, workflow calls and human handoffs are governed by release, tenant and redaction controls.');
+const agentRuntime=await read('packages/atlas-agent-fabric/model-runtime.mjs');
+const turnRuntime=await read('packages/atlas-agent-fabric/turn-runtime.mjs');
+check('V148 governed model/turn runtime is wired',agentRuntime.includes('createModelRequest')&&agentRuntime.includes('invokeModelTurn')&&turnRuntime.includes('runAgentTurn'),'V148 model requests, bounded model invocation and governed turn execution are wired.');
 check('V139-V143 distributed fabric is wired',fabric.includes('RedisTransport')&&fabric.includes('computeScaleDecision')&&fabric.includes('evaluateFailover')&&fabric.includes('buildOtlpSpan')&&fabric.includes('deploymentReadiness'),'Distributed dispatch, autoscaling, failover, OTLP and deployment gates are present without claiming external infrastructure is live.');
 
 check('CI has bounded permissions',ci.includes('permissions:')&&ci.includes('contents: read'),'CI uses explicit least-privilege permissions.');
