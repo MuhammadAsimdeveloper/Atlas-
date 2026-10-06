@@ -46,7 +46,7 @@ export function executeN8nNode({tenantId,node,input=[],context={},policy={},now=
     case 'wait': case 'delay': {const waitMs=int(config.waitMs??config.delayMs??1000,'waitMs',1000,30*24*60*60_000);return {items:clone(items),control:{status:'waiting',resumeAt:new Date(Number(now)+waitMs).toISOString(),waitMs}};}
     case 'stop_and_error': {const errorCode=String(config.errorCode||'workflow.stopped');if(!/^[a-z][a-z0-9_.-]{2,79}$/.test(errorCode))throw new TypeError('invalid errorCode');return {items:[],control:{status:'failed',errorCode,retryable:config.retryable===true}};}
     case 'error_trigger': {const errorRef=ref(config.errorRef||context.errorRef,'errorRef');return {items:[{errorRef}],control:{status:'continue'}};}
-    case 'execution_data': {const key=String(config.key||'value');return {items:items.map(item=>({...item,executionData:{[key]:config.value??null}}),control:{status:'continue'}};}
+    case 'execution_data': {const key=String(config.key||'value');return {items:items.map(item=>({...item,executionData:{[key]:config.value??null}})),control:{status:'continue'}};}
     default: throw new Error('N8N node runtime does not execute connector/AI side effects: '+type);
   }
 }
