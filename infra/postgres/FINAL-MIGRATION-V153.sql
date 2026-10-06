@@ -72,36 +72,30 @@ CREATE POLICY atlas_v153_copilot_stream_tenant ON atlas_v153_copilot_stream_even
   WITH CHECK (tenant_id = nullif(current_setting('app.tenant_id',true),'')::uuid);
 
 CREATE OR REPLACE FUNCTION atlas_v153_create_public_session(
-  p_widget_key TEXT,
-  p_session_id UUID,
-  p_customer_ref TEXT,
-  p_expires_at TIMESTAMPTZ,
-  p_origin TEXT DEFAULT NULL
-) RETURNS TABLE(
-  tenant_id UUID, config_id UUID, session_id UUID, release_snapshot JSONB, allowed_origins JSONB
-) LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+  p_widget_key TEXT,p_session_id UUID,p_customer_ref TEXT,p_expires_at TIMESTAMPTZ,p_origin TEXT DEFAULT NULL
+) RETURNS TABLE(tenant_id UUID,config_id UUID,session_id UUID,release_snapshot JSONB,allowed_origins JSONB)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE v_tenant UUID; v_config UUID; v_snapshot JSONB; v_origins JSONB;
 BEGIN
-  IF p_widget_key IS NULL OR p_widget_key !~ '^[A-Za-z0-9_-]{32,128}
-     OR p_expires_at <= now() OR p_expires_at > now() + interval '24 hours' THEN
+  IF p_widget_key IS NULL OR p_widget_key !~ '^[A-Za-z0-9_-]{32,128}$'
+     OR p_session_id IS NULL OR p_expires_at IS NULL
+     OR p_expires_at <= now() OR p_expires_at > now() + interval '24 hours'
+     OR p_customer_ref IS NOT NULL AND (length(p_customer_ref)>240 OR p_customer_ref ~ '[\r\n\u0000]') THEN
     RAISE EXCEPTION 'copilot_session_invalid';
   END IF;
-  RETURN QUERY
-  WITH cfg AS (
-    SELECT c.tenant_id,c.config_id,c.release_snapshot,c.allowed_origins
-    FROM public.atlas_v153_copilot_configs c
-    WHERE c.widget_key=p_widget_key AND c.status='active'
-    LIMIT 1
-  ), ins AS (
-    INSERT INTO public.atlas_v153_copilot_sessions(tenant_id,session_id,config_id,release_id,customer_ref,expires_at)
-    SELECT tenant_id,p_session_id,config_id,release_snapshot->>'releaseId',
-           CASE WHEN p_customer_ref IS NULL OR p_customer_ref='' THEN NULL ELSE left(p_customer_ref,240) END,
-           p_expires_at
-    FROM cfg
-    RETURNING tenant_id,config_id,session_id
-  )
-  SELECT cfg.tenant_id,cfg.config_id,ins.session_id,cfg.release_snapshot,cfg.allowed_origins
-  FROM cfg JOIN ins ON ins.tenant_id=cfg.tenant_id AND ins.config_id=cfg.config_id;
-  IF NOT FOUND THEN RAISE EXCEPTION 'copilot_widget_not_found'; END IF;
+  SELECT c.tenant_id,c.config_id,c.release_snapshot,c.allowed_origins
+    INTO v_tenant,v_config,v_snapshot,v_origins
+  FROM public.atlas_v153_copilot_configs c
+  WHERE c.widget_key=p_widget_key AND c.status='active'
+  LIMIT 1;
+  IF v_config IS NULL THEN RAISE EXCEPTION 'copilot_widget_not_found'; END IF;
+  IF p_origin IS NOT NULL AND NOT EXISTS(
+    SELECT 1 FROM jsonb_array_elements_text(v_origins) o(value) WHERE o.value=p_origin
+  ) THEN RAISE EXCEPTION 'copilot_origin_forbidden'; END IF;
+  INSERT INTO public.atlas_v153_copilot_sessions(tenant_id,session_id,config_id,release_id,customer_ref,expires_at)
+  VALUES(v_tenant,p_session_id,v_config,v_snapshot->>'releaseId',
+         CASE WHEN p_customer_ref IS NULL OR p_customer_ref='' THEN NULL ELSE p_customer_ref END,p_expires_at);
+  RETURN QUERY SELECT v_tenant,v_config,p_session_id,v_snapshot,v_origins;
 END;
 $$;
 
@@ -129,7 +123,7 @@ DECLARE
   v_created BOOLEAN:=false;
   v_existing UUID;
 BEGIN
-  IF p_tenant_id IS NULL OR p_config_id IS NULL OR p_session_id IS NULL OR p_message_id IS NULL
+  IF p_tenant_id IS NULL OR p_session_id IS NULL OR p_message_id IS NULL
      OR p_content_ref IS NULL OR p_content_ref !~ '^[A-Za-z0-9][A-Za-z0-9_.:/@-]{2,240}$'
      OR p_prompt_hash !~ '^[a-f0-9]{64}$'
      OR p_idempotency_key !~ '^[a-f0-9]{64}$'
@@ -538,10 +532,19 @@ END;
 $$;
 
 REVOKE ALL ON atlas_v153_copilot_configs,atlas_v153_copilot_sessions,atlas_v153_copilot_stream_events FROM PUBLIC;
-REVOKE ALL ON FUNCTION atlas_v153_create_public_session(TEXT,UUID,TEXT,TIMESTAMPTZ) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION atlas_v153_create_public_session(TEXT,UUID,TEXT,TIMESTAMPTZ,TEXT) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v153_prepare_public_turn(UUID,UUID,UUID,UUID,TEXT,CHAR(64),TEXT,UUID,UUID,CHAR(64)) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v153_append_stream_event(UUID,UUID,UUID,TEXT,BIGINT,TEXT,TEXT,CHAR(64)) TO atlas_worker;
+GRANT EXECUTE ON FUNCTION atlas_v153_public_state(UUID,UUID,UUID) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v153_public_stream(UUID,UUID,UUID,BIGINT) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v153_public_execution(UUID,UUID,UUID) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v153_request_handoff(UUID,UUID,TEXT,UUID,TEXT) TO atlas_app;
+REVOKE ALL ON FUNCTION atlas_v153_create_public_session(TEXT,UUID,TEXT,TIMESTAMPTZ,TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v153_prepare_public_turn(UUID,UUID,UUID,UUID,TEXT,CHAR(64),TEXT,UUID,UUID,CHAR(64)) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v153_append_stream_event(UUID,UUID,UUID,TEXT,BIGINT,TEXT,TEXT,CHAR(64)) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v153_public_state(UUID,UUID,UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION atlas_v153_public_stream(UUID,UUID,UUID,BIGINT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION atlas_v153_public_execution(UUID,UUID,UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v153_request_handoff(UUID,UUID,TEXT,UUID,TEXT) FROM PUBLIC;
 
 COMMIT;
