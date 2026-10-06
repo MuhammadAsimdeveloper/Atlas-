@@ -66,8 +66,14 @@ export async function buildSite(options = {}) {
   const appHtml = await readFile(appHtmlPath, 'utf8');
   await writeFile(appHtmlPath, makeNoindex(appHtml), 'utf8');
   await writeFile(path.join(outputDir, 'robots.txt'), mode === 'public' ? renderPublicRobots(origin) : renderPreviewRobots(), 'utf8');
-  if (mode === 'public') await writeFile(path.join(outputDir, 'sitemap.xml'), renderPublicSitemap(origin), 'utf8');
-  return { mode, origin: origin || null, outputDir, files: ['index.html', 'robots.txt', ...(mode === 'public' ? ['sitemap.xml'] : []), 'app/index.html'] };
+  if (mode === 'public') {
+    await writeFile(path.join(outputDir, 'sitemap.xml'), renderPublicSitemap(origin), 'utf8');
+    const contact = process.env.ATLAS_SECURITY_CONTACT || '';
+    if (!/^(mailto:[^\\s@]+@[^\\s@]+\\.[^\\s@]+|https:\\/\\/[^\\s]+)$/.test(contact)) throw new Error('Public builds require ATLAS_SECURITY_CONTACT as a mailto or HTTPS security contact.');
+    await mkdir(path.join(outputDir, '.well-known'), { recursive: true });
+    await writeFile(path.join(outputDir, '.well-known', 'security.txt'), 'Contact: ' + contact + '\\nExpires: 2027-10-06T00:00:00Z\\nPreferred-Languages: en\\n\\n', 'utf8');
+  }
+  return { mode, origin: origin || null, outputDir, files: ['index.html', 'robots.txt', 'llms.txt', 'manifest.webmanifest', ...(mode === 'public' ? ['sitemap.xml', '.well-known/security.txt'] : []), 'app/index.html'] };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
