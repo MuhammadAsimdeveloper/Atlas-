@@ -251,6 +251,24 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
         await runtimeStore.recordAgentTurnPlan({ ...who, plan: { ...plan, agentId: body.agentRelease.agentId } });
         return send(res, 201, { plan }, env);
       }
+      if (path === '/api/v1/growth/agents/turns/execute' && req.method === 'POST') {
+        await requireMutation(req, who.session);
+        if (env.ATLAS_AGENT_TURN_EXECUTION_ENABLED !== 'true' || env.ATLAS_AGENT_TURN_EXECUTION_HANDLER_READY !== 'true') {
+          return send(res, 503, { error:'agent_turn_execution_not_enabled', message:'Live agent execution requires an explicitly enabled reviewed model/input worker handler.' }, env);
+        }
+        if (typeof runtimeStore?.queueAgentTurnExecution !== 'function') throw createAuthError(503,'agent_turn_execution_unavailable');
+        const body=await readJson(req); exact(body,['executionId','planId']);
+        return send(res,202,{execution:await runtimeStore.queueAgentTurnExecution({...who,...body})},env);
+      }
+      if (path === '/api/v1/growth/agents/turns' && req.method === 'GET') {
+        if (typeof runtimeStore?.listAgentTurnExecutions !== 'function') throw createAuthError(503,'agent_turn_execution_unavailable');
+        return send(res,200,await runtimeStore.listAgentTurnExecutions({...who,sessionId:url.searchParams.get('sessionId')||null,status:url.searchParams.get('status')||null,limit:Number(url.searchParams.get('limit')||50)}),env);
+      }
+      const agentTurnMatch=path.match(/^\/api\/v1\/growth\/agents\/turns\/([0-9a-f-]{36})$/i);
+      if(agentTurnMatch && req.method==='GET'){
+        if (typeof runtimeStore?.getAgentTurnExecution !== 'function') throw createAuthError(503,'agent_turn_execution_unavailable');
+        return send(res,200,{execution:await runtimeStore.getAgentTurnExecution({...who,executionId:agentTurnMatch[1]})},env);
+      }
       if (path === '/api/v1/growth/agents/workflow-invocations/authorize' && req.method === 'POST') {
         await requireMutation(req, who.session);
         const body = await readJson(req);
