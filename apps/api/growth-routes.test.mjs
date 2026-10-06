@@ -253,7 +253,8 @@ test('V147 workflow invocation and handoff APIs are tenant-bound and approval-aw
     assert.equal(handoff.redacted,true);
   } finally { await api.close(); }
 });
-\ntest('V148 agent turn execution is feature-gated, tenant-scoped and queued from a stored plan', async () => {
+
+test('V148 agent turn execution is feature-gated, tenant-scoped and queued from a stored plan', async () => {
   const queued=[];
   const runtimeStoreExtra={
     async queueAgentTurnExecution(data){ queued.push(data); return {executionId:'99999999-9999-4999-8999-999999999999',jobId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}; },
