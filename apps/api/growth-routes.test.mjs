@@ -5,11 +5,12 @@ import { once } from 'node:events';
 import test from 'node:test';
 import { createGrowthApi } from './growth-routes.mjs';
 import { hashOpaqueToken, sessionCookieName } from './auth-contracts.mjs';
+import { createAgentReleaseManifest } from '../../packages/atlas-agent-fabric/index.mjs';
 
 const tenantA='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', tenantB='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const actor='11111111-1111-4111-8111-111111111111', ownerEmail='khan@example.net';
 
-async function createTestApi({ tenantId = tenantA, email = ownerEmail, memberships = [{tenant_id:tenantA,role_key:'owner',status:'active'}], envExtra = {}, subscriptionState = null, paddleFetch = fetch } = {}) {
+async function createTestApi({ tenantId = tenantA, email = ownerEmail, memberships = [{tenant_id:tenantA,role_key:'owner',status:'active'}], envExtra = {}, subscriptionState = null, paddleFetch = fetch, runtimeStoreExtra = {} } = {}) {
   const sessionToken='session-token-for-growth-api-test'; const csrf='csrf-token-for-growth-api-test'; const seen=[];
   const session={tokenHash:hashOpaqueToken(sessionToken),csrfHash:hashOpaqueToken(csrf),expiresAt:new Date(Date.now()+60_000),tenantId,user:{id:actor,email,displayName:'Khan',emailVerified:true,status:'active'},memberships};
   const authStore={async getSession({sessionHash}) { return sessionHash===session.tokenHash ? session : null; }};
@@ -29,7 +30,8 @@ async function createTestApi({ tenantId = tenantA, email = ownerEmail, membershi
     async requireBillingManager(data) { seen.push(['billing_manager',data]); }
   };
   const env={NODE_ENV:'development',ATLAS_PLATFORM_OWNER_EMAIL:ownerEmail,ATLAS_PADDLE_WEBHOOK_SECRET:'webhook-secret-for-test-long-enough',ATLAS_PADDLE_PRICE_STARTER:'pri_1234567890',...envExtra};
-  const api=createGrowthApi({store,authStore,env,fetchImpl:paddleFetch});
+  const runtimeStore={...runtimeStoreExtra};
+  const api=createGrowthApi({store,authStore,runtimeStore,env,fetchImpl:paddleFetch});
   const server=createServer(async(req,res)=>{if(!(await api.handle(req,res))){res.writeHead(404);res.end();}});
   server.listen(0,'127.0.0.1'); await once(server,'listening');
   const base=`http://127.0.0.1:${server.address().port}`;
@@ -207,4 +209,42 @@ test('V146 workflow security audit endpoint is authenticated and returns fail-cl
     assert.ok(body.report.findings.some(finding=>finding.code==='DIRECT_NETWORK_URL'));
     assert.ok(body.report.findings.some(finding=>finding.code==='UNPROTECTED_WEBHOOK'));
   } finally {await api.close();}
+});
+
+test('V147 authenticated agent turn planning binds the persistent session to the exact release', async () => {
+  const sessionId='99999999-9999-4999-8999-999999999999';
+  const release=createAgentReleaseManifest({tenantId:tenantA,agentId:'77777777-7777-4777-8777-777777777777',releaseId:'88888888-8888-4888-8888-888888888888',version:1,status:'active',allowedTools:['crm.search'],modelPolicy:{provider:'model_adapter'},systemPromptHash:'a'.repeat(64)});
+  const stored=[];
+  const api=await createTestApi({runtimeStoreExtra:{
+    async getAgentSession({tenantId,sessionId:requested}) { assert.equal(tenantId,tenantA); assert.equal(requested,sessionId); return {session_id:sessionId,agent_release_ref:release.releaseId,status:'active'}; },
+    async recordAgentTurnPlan({tenantId,plan}) { assert.equal(tenantId,tenantA); stored.push(plan); return plan.planId; }
+  }});
+  try {
+    const response=await fetch(api.base+'/api/v1/growth/agents/turns/plan',{method:'POST',headers:api.headers,body:JSON.stringify({
+      sessionId,agentRelease:release,turnId:'turn_v147_001',promptHash:'b'.repeat(64),
+      toolCalls:[{toolName:'crm.search',risk:'read',argumentsHash:'c'.repeat(64)}],
+      approvalRefs:[],workflowInvocationRef:null,
+      journeyContext:{tenantId:tenantA,journeyId:'journey_v147_api_001',contactRef:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',redacted:true,payloadMode:'reference_only',contextHash:'0'.repeat(64)},
+      now:Date.parse('2026-10-06T08:00:00.000Z')
+    })});
+    assert.equal(response.status,400);
+  } finally { await api.close(); }
+});
+
+test('V147 workflow invocation and handoff APIs are tenant-bound and approval-aware', async () => {
+  const release=createAgentReleaseManifest({tenantId:tenantA,agentId:'77777777-7777-4777-8777-777777777777',releaseId:'88888888-8888-4888-8888-888888888888',version:1,status:'active',allowedTools:['crm.search'],modelPolicy:{provider:'model_adapter'},systemPromptHash:'a'.repeat(64)});
+  const api=await createTestApi({runtimeStoreExtra:{
+    async getAgentSession({tenantId,sessionId}) { assert.equal(tenantId,tenantA); return {session_id:sessionId,agent_release_ref:release.releaseId,status:'active'}; },
+    async recordAgentHandoff({tenantId,handoff}) { assert.equal(tenantId,tenantA); return handoff.handoffId; }
+  }});
+  try {
+    let response=await fetch(api.base+'/api/v1/growth/agents/workflow-invocations/authorize',{method:'POST',headers:api.headers,body:JSON.stringify({agentRelease:release,workflowId:'66666666-6666-4666-8666-666666666666',workflowVersion:2,risk:'write',approvalRef:null})});
+    assert.equal(response.status,200);
+    assert.equal((await response.json()).authorization.allowed,false);
+    response=await fetch(api.base+'/api/v1/growth/agents/handoffs',{method:'POST',headers:api.headers,body:JSON.stringify({sessionId:'99999999-9999-4999-8999-999999999999',reason:'low_confidence',queueRef:'queue_sales_001',appointmentRef:null,now:Date.parse('2026-10-06T08:00:00.000Z')})});
+    assert.equal(response.status,201);
+    const handoff=(await response.json()).handoff;
+    assert.equal(handoff.tenantId,tenantA);
+    assert.equal(handoff.redacted,true);
+  } finally { await api.close(); }
 });
