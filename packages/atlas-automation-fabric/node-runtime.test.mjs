@@ -28,3 +28,10 @@ test('V151 unsupported connector/AI side effects fail closed',()=>{
  assert.throws(()=>executeN8nNode({tenantId:T,node:{...base,type:'send_message',config:{}},input:[]}),/does not execute/);
  assert.throws(()=>executeN8nNode({tenantId:T,node:{...base,type:'invoke_agent',config:{}},input:[]}),/does not execute/);
 });
+
+test('V151 loop evidence envelopes do not persist item payloads',()=>{
+ const result=executeN8nNode({tenantId:T,node:{...base,type:'loop_over_items',config:{batchSize:1}},input:[{email:'private@example.test'}]});
+ const envelope=createNodeExecutionEnvelope({tenantId:T,workflowId:'workflow-123',executionId:'exec-456',nodeId:'node-123',nodeType:'loop_over_items',inputCount:1,outputCount:1,control:result.control});
+ assert.equal('batches' in envelope.control,false);
+ assert.equal('email' in JSON.stringify(envelope),false);
+});
