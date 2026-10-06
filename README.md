@@ -1,3 +1,9 @@
+# Atlas Business Operating System — V148
+
+V148 is the current repository release. It hardens the AI execution frontier with a provider-neutral model runtime, governed agent turns, redacted execution timelines, durable worker-mediated turn state, and plan-first AI workflow authoring. External model providers, telephony, managed Redis/KMS/WAF/CDN/object storage, production credentials and measured disaster/load evidence remain explicit deployment gates.
+
+See [V148 gap register](docs/ATLAS-GAP-REGISTER-V148-2026-10.md) for the remaining incomplete product and production features.
+
 ## V144 — Runtime control-plane integration
 
 V144 closes the repository-side control/observability gap: durable dispatch state is recorded by the worker, bounded runtime control events provide an auditable decision ledger, and optional OTLP HTTP export is best-effort so telemetry can never block customer work.
