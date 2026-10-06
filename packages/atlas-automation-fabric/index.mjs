@@ -274,6 +274,33 @@ export function createAiWorkflowProposal({ tenantId, requestedByActorId, prompt,
   });
 }
 
+export function createAiWorkflowAuthoringPlan({ tenantId, requestedByActorId, businessGoal, knownFacts = {}, candidateNodes = [] } = {}) {
+  ref(tenantId, 'tenantId'); ref(requestedByActorId, 'requestedByActorId');
+  const goal = boundedText(businessGoal, 'businessGoal', 1000);
+  if (!knownFacts || typeof knownFacts !== 'object' || Array.isArray(knownFacts)) throw new TypeError('knownFacts must be an object');
+  if (!Array.isArray(candidateNodes) || candidateNodes.length < 1 || candidateNodes.length > 50) throw new TypeError('candidateNodes must be 1-50');
+  const questions = [];
+  const required = [
+    ['trigger', 'What event starts this automation?'],
+    ['audience', 'Which contact/customer scope should it affect?'],
+    ['success', 'What outcome marks the workflow successful?'],
+    ['failure', 'What should happen when a provider, approval or validation fails?']
+  ];
+  for (const [key, question] of required) if (knownFacts[key] == null || String(knownFacts[key]).trim() === '') questions.push({ key, question });
+  const normalizedNodes = [...new Set(candidateNodes.map(type => boundedText(type, 'candidate node', 60)))];
+  for (const type of normalizedNodes) if (!WORKFLOW_NODE_CATALOG[type]) throw new Error('Authoring plan requested unsupported node: ' + type);
+  const draft = createAiWorkflowProposal({ tenantId, requestedByActorId, prompt: goal, candidateNodes: normalizedNodes });
+  return freeze({
+    status: questions.length ? 'needs_clarification' : 'ready_for_preview',
+    tenantId, requestedByActorId, businessGoal: goal,
+    missingFacts: questions,
+    proposedNodes: normalizedNodes,
+    proposal: draft,
+    diffRef: 'draft_' + sha256({ tenantId, goal, normalizedNodes }).slice(0, 24),
+    productionMutation: false
+  });
+}
+
 export function auditWorkflowSecurity({ tenantId, workflow } = {}) {
   ref(tenantId, 'tenantId');
   const findings = [];
