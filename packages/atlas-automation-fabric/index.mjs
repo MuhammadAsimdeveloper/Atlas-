@@ -210,7 +210,8 @@ export function createWorkflowTemplate({ tenantId, id, name, version, graph } = 
   ref(tenantId, 'tenantId'); ref(id, 'templateId'); boundedText(name, 'name', 120); int(version, 'version', 1, 100000);
   if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) throw new TypeError('template graph is required');
   const validationGraph = sanitizeTemplateGraph(graph);
-  const normalized = createWorkflowGraph({ tenantId, id, version, name, nodes:validationGraph.nodes, edges:validationGraph.edges });
+  const validationNodes = validationGraph.nodes.map(node => node?.type === 'create_contact' ? { ...node, config: { ...(node.config || {}), sourceRef: node.config?.sourceRef || '11111111-1111-4111-8111-111111111111' } } : node);
+  const normalized = createWorkflowGraph({ tenantId, id, version, name, nodes:validationNodes, edges:validationGraph.edges });
   if (!verifyWorkflowGraph(normalized)) throw new Error('template graph checksum invalid');
   const rawTemplateGraph = JSON.parse(JSON.stringify(graph));
   return freeze({ tenantId, id, name, version, graph:rawTemplateGraph, manifestSha256:sha256({ tenantId, id, version, graph:normalized.checksum }) });
