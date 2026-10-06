@@ -52,3 +52,11 @@ The test is intentionally real: it does not stub the model provider, worker, Red
 The public widget key is an identifier, not a credential. The customer session is the credential. The server validates its HMAC signature, expiry, channel, tenant/release scope and database session ledger before accepting turns. Public SQL access is exposed only through security-definer functions with explicit role grants.
 
 Raw customer/model content is not written into execution evidence. Customer-visible message and stream content goes through the existing inbox content-store contract.
+
+
+## Final hardening verification
+
+- Public session, turn, history, stream and handoff requests are origin-bound and rate-limited.
+- Published agent release manifests are checksum-verified and tenant-bound before widget activation.
+- Public origin resolution uses a forced-RLS-safe `SECURITY DEFINER` function.
+- Staging E2E also verifies the served Hub/widget assets and, when staging auth material is supplied, authenticated handoff resolution with CSRF.

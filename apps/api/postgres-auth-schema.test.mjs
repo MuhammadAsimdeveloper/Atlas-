@@ -16,8 +16,9 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
   try {
     const migrationDirectory = path.join(root, 'infra/postgres');
     await db.exec('CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;');
+    await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
   const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
-    assert.equal(files.at(-1), 'FINAL-MIGRATION-V148.sql');
+    assert.equal(files.at(-1), 'FINAL-MIGRATION-V153.sql');
     for (const file of files) { try { await db.exec(await readFile(path.join(migrationDirectory,file),'utf8')); } catch (error) { throw new Error(`${file}: ${error.message}`); } }
     const automationTable = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_v127_automation_events'::regclass");
     assert.equal(automationTable.rows[0].relrowsecurity,true);
@@ -34,7 +35,6 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     const agentTurnTable = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_agent_turn_executions'::regclass");
     assert.equal(agentTurnTable.rows[0].relrowsecurity,true,'V148 agent turn execution table uses RLS');
     assert.equal(agentTurnTable.rows[0].relforcerowsecurity,true,'V148 agent turn execution table forces RLS');
-    await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V112.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V114.sql'), 'utf8'));
     await db.exec(await readFile(path.join(root, 'infra', 'postgres', 'API-ROLE-GRANTS-V115.sql'), 'utf8'));
@@ -151,9 +151,10 @@ test('V114 Growth Center CRUD, revisions, Paddle webhook state and tenant isolat
   try {
     const migrationDirectory = path.join(root, 'infra/postgres');
     await db.exec('CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;');
+    await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
     const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
     for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
-    await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
+
     await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V112.sql'),'utf8'));
     await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V114.sql'),'utf8'));
     await db.exec(await readFile(path.join(root,'infra/postgres/API-ROLE-GRANTS-V115.sql'),'utf8'));
