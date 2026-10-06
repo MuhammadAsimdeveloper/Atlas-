@@ -29,6 +29,12 @@ async function loadSecretResolver(){
 const baseUrl=process.env.ATLAS_MODEL_TURN_EXECUTOR_ENABLED==='true'?allowedBaseUrl():null;
 const resolveSecret=process.env.ATLAS_MODEL_TURN_EXECUTOR_ENABLED==='true'?await loadSecretResolver():null;
 
+export function splitSseBuffer(buffer){
+  if(typeof buffer!=='string') throw new TypeError('SSE buffer must be a string');
+  const lines=buffer.split(/\r?\n/);
+  return Object.freeze({lines:lines.slice(0,-1),remainder:lines.at(-1)||''});
+}
+
 function toMessages(input){
   const history=Array.isArray(input?.history)?input.history.slice(-20):[];
   const prompt=typeof input?.prompt==='string'?input.prompt:'';
@@ -68,9 +74,9 @@ export async function getModelAdapter({tenantId,release}={}){
         while(true){
           const {value,done}=await reader.read(); if(done) break;
           buffer+=decoder.decode(value,{stream:true});
-          const lines=buffer.split(/\r?\n/);
-          buffer=lines.pop() || '';
-          for(const line of lines){
+          const parsed=splitSseBuffer(buffer);
+          buffer=parsed.remainder;
+          for(const line of parsed.lines){
             const trimmed=line.trim();
             if(!trimmed||!trimmed.startsWith('data:')) continue;
             const data=trimmed.slice(5).trim();
