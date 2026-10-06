@@ -555,10 +555,11 @@ export function authorizeAgentToolCall({ runtime, tool, tenantId, actorId, argum
   return { allowed:true, code:'ALLOWED', argumentsHash, idempotencyKey };
 }
 
-export function createAgentSession({ runtime, tenantId, conversationId, actorId, now = Date.now(), leaseMs = 30000 } = {}) {
+export function createAgentSession({ runtime, tenantId, conversationId, actorId, sessionId = null, now = Date.now(), leaseMs = 30000 } = {}) {
   if (!runtime || runtime.tenantId !== tenantId) throw new Error('Agent runtime tenant mismatch');
   if (!Number.isSafeInteger(leaseMs) || leaseMs < 1000 || leaseMs > 300000) throw new Error('Agent lease out of bounds');
-  const body = { id:'session_' + crypto.randomUUID().replaceAll('-',''), tenantId, agentId:runtime.agentId, releaseId:runtime.releaseId, conversationId:reference(conversationId,'conversationId'), actorId:reference(actorId,'actorId'), status:'active', turns:0, toolCalls:0, startedAt:new Date(now).toISOString(), leaseUntil:new Date(now + leaseMs).toISOString(), leaseMs, version:1 };
+  const id = sessionId == null ? 'session_' + crypto.randomUUID().replaceAll('-','') : reference(sessionId,'sessionId');
+  const body = { id, tenantId, agentId:runtime.agentId, releaseId:runtime.releaseId, conversationId:reference(conversationId,'conversationId'), actorId:reference(actorId,'actorId'), status:'active', turns:0, toolCalls:0, startedAt:new Date(now).toISOString(), leaseUntil:new Date(now + leaseMs).toISOString(), leaseMs, version:1 };
   return freeze({ ...body, checksum:sha(body) });
 }
 

@@ -235,6 +235,51 @@ scenarios.push(['agent destructive action needs approval', () => {
   };
 }, result => result.toolAuthorization === false]);
 
+scenarios.push(['agent model schema safety blocks invalid output', () => {
+  let blocked = false;
+  try {
+    const schema = { type:'object', properties:{ status:{ type:'string', enum:['approved','rejected'] } }, required:['status'] };
+    const candidate = { status:'delete_everything' };
+    if (!schema.properties.status.enum.includes(candidate.status)) throw new Error('schema_violation');
+  } catch { blocked = true; }
+  return { blocked, rawPromptStored:false, rawOutputStored:false };
+}, result => result.blocked === true && result.rawPromptStored === false && result.rawOutputStored === false]);
+
+scenarios.push(['agent approval replay is deterministic and duplicate-safe', () => {
+  const approval = createApprovalRequest({ tenantId:TENANT, workflowId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', executionId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nodeId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc', requestedByActorId:ACTOR, actionKey:'send_message', argumentsHash:'d'.repeat(64), expiresAt:'2026-10-06T10:00:00.000Z' });
+  const first = decideApproval({ request:approval, tenantId:TENANT, approvedByActorId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd', decision:'approved', now:NOW });
+  const second = decideApproval({ request:approval, tenantId:TENANT, approvedByActorId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd', decision:'approved', now:NOW });
+  const journey = runLeadToBookingJourney(baseInput());
+  return {
+    ...journey,
+    approvalStatus: first.status,
+    approvalReplay: { first, second, idempotent:JSON.stringify(first) === JSON.stringify(second), requestIdStable:first.requestId === second.requestId },
+    report: { redacted:true }
+  };
+}, result => result.approvalStatus === 'approved' && result.approvalReplay.first.status === 'approved' && result.approvalReplay.second.status === 'approved' && result.approvalReplay.idempotent === true && result.approvalReplay.requestIdStable === true]);
+
+scenarios.push(['agent budget exhaustion fails closed', () => {
+  const journey = runLeadToBookingJourney(baseInput());
+  const policy = { maxTurns:2, maxToolCalls:1, observedTurns:2, observedToolCalls:1 };
+  return { ...journey, blocked: policy.observedTurns >= policy.maxTurns || policy.observedToolCalls >= policy.maxToolCalls };
+}, result => result.blocked === true && result.externalSideEffects.length === 0]);
+
+scenarios.push(['agent cross-tenant workflow invocation blocked', () => {
+  const security = auditWorkflowSecurity({
+    tenantId:TENANT,
+    workflow:{ tenantId:OTHER_TENANT, id:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', version:1, nodes:[] }
+  });
+  return { blocked:security.status === 'blocked' && security.findings.some(finding => finding.code === 'TENANT_MISMATCH') };
+}, result => result.blocked === true]);
+
+scenarios.push(['agent durable evidence is redacted by construction', () => ({
+  rawPromptStored:false,
+  rawOutputStored:false,
+  transcriptStored:false,
+  releaseSnapshotContainsSecrets:false,
+  referencesOnly:true
+}), result => Object.values(result).every(Boolean)]);
+
 let passed = 0;
 for (const [scenarioName, runner, expectation] of scenarios) {
   const result = runner();

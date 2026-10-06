@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { createWorkflowGraph, verifyWorkflowGraph } from '../atlas-target/index.mjs';
 import { WORKFLOW_NODE_CATALOG } from '../atlas-target/workflow-catalog.mjs';
+import { validateDataMapping } from './safe-data-mapping.mjs';
 
 const sha256 = value => crypto.createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
@@ -111,6 +112,7 @@ export function validateAutomationNode({ tenantId, node } = {}) {
   if (node.type === 'http_request' && networkTargetFinding) throw new Error('http_request requires a connector-scoped operation, not a direct URL');
   if (node.type === 'code_transform' && findings.some(item => item.code === 'EXECUTABLE_OR_NETWORK_PAYLOAD')) throw new Error('code_transform accepts declarative expressions only');
   if (findings.some(item => item.code === 'SECRET_LIKE_FIELD')) throw new Error('Workflow config contains secret-like fields');
+  if (node.type === 'edit_fields' && node.config?.mapping) validateDataMapping({mapping:node.config.mapping});
   if (node.type === 'loop_over_items') {
     int(node.config?.batchSize ?? 1, 'loop batchSize', 1, 100);
     int(node.config?.maxItems ?? 1000, 'loop maxItems', 1, 10000);
@@ -271,6 +273,33 @@ export function createAiWorkflowProposal({ tenantId, requestedByActorId, prompt,
     safeNodeCount:selectedNodes.filter(type => ['read'].includes(WORKFLOW_NODE_CATALOG[type].risk)).length,
     requiresHumanReview: true,
     riskReview:requiresHumanReview ? 'required' : 'advisory'
+  });
+}
+
+export function createAiWorkflowAuthoringPlan({ tenantId, requestedByActorId, businessGoal, knownFacts = {}, candidateNodes = [] } = {}) {
+  ref(tenantId, 'tenantId'); ref(requestedByActorId, 'requestedByActorId');
+  const goal = boundedText(businessGoal, 'businessGoal', 1000);
+  if (!knownFacts || typeof knownFacts !== 'object' || Array.isArray(knownFacts)) throw new TypeError('knownFacts must be an object');
+  if (!Array.isArray(candidateNodes) || candidateNodes.length < 1 || candidateNodes.length > 50) throw new TypeError('candidateNodes must be 1-50');
+  const questions = [];
+  const required = [
+    ['trigger', 'What event starts this automation?'],
+    ['audience', 'Which contact/customer scope should it affect?'],
+    ['success', 'What outcome marks the workflow successful?'],
+    ['failure', 'What should happen when a provider, approval or validation fails?']
+  ];
+  for (const [key, question] of required) if (knownFacts[key] == null || String(knownFacts[key]).trim() === '') questions.push({ key, question });
+  const normalizedNodes = [...new Set(candidateNodes.map(type => boundedText(type, 'candidate node', 60)))];
+  for (const type of normalizedNodes) if (!WORKFLOW_NODE_CATALOG[type]) throw new Error('Authoring plan requested unsupported node: ' + type);
+  const draft = createAiWorkflowProposal({ tenantId, requestedByActorId, prompt: goal, candidateNodes: normalizedNodes });
+  return freeze({
+    status: questions.length ? 'needs_clarification' : 'ready_for_preview',
+    tenantId, requestedByActorId, businessGoal: goal,
+    missingFacts: questions,
+    proposedNodes: normalizedNodes,
+    proposal: draft,
+    diffRef: 'draft_' + sha256({ tenantId, goal, normalizedNodes }).slice(0, 24),
+    productionMutation: false
   });
 }
 
