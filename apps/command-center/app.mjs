@@ -72,6 +72,7 @@ function render() {
       <nav class="primary-nav" aria-label="Primary navigation">
         <a href="#overview" aria-current="page"><span aria-hidden="true">⌂</span> Overview</a>
         <a href="#ai-agents"><span aria-hidden="true">✦</span> AI agents</a>
+        <a href="/copilot.html"><span aria-hidden="true">◉</span> Copilot Hub</a>
         <a href="#voice-operations"><span aria-hidden="true">☎</span> Voice operations</a>
         <a href="#voice-quality"><span aria-hidden="true">✓</span> Voice QA</a>
         <a href="#service-desk"><span aria-hidden="true">▤</span> Service desk <span class="nav-count">${escapeHtml(state.serviceDesk.open)}</span></a>
