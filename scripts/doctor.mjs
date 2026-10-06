@@ -291,9 +291,11 @@ try {
   const v148Migration = await read('infra/postgres/FINAL-MIGRATION-V148.sql');
   const v148Grants = await read('infra/postgres/API-ROLE-GRANTS-V148.sql');
   const v148Gap = await read('docs/ATLAS-GAP-REGISTER-V148-2026-10.md');
+  const v148Mapping = await read('packages/atlas-automation-fabric/safe-data-mapping.mjs');
   const v148Automation = await read('packages/atlas-automation-fabric/index.mjs');
   check('V148 governed agent model runtime', v148Model.includes('createModelAdapter') && v148Model.includes('invokeModelTurn') && v148Model.includes('rawPromptStored: false') && v148Turn.includes('authorizeAgentToolCall') && v148Turn.includes('consumeAgentBudget'), agentFabricTests.includes('V148') && v148Migration.includes('atlas_agent_turn_executions') && v148Migration.includes('atlas_v148_get_agent_turn_for_job') && v148Grants.includes('atlas_worker'), 'Agent model inference, bounded streaming, tool approval, tenant isolation and durable worker state are connected with explicit secret/content redaction.');
   check('V148 agent observability and authoring', v148Timeline.includes('exportAgentTimeline') && v148Turn.includes('appendAgentTimelineEvent') && v148Automation.includes('createAiWorkflowAuthoringPlan') && await read('apps/api/growth-routes.mjs').then(x => x.includes('/api/v1/growth/agents/turns/execute') && x.includes('/api/v1/growth/agents/turns') && x.includes('/api/v1/growth/automation/ai-plan')), v148Gap.includes('V148 delivered') && await read('scripts/mirofish-check.mjs').then(x => x.includes('agent model schema safety') && x.includes('agent durable evidence is redacted')), 'Operator-visible agent debugging and plan-first workflow authoring exist as bounded, draft/feature-gated capabilities without autonomous production mutation.');
+  check('V148 n8n-safe data mapping', v148Mapping.includes('validateDataMapping') && v148Mapping.includes('applyDataMapping') && v148Automation.includes("node.type === 'edit_fields'") && v148Automation.includes('validateDataMapping'), 'Workflow edit-fields mapping is allowlisted, declarative and rejects reserved/code/network paths.');
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
 }
