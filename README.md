@@ -1,21 +1,18 @@
-# Atlas Business Operating System — V151
+# Atlas Business Operating System — V152
 
 V151 is the current repository release. It extends the AI execution frontier with a tenant-grounded customer-support Copilot, hardened voice-agent turns, a deterministic n8n-style node runtime, support-agent evaluation/training artifacts, and governed agent skills. External model, speech, telephony, knowledge-provider and production infrastructure activation remain explicit deployment gates.
 
 See [V148 gap register](docs/ATLAS-GAP-REGISTER-V148-2026-10.md) for the remaining incomplete product and production features.
 
-## V151 — AI agents, voice agents, n8n runtime and customer-support Copilot
+## V152 — Customer Support Activation and Voice Streaming
 
-- Customer-support Copilot grounds factual answers in tenant-approved knowledge and escalates uncertainty, privacy, complaints and sensitive intents.
-- Support-agent “training” is implemented as an evaluation/grounding curriculum using hashes, expected intents, knowledge references, reviewer outcomes and failure codes; no foundation-model fine-tuning is falsely claimed.
-- Voice-agent runtime enforces AI disclosure, outbound consent, call windows, transfer budgets, interruption limits and reference-only transcript evidence.
-- n8n-style native nodes now have deterministic bounded handlers for loops, split/aggregate, deduplication, sorting, filtering, branching, waits, execution metadata and terminal errors.
-- Connector/AI side-effect nodes remain behind Atlas's existing approval, idempotency, provider and worker boundaries.
-- New governed skills expose Customer Support Agent, Voice Agent Operator and n8n Automation Operator.
+- Added signed, expiring customer-support session tokens bound to a tenant, published agent release and channel.
+- Added hash-bound customer turn validation and a reference-only enqueue envelope so raw customer messages are not copied into durable orchestration metadata.
+- Reused the reviewed worker execution bridge: inbox content resolver → tenant-bound agent turn → allowlisted OpenAI-compatible model adapter → streamed inference → inbox response sink.
+- Added a bounded voice media gateway contract with codec, frame-size, duration, sequence and tenant/session checks; durable evidence stores hashes/references, never audio payloads.
+- Added V152 doctor and production activation checks.
 
-**Production truth boundary:** repository code and tests establish policy/runtime contracts; they do not by themselves activate a model provider, speech stack, telephony account, knowledge index or customer-facing public widget.
-
-See the V151 AI/n8n milestone notes and V148 gap register for the remaining external activation work.
+**Production truth boundary:** these repository components establish the activation path and security contracts. A live customer-facing widget, model credentials, speech/telephony account, provider webhook and production public endpoint still require real deployment configuration and staging probes.
 
 ## V144 — Runtime control-plane integration
 
