@@ -1,3 +1,13 @@
+# Changelog
+
+## 151.0.0 — AI Agents, Voice Agents, n8n Runtime and Customer Support Copilot
+- Added bounded deterministic n8n-style runtime handlers for collection, branching, waits, execution metadata and terminal errors.
+- Added tenant-grounded customer-support Copilot runtime with confidence/handoff controls and reference-only evidence.
+- Added support-agent evaluation/training curriculum using hashes, knowledge references, intents, reviewer outcomes and failure codes.
+- Added hardened voice-agent turn runtime with AI disclosure, outbound consent, call-window checks, transfer/interruption budgets and reference-only transcripts.
+- Added regression and release doctor gates for the V151 AI and automation surfaces.
+- No live model, speech, telephony, knowledge provider or external account activation is fabricated by this release.
+
 ## 147.0.0 — Agent Journey Runtime + Durable Handoffs
 - Added tenant/release-pinned agent release manifests with model-policy bounds and prompt-hash-only storage.
 - Added reference-only agent journey context linking CRM, appointments, conversations, voice sessions and workflow executions.
