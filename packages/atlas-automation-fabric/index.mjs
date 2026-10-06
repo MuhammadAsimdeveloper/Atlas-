@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { createWorkflowGraph, verifyWorkflowGraph } from '../atlas-target/index.mjs';
 import { WORKFLOW_NODE_CATALOG } from '../atlas-target/workflow-catalog.mjs';
+import { validateDataMapping } from './safe-data-mapping.mjs';
 
 const sha256 = value => crypto.createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
@@ -111,6 +112,7 @@ export function validateAutomationNode({ tenantId, node } = {}) {
   if (node.type === 'http_request' && networkTargetFinding) throw new Error('http_request requires a connector-scoped operation, not a direct URL');
   if (node.type === 'code_transform' && findings.some(item => item.code === 'EXECUTABLE_OR_NETWORK_PAYLOAD')) throw new Error('code_transform accepts declarative expressions only');
   if (findings.some(item => item.code === 'SECRET_LIKE_FIELD')) throw new Error('Workflow config contains secret-like fields');
+  if (node.type === 'edit_fields' && node.config?.mapping) validateDataMapping({mapping:node.config.mapping});
   if (node.type === 'loop_over_items') {
     int(node.config?.batchSize ?? 1, 'loop batchSize', 1, 100);
     int(node.config?.maxItems ?? 1000, 'loop maxItems', 1, 10000);
