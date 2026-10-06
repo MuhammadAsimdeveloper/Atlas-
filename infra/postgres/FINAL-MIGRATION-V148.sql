@@ -261,6 +261,7 @@ REVOKE ALL ON FUNCTION atlas_v148_update_agent_turn_for_job(UUID,UUID,TEXT,UUID,
 
 
 
+
 CREATE OR REPLACE FUNCTION atlas_v148_create_agent_response_for_job(
   p_tenant_id UUID,p_job_id UUID,p_worker_id TEXT,p_execution_id UUID,p_content_ref TEXT
 ) RETURNS TABLE(message_id UUID,conversation_id UUID,job_id UUID,created BOOLEAN)
@@ -328,65 +329,10 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON atlas_agent_turn_executions FROM PUBLIC;
+REVOKE ALL ON FUNCTION atlas_v148_get_agent_turn_for_job(UUID,UUID,TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v148_get_agent_input_for_job(UUID,UUID,TEXT,UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION atlas_v148_update_agent_turn_for_job(UUID,UUID,TEXT,UUID,INTEGER,TEXT,JSONB,TEXT,INTEGER,INTEGER,INTEGER,INTEGER,TEXT,TEXT,TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v148_create_agent_response_for_job(UUID,UUID,TEXT,UUID,TEXT) FROM PUBLIC;
-
-    AND c.conversation_id=NULLIF(REPLACE(e.input_ref,'inbox:conversation:',''),'')::uuid
-  JOIN LATERAL (
-    SELECT m.message_id,m.sender_ref,m.recipient_ref,m.subject,m.content_ref
-    FROM public.atlas_v122_messages m
-    WHERE m.tenant_id=e.tenant_id AND m.conversation_id=c.conversation_id
-      AND m.direction='inbound'
-    ORDER BY m.created_at DESC,m.message_id DESC LIMIT 1
-  ) m ON true
-  WHERE e.tenant_id=p_tenant_id AND e.execution_id=p_execution_id
-    AND e.status IN ('queued','running','retryable')
-    AND e.input_ref ~ '^inbox:conversation:' = false;
-END;
-$$;
-
-
-REVOKE ALL ON atlas_agent_turn_executions FROM PUBLIC;
-
-
-
-
-
-    AND c.conversation_id=NULLIF(REPLACE(e.input_ref,'inbox:conversation:',''),'')::uuid
-  JOIN LATERAL (
-    SELECT m.message_id,m.sender_ref,m.recipient_ref,m.subject,m.content_ref
-    FROM public.atlas_v122_messages m
-    WHERE m.tenant_id=e.tenant_id AND m.conversation_id=c.conversation_id
-      AND m.direction='inbound'
-    ORDER BY m.created_at DESC,m.message_id DESC LIMIT 1
-  ) m ON true
-  WHERE e.tenant_id=p_tenant_id AND e.execution_id=p_execution_id
-    AND e.status IN ('queued','running','retryable');
-END;
-$$;
-
-
-REVOKE ALL ON atlas_agent_turn_executions FROM PUBLIC;
-
-
-
-
-
-    AND c.conversation_id=NULLIF(REPLACE(e.input_ref,'inbox:conversation:',''),'')::uuid
-  JOIN LATERAL (
-    SELECT m.message_id,m.sender_ref,m.recipient_ref,m.subject,m.content_ref
-    FROM public.atlas_v122_messages m
-    WHERE m.tenant_id=e.tenant_id AND m.conversation_id=c.conversation_id
-      AND m.direction='inbound'
-    ORDER BY m.created_at DESC,m.message_id DESC LIMIT 1
-  ) m ON true
-  WHERE e.tenant_id=p_tenant_id AND e.execution_id=p_execution_id
-    AND e.status IN ('queued','running','retryable')
-    AND e.input_ref ~ '^inbox:conversation:' = false;
-END;
-$$;
-
-
-REVOKE ALL ON atlas_agent_turn_executions FROM PUBLIC;
 
 COMMIT;
