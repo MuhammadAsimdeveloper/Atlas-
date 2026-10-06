@@ -179,9 +179,9 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
   async function handle(req,res){
     const url=new URL(req.url||'/','http://localhost');
     try{
-      if(url.pathname==='/api/v1/public/copilot/session' && req.method==='OPTIONS')return send(res,204,null,env,{'access-control-allow-methods':'POST,OPTIONS','access-control-allow-headers':'content-type','access-control-max-age':'600'});
+      if(url.pathname==='/api/v1/public/copilot/session' && req.method==='OPTIONS')return send(res,204,null,env,{'access-control-allow-origin':'*','access-control-allow-methods':'POST,OPTIONS','access-control-allow-headers':'content-type','access-control-max-age':'600'});
       if(url.pathname.startsWith('/api/v1/public/copilot/')){
-        if(req.method==='OPTIONS')return send(res,204,null,env,{'access-control-allow-methods':'GET,POST,OPTIONS','access-control-allow-headers':'authorization,content-type','access-control-max-age':'600'});
+        if(req.method==='OPTIONS')return send(res,204,null,env,{'access-control-allow-origin':'*','access-control-allow-methods':'GET,POST,OPTIONS','access-control-allow-headers':'authorization,content-type','access-control-max-age':'600'});
         if(url.pathname==='/api/v1/public/copilot/session'&&req.method==='POST')return await publicSession(req,res);
         const claims=await publicClaims(req);
         if(url.pathname==='/api/v1/public/copilot/turn'&&req.method==='POST')return await publicTurn(req,res,claims);
