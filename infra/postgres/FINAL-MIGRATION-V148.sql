@@ -131,6 +131,43 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION atlas_v148_get_agent_input_for_job(
+  p_tenant_id UUID, p_job_id UUID, p_worker_id TEXT, p_execution_id UUID
+) RETURNS TABLE (
+  tenant_id UUID, execution_id UUID, conversation_id UUID, message_id UUID, channel TEXT,
+  provider_connection_id UUID, sender_ref TEXT, recipient_ref TEXT, subject TEXT, content_ref TEXT
+) LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+BEGIN
+  IF p_tenant_id IS NULL OR p_job_id IS NULL OR p_execution_id IS NULL
+     OR p_worker_id IS NULL OR p_worker_id !~ '^[a-zA-Z0-9_.:-]{1,120}$' THEN
+    RAISE EXCEPTION 'agent_input_parameters_invalid';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.atlas_runtime_jobs j
+    WHERE j.tenant_id=p_tenant_id AND j.job_id=p_job_id AND j.job_type='agent.turn.execute'
+      AND j.status='leased' AND j.lease_owner=p_worker_id AND j.lease_until>now()
+  ) THEN RAISE EXCEPTION 'worker_job_lease_invalid'; END IF;
+  PERFORM set_config('app.tenant_id',p_tenant_id::text,true);
+  RETURN QUERY
+  SELECT e.tenant_id,e.execution_id,c.conversation_id,m.message_id,c.channel,c.provider_connection_id,
+         m.sender_ref,m.recipient_ref,m.subject,m.content_ref
+  FROM public.atlas_agent_turn_executions e
+  JOIN public.atlas_ai_agent_sessions s ON s.tenant_id=e.tenant_id AND s.session_id=e.session_id
+  JOIN public.atlas_v122_conversations c ON c.tenant_id=e.tenant_id
+    AND c.conversation_id=NULLIF(e.input_ref,'')::uuid
+  JOIN LATERAL (
+    SELECT m.message_id,m.sender_ref,m.recipient_ref,m.subject,m.content_ref
+    FROM public.atlas_v122_messages m
+    WHERE m.tenant_id=e.tenant_id AND m.conversation_id=c.conversation_id
+      AND m.direction='inbound'
+    ORDER BY m.created_at DESC,m.message_id DESC LIMIT 1
+  ) m ON true
+  WHERE e.tenant_id=p_tenant_id AND e.execution_id=p_execution_id
+    AND e.status IN ('queued','running','retryable')
+    AND e.input_ref ~ '^inbox:conversation:' = false;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION atlas_v148_update_agent_turn_for_job(
   p_tenant_id UUID,
   p_job_id UUID,
@@ -201,5 +238,77 @@ $$;
 REVOKE ALL ON atlas_agent_turn_executions FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v148_get_agent_turn_for_job(UUID,UUID,TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v148_update_agent_turn_for_job(UUID,UUID,TEXT,UUID,INTEGER,TEXT,JSONB,TEXT,INTEGER,INTEGER,INTEGER,INTEGER,TEXT,TEXT,TEXT) FROM PUBLIC;
+
+
+
+CREATE OR REPLACE FUNCTION atlas_v148_create_agent_response_for_job(
+  p_tenant_id UUID,p_job_id UUID,p_worker_id TEXT,p_execution_id UUID,p_content_ref TEXT
+) RETURNS TABLE(message_id UUID,conversation_id UUID,job_id UUID,created BOOLEAN)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE v_conversation UUID; v_channel TEXT; v_connection UUID; v_sender TEXT; v_recipient TEXT; v_subject TEXT; v_message UUID; v_job UUID; v_created BOOLEAN:=false;
+BEGIN
+  IF p_tenant_id IS NULL OR p_job_id IS NULL OR p_execution_id IS NULL OR p_content_ref IS NULL
+     OR p_worker_id IS NULL OR p_worker_id !~ '^[a-zA-Z0-9_.:-]{1,120}$'
+     OR p_content_ref !~ '^[A-Za-z0-9][A-Za-z0-9_.:/@-]{2,240}$' THEN
+    RAISE EXCEPTION 'agent_response_parameters_invalid';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.atlas_runtime_jobs j
+    WHERE j.tenant_id=p_tenant_id AND j.job_id=p_job_id AND j.job_type='agent.turn.execute'
+      AND j.status='leased' AND j.lease_owner=p_worker_id AND j.lease_until>now()
+  ) THEN RAISE EXCEPTION 'worker_job_lease_invalid'; END IF;
+  PERFORM set_config('app.tenant_id',p_tenant_id::text,true);
+  SELECT c.conversation_id,c.channel,c.provider_connection_id,m.recipient_ref,m.sender_ref,m.subject
+    INTO v_conversation,v_channel,v_connection,v_sender,v_recipient,v_subject
+  FROM public.atlas_agent_turn_executions e
+  JOIN public.atlas_v122_conversations c
+    ON c.tenant_id=e.tenant_id AND NULLIF(REPLACE(e.input_ref,'inbox:conversation:',''),'')::uuid=c.conversation_id
+  JOIN LATERAL (
+    SELECT m.sender_ref,m.recipient_ref,m.subject
+    FROM public.atlas_v122_messages m
+    WHERE m.tenant_id=e.tenant_id AND m.conversation_id=c.conversation_id AND m.direction='inbound'
+    ORDER BY m.created_at DESC,m.message_id DESC LIMIT 1
+  ) m ON true
+  WHERE e.tenant_id=p_tenant_id AND e.execution_id=p_execution_id
+  FOR UPDATE OF c;
+  IF v_conversation IS NULL THEN RAISE EXCEPTION 'agent_response_conversation_not_found'; END IF;
+  SELECT x.message_id INTO v_message
+  FROM public.atlas_v122_messages x
+  WHERE x.tenant_id=p_tenant_id
+    AND x.idempotency_key=encode(digest('agent-response:'||p_execution_id::text,'sha256'),'hex')
+  FOR UPDATE;
+  IF v_message IS NULL THEN
+    INSERT INTO public.atlas_v122_messages(
+      tenant_id,message_id,conversation_id,direction,sender_ref,recipient_ref,body_ref,
+      delivery_status,idempotency_key,content_ref,subject,provider_status,created_at,updated_at
+    ) VALUES(
+      p_tenant_id,gen_random_uuid(),v_conversation,'outbound',v_sender,v_recipient,'{}','queued',
+      encode(digest('agent-response:'||p_execution_id::text,'sha256'),'hex'),p_content_ref,
+      CASE WHEN v_subject IS NULL OR v_subject='' THEN NULL ELSE CASE WHEN v_subject ILIKE 'Re:%' THEN v_subject ELSE 'Re: '||v_subject END END,
+      'queued',now(),now()
+    ) RETURNING message_id INTO v_message;
+    v_created:=true;
+  END IF;
+  IF v_created THEN
+    SELECT public.atlas_v115_enqueue_job(
+      p_tenant_id,gen_random_uuid(),'communication.message.send',
+      jsonb_build_object('messageId',v_message),
+      rpad(encode(digest('agent-response-job:'||p_execution_id::text,'sha256'),'hex'),64,'0')::char(64),
+      now(),5
+    ) INTO v_job;
+  ELSE
+    SELECT j.job_id INTO v_job
+    FROM public.atlas_runtime_jobs j
+    WHERE j.tenant_id=p_tenant_id
+      AND j.job_type='communication.message.send'
+      AND j.payload_ref->>'messageId'=v_message::text
+    ORDER BY j.created_at DESC LIMIT 1;
+  END IF;
+  RETURN QUERY SELECT v_message,v_conversation,v_job,v_created;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION atlas_v148_get_agent_input_for_job(UUID,UUID,TEXT,UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION atlas_v148_create_agent_response_for_job(UUID,UUID,TEXT,UUID,TEXT) FROM PUBLIC;
 
 COMMIT;
