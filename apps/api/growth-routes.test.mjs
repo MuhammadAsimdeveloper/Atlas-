@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import test from 'node:test';
 import { createGrowthApi } from './growth-routes.mjs';
 import { hashOpaqueToken, sessionCookieName } from './auth-contracts.mjs';
-import { createAgentReleaseManifest } from '../../packages/atlas-agent-fabric/index.mjs';
+import { createAgentReleaseManifest, buildAgentJourneyContext } from '../../packages/atlas-agent-fabric/index.mjs';
 
 const tenantA='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', tenantB='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const actor='11111111-1111-4111-8111-111111111111', ownerEmail='khan@example.net';
@@ -224,10 +224,15 @@ test('V147 authenticated agent turn planning binds the persistent session to the
       sessionId,agentRelease:release,turnId:'turn_v147_001',promptHash:'b'.repeat(64),
       toolCalls:[{toolName:'crm.search',risk:'read',argumentsHash:'c'.repeat(64)}],
       approvalRefs:[],workflowInvocationRef:null,
-      journeyContext:{tenantId:tenantA,journeyId:'journey_v147_api_001',contactRef:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',redacted:true,payloadMode:'reference_only',contextHash:'0'.repeat(64)},
+      journeyContext:buildAgentJourneyContext({tenantId:tenantA,journeyId:'journey_v147_api_001',contactRef:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}),
       now:Date.parse('2026-10-06T08:00:00.000Z')
     })});
-    assert.equal(response.status,400);
+    assert.equal(response.status,201);
+    const body=await response.json();
+    assert.equal(body.plan.releaseId,release.releaseId);
+    assert.equal(body.plan.rawPromptStored,false);
+    assert.equal(stored.length,1);
+    assert.equal(stored[0].tenantId,tenantA);
   } finally { await api.close(); }
 });
 
