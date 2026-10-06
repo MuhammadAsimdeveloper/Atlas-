@@ -158,7 +158,9 @@ BEGIN
   INSERT INTO public.atlas_ai_agent_sessions(tenant_id,session_id,agent_release_ref,channel,customer_ref,memory_scope,created_by)
   VALUES(
     p_tenant_id,p_session_id,v_release_id,'webchat',
-    jsonb_build_object('kind','copilot_session','id',p_session_id::text,'version',1),'session',NULL
+    CASE WHEN s.customer_ref IS NULL THEN jsonb_build_object('kind','copilot_session','id',p_session_id::text,'version',1)
+         ELSE jsonb_build_object('kind','customer_ref','id',s.customer_ref,'version',1) END,
+    'session',NULL
   ) ON CONFLICT (tenant_id,session_id) DO NOTHING;
 
   IF v_existing IS NOT NULL THEN
