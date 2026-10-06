@@ -268,3 +268,11 @@ test('V148 safe data mapping supports allowlisted transforms and forbids code/ne
   assert.throws(()=>validateDataMapping({mapping:[{source:'input.customer.name',target:'contact.name',transform:'eval'}]}),/unsupported/i);
   assert.throws(()=>validateDataMapping({mapping:[{source:'input.customer.name',target:'contact.name',transform:'identity'},{source:'input.customer.email',target:'contact.name',transform:'identity'}]}),/unique/i);
 });
+
+test('V148 edit-fields workflow node is backed by the safe mapping validator', () => {
+  assert.doesNotThrow(() => createAiWorkflowProposal({
+    tenantId:TENANT, requestedByActorId:ACTOR,
+    prompt:'Normalize a contact email before updating the CRM.',
+    candidateNodes:['edit_fields']
+  }));
+});
