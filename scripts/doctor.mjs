@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '152.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '153.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   const nodeRuntime = await read('packages/atlas-automation-fabric/node-runtime.mjs');
   const nodeRuntimeTests = await read('packages/atlas-automation-fabric/node-runtime.test.mjs');
   const supportRuntime = await read('packages/atlas-copilot/support-runtime.mjs');
@@ -32,6 +32,16 @@ try {
   check('V152 support session gateway', supportSession.includes('issueSupportSessionToken') && supportSession.includes('timingSafeEqual') && supportSession.includes('rawMessageStored:false') && supportSessionTests.includes('V152'), 'Customer-facing support sessions are signed, tenant/release bound, expiring and hash-bound; durable turn envelopes contain no raw message.');
   check('V152 real model/inbox execution bridge', openAiAdapter.includes('getModelAdapter') && openAiAdapter.includes('/v1/chat/completions') && openAiAdapter.includes('stream:true') && agentInput.includes('getMessageContent') && responseSink.includes('createAgentResponseForWorker') && agentHandler.includes('createAgentTurnJobHandler'), 'The reviewed worker bridge has an allowlisted OpenAI-compatible model adapter, inbox content resolver, streamed inference and response sink.');
   check('V152 bounded voice streaming gateway', voiceStream.includes('createVoiceStreamSession') && voiceStream.includes('acceptVoiceAudioFrame') && voiceStream.includes('audioStored:false') && voiceStream.includes('MAX_FRAME_BYTES') && voiceStreamTests.includes('V152'), 'Voice media frames are tenant/session scoped, codec/size/time bounded and represented durably by hashes rather than audio payloads.');
+  const copilotRoutes = await read('apps/api/copilot-routes.mjs');
+  const copilotMigration = await read('infra/postgres/FINAL-MIGRATION-V153.sql');
+  const copilotHub = await read('apps/command-center/copilot.html');
+  const copilotWidget = await read('apps/marketing-site/copilot-widget.mjs');
+  const copilotE2E = await read('scripts/copilot-staging-test.mjs');
+  check('V153 authenticated/public Copilot Hub', copilotRoutes.includes('/api/v1/public/copilot/session') && copilotRoutes.includes('/api/v1/platform/copilot/config') && copilotRoutes.includes('verifySupportSessionToken') && copilotMigration.includes('atlas_v153_copilot_configs') && copilotMigration.includes('atlas_v153_append_stream_event') && copilotHub.includes('Copilot Chat Hub') && copilotWidget.includes('authorization') && copilotE2E.includes('COPILOT_STAGING_E2E_OK'), 'Authenticated operator configuration, signed public sessions, tenant-bound streaming, handoff/approval inboxes and staging E2E are wired.');
+  const streamSink = await read('apps/worker/response-sinks/inbox.mjs');
+  const streamHandler = await read('apps/worker/agent-turn-handler.mjs');
+  const modelRuntime = await read('packages/atlas-agent-fabric/model-runtime.mjs');
+  check('V153 real model delta streaming', streamSink.includes('deliverStreamDelta') && streamSink.includes('appendAgentStreamEvent') && streamHandler.includes('onDelta') && modelRuntime.includes('await onDelta(delta)'), 'Model deltas cross the worker through a durable tenant-bound stream-event bridge instead of a fake delayed final response.');
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143']) {
