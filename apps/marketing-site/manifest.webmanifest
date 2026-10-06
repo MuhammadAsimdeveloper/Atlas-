@@ -1,0 +1,10 @@
+{
+  "name":"Atlas",
+  "short_name":"Atlas",
+  "description":"Governed AI customer operations for service businesses.",
+  "start_url":"/",
+  "display":"standalone",
+  "background_color":"#f7f8fc",
+  "theme_color":"#f7f8fc",
+  "icons":[{"src":"/favicon.svg","sizes":"any","type":"image/svg+xml"}]
+}
