@@ -282,7 +282,7 @@ scenarios.push(['agent durable evidence is redacted by construction', () => ({
     releaseSnapshotContainsSecrets:false,
     referencesOnly:true
   }
-}), result => Object.values(result.evidence).every(Boolean)]);
+}), result => result.evidence.rawPromptStored === false && result.evidence.rawOutputStored === false && result.evidence.transcriptStored === false && result.evidence.releaseSnapshotContainsSecrets === false && result.evidence.referencesOnly === true]);
 
 let passed = 0;
 for (const [scenarioName, runner, expectation] of scenarios) {
