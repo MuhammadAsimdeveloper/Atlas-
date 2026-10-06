@@ -11,7 +11,7 @@ try {
   const pkg = JSON.parse(await read('package.json'));
   const lock = JSON.parse(await read('package-lock.json'));
   check('runtime', Number(process.versions.node.split('.')[0]) >= 20, `Node ${process.versions.node}; Atlas requires >=20`);
-  check('release metadata', pkg.version === '146.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
+  check('release metadata', pkg.version === '147.0.0' && lock.version === pkg.version && lock.packages?.['']?.version === pkg.version, `package ${pkg.version}; lock ${lock.version}`);
   check('locked database dependencies', pkg.dependencies?.pg === '8.23.1' && lock.packages?.['node_modules/pg']?.version === pkg.dependencies.pg && pkg.devDependencies?.['@electric-sql/pglite'] === '0.5.8' && lock.packages?.['node_modules/@electric-sql/pglite']?.version === pkg.devDependencies['@electric-sql/pglite'], 'Runtime uses pinned node-postgres; ephemeral PostgreSQL migration tests use pinned PGlite');
 
   for (const version of ['129','130','131','132','133','134','135','136','137','138','139','140','141','142','143']) {
@@ -279,6 +279,12 @@ try {
   check('V146 hardened n8n automation fabric', automationFabric.includes('N8N_PARITY_FEATURES') && automationFabric.includes('createAutomationPolicy') && automationFabric.includes('createApprovalRequest') && automationFabric.includes('createWorkflowTemplate') && automationFabric.includes('createMcpServerManifest') && automationFabric.includes('createAiWorkflowProposal') && automationFabric.includes('auditWorkflowSecurity'), automationTests.includes('n8n parity catalog') && automationPlan.includes('V146 — n8n-inspired hardened automation fabric') && automationAudit.includes('n8n Parity + Hardening Audit'), 'n8n-style workflow features are governed by tenant scope, idempotency, approval, protected environments, capability-scoped MCP and security auditing.');
   check('V146 automation API surfaces', await read('apps/api/growth-routes.mjs').then(x => x.includes('/api/v1/growth/automation/ai-proposal') && x.includes('/api/v1/growth/automation/security-audit')), 'AI workflow proposals and security audits are exposed through the authenticated Growth API without autonomous production mutation.');
 
+  const agentFabric = await read('packages/atlas-agent-fabric/index.mjs');
+  const agentFabricTests = await read('packages/atlas-agent-fabric/index.test.mjs');
+  const agentMigration = await read('infra/postgres/FINAL-MIGRATION-V147.sql');
+  const agentGrants = await read('infra/postgres/API-ROLE-GRANTS-V147.sql');
+  check('V147 agent journey runtime', agentFabric.includes('createAgentReleaseManifest') && agentFabric.includes('planAgentTurn') && agentFabric.includes('authorizeAgentWorkflowInvocation') && agentFabric.includes('createHumanHandoff'), agentFabricTests.includes('V147 agent turn planning') && agentMigration.includes('atlas_agent_turn_plans') && agentMigration.includes('atlas_agent_handoffs') && agentMigration.includes('FORCE ROW LEVEL SECURITY') && agentGrants.includes('atlas_app'), 'Agent release/session context, turn planning, workflow invocation authorization and handoffs are reference-only and persisted under tenant RLS.');
+  check('V147 agent API/runtime store', await read('apps/api/growth-routes.mjs').then(x => x.includes('/api/v1/growth/agents/turns/plan') && x.includes('/api/v1/growth/agents/workflow-invocations/authorize') && x.includes('/api/v1/growth/agents/handoffs')) && await read('apps/api/runtime-store.mjs').then(x => x.includes('recordAgentTurnPlan') && x.includes('recordAgentHandoff') && x.includes('getAgentSession')), 'Agent turn plans and handoffs are connected to the authenticated API and durable runtime store.');
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
 }
