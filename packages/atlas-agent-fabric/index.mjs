@@ -18,6 +18,10 @@ function canonical(value) {
 function sha(value) {
   return crypto.createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 }
+function uuidFromHash(value) {
+  const hex = sha(value).slice(0, 32);
+  return hex.slice(0,8)+'-'+hex.slice(8,12)+'-4'+hex.slice(13,16)+'-8'+hex.slice(17,20)+'-'+hex.slice(20,32);
+}
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value)) freeze(child);
@@ -126,7 +130,8 @@ export function planAgentTurn({
     promptHash, toolCalls:normalizedTools, approvalRefs:approvals, workflowInvocationRef,
     journeyContext, rawPromptStored:false, plannedAt:new Date(current).toISOString()
   };
-  return freeze({ ...snapshot, idempotencyKey:sha(snapshot) });
+  const idempotencyKey=sha(snapshot);
+  return freeze({ ...snapshot, planId:uuidFromHash({tenantId,sessionId,turnId,releaseId:agentRelease.releaseId}), idempotencyKey });
 }
 
 export function authorizeAgentWorkflowInvocation({
@@ -150,7 +155,7 @@ export function createHumanHandoff({tenantId,sessionId,reason,queueRef,appointme
   if (appointmentRef != null) ref(appointmentRef,'appointmentRef');
   const current=timestamp(now,'now');
   const body={tenantId,sessionId,reason,queueRef,appointmentRef,status:'pending',requestedAt:new Date(current).toISOString()};
-  return freeze({handoffId:'handoff_'+sha(body).slice(0,24),...body,redacted:true});
+  return freeze({handoffId:uuidFromHash(body),...body,redacted:true});
 }
 
 export function summarizeAgentRun({tenantId,sessionId,agentRelease,turns=0,toolCalls=0,status,outcome=null,failureReason=null,handoffReason=null,journeyContext}={}) {
