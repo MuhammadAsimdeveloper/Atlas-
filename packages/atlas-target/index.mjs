@@ -139,6 +139,7 @@ const CONFIG_REFERENCE_PHONE = /[+()\s]/;
 
 function opaqueWorkflowReference(value, label) {
   const result = reference(value, label);
+  if (/^TEMPLATE_[A-Z0-9_]{1,120}$/.test(result)) return result;
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result);
   const numericAddress = /^[+\d(). -]+$/.test(result) && (result.match(/\d/g) || []).length >= 7;
   const phoneLike = CONFIG_REFERENCE_PHONE.test(result) && (result.match(/\d/g) || []).length >= 7;
@@ -245,7 +246,7 @@ function validateWorkflowNodeConfig(type, config) {
   }
   if (type === 'stop_and_error') {
     if (typeof config.errorCode !== 'string' || !/^[a-z][a-z0-9_.-]{0,79}$/.test(config.errorCode)) throw new Error('stop_and_error errorCode is invalid');
-    if (typeof config.message !== 'string' || !config.message.trim() || config.message.length > 500 || /[\\r\\n\\u0000]/.test(config.message)) throw new Error('stop_and_error message is invalid');
+    if (typeof config.message !== 'string' || !config.message.trim() || config.message.length > 500 || config.message.includes('\r') || config.message.includes('\n') || config.message.includes('\u0000')) throw new Error('stop_and_error message is invalid');
   }
   if (type === 'execution_data') {
     if (typeof config.key !== 'string' || !/^[a-z][a-z0-9_.-]{0,79}$/.test(config.key)) throw new Error('execution_data key is invalid');
