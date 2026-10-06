@@ -5,6 +5,7 @@ import { nextScheduleOccurrence, assertIanaTimezone, boundedJson, eventDedupKey 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
 const PREFIX = /^[a-f0-9]{56}$/;
+const sha256 = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 export class PostgresRuntimeStore {
   constructor(pool) { this.pool = pool; }
@@ -317,7 +318,7 @@ export class PostgresRuntimeStore {
     if(!plan || !UUID.test(plan.planId||'') || !UUID.test(plan.sessionId||'') || !UUID.test(plan.agentId||'') || typeof plan.releaseId!=='string' || !/^[A-Za-z0-9_.:/@+-]{1,180}$/.test(plan.releaseId) || !Number.isInteger(plan.releaseVersion) || plan.releaseVersion<1 || !SHA256.test(plan.promptHash||'') || !SHA256.test(plan.idempotencyKey||'')) throw createAuthError(400,'agent_turn_plan_invalid');
     return this.#tenantTransaction({actorId,tenantId},async client=>{
       await client.query('INSERT INTO atlas_agent_turn_plans(tenant_id,plan_id,session_id,turn_id,agent_id,release_id,release_version,prompt_hash,tool_plan,approval_refs,workflow_invocation_ref,journey_context,idempotency_key,status,checksum) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13,$14,$15) ON CONFLICT(tenant_id,idempotency_key) DO NOTHING',
-        [tenantId,plan.planId,plan.sessionId,plan.turnId,plan.agentId,plan.releaseId,plan.releaseVersion,plan.promptHash,JSON.stringify(plan.toolCalls||[]),JSON.stringify(plan.approvalRefs||[]),plan.workflowInvocationRef||null,JSON.stringify(plan.journeyContext||{}),plan.idempotencyKey,'planned',plan.checksum||'']);
+        [tenantId,plan.planId,plan.sessionId,plan.turnId,plan.agentId,plan.releaseId,plan.releaseVersion,plan.promptHash,JSON.stringify(plan.toolCalls||[]),JSON.stringify(plan.approvalRefs||[]),plan.workflowInvocationRef||null,JSON.stringify(plan.journeyContext||{}),plan.idempotencyKey,'planned',sha256(plan)]);
       return plan.planId;
     });
   }
