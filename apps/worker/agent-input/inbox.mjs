@@ -8,14 +8,14 @@ function boundedContent(value,label,max=24000){ if(typeof value!=='string'||valu
 const env=process.env;
 const store=await loadInboxContentStore(env);
 
-export async function resolveInput({tenantId,inputRef,context}={}){
+export async function resolveInput({tenantId,inputRef,executionId,context}={}){
   boundedRef(tenantId,'tenantId'); boundedRef(inputRef,'inputRef');
-  const executionId=boundedRef(context?.jobId||'agent_job','jobId');
+  boundedRef(executionId,'executionId');
   const item=await context.workerStore.getAgentInputForWorker({
     tenantId,
     jobId:context.jobId,
     workerId:context.workerId,
-    executionId:context.executionId||context.payloadExecutionId||context.jobId
+    executionId
   });
   if(!item) throw Object.assign(new Error('Agent input is unavailable'),{code:'agent_input_unavailable'});
   const content=await store.getMessageContent({
