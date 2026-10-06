@@ -6,7 +6,7 @@ import { paddlePlanCatalog, verifyPaddleFreeTrialPrice, createPaddleCheckout, cr
 import { simulateWorkflow } from '../../packages/atlas-target/workflow-simulator.mjs';
 import { enforceRateLimit, securityHeaders } from './security.mjs';
 import { createPromotionManifest, routeEvent } from '../../packages/atlas-core/production-frontier.mjs';
-import { auditWorkflowSecurity, createAiWorkflowProposal } from '../../packages/atlas-automation-fabric/index.mjs';
+import { auditWorkflowSecurity, createAiWorkflowProposal, createAiWorkflowAuthoringPlan } from '../../packages/atlas-automation-fabric/index.mjs';
 import { planAgentTurn, buildAgentJourneyContext, authorizeAgentWorkflowInvocation, createHumanHandoff } from '../../packages/atlas-agent-fabric/index.mjs';
 
 const MAX_BODY_BYTES = 110_000;
@@ -193,6 +193,18 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
           throw createAuthError(400, 'invalid_ai_workflow_proposal', error?.message || 'The workflow proposal is invalid.');
         }
       }
+      if (path === '/api/v1/growth/automation/ai-plan' && req.method === 'POST') {
+        await requireMutation(req, who.session);
+        const body=await readJson(req);
+        exact(body,['businessGoal','knownFacts','candidateNodes']);
+        try {
+          const plan=createAiWorkflowAuthoringPlan({tenantId:who.tenantId,requestedByActorId:who.actorId,...body});
+          return send(res,201,{plan},env);
+        } catch(error) {
+          throw createAuthError(400,'invalid_ai_workflow_plan',error?.message||'The workflow authoring plan is invalid.');
+        }
+      }
+
       if (path === '/api/v1/growth/automation/security-audit' && req.method === 'POST') {
         await requireMutation(req, who.session);
         const body = await readJson(req);
