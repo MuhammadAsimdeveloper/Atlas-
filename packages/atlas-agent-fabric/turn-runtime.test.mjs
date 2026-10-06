@@ -14,6 +14,7 @@ import {
   createAgentSession
 } from '../atlas-target/index.mjs';
 import { createAgentReleaseManifest } from './index.mjs';
+import { createAgentTimeline, appendAgentTimelineEvent, resetAgentTimeline, exportAgentTimeline } from './execution-timeline.mjs';
 
 const TENANT = '11111111-1111-4111-8111-111111111111';
 const ACTOR = '33333333-3333-4333-8333-333333333333';
@@ -208,4 +209,17 @@ test('V148 streaming adapter exposes transient deltas but redacts them from dura
   assert.equal(result.status, 'completed');
   assert.equal(result.output, 'Hello');
   assert.equal(result.redacted.transcriptStored, false);
+});
+
+test('V148 execution timeline is bounded, resettable and export-safe', () => {
+  let timeline=createAgentTimeline({tenantId:TENANT,sessionId:SESSION_CONVERSATION,releaseId:RELEASE,maxEvents:20});
+  timeline=appendAgentTimelineEvent(timeline,{type:'session.started',now:NOW});
+  timeline=appendAgentTimelineEvent(timeline,{type:'tool.proposed',turnId:'turn_v148_timeline',nodeRef:'crm.search',refHash:'f'.repeat(64),now:NOW});
+  timeline=resetAgentTimeline(timeline,{now:NOW+1});
+  const exported=exportAgentTimeline(timeline);
+  assert.equal(exported.eventCount,3);
+  assert.equal(exported.rawContentStored,false);
+  assert.ok(exported.events.every(event => Object.hasOwn(event,'refHash')));
+  assert.equal('prompt' in exported.events[0],false);
+  assert.equal('output' in exported.events[0],false);
 });
