@@ -29,7 +29,16 @@ function allowOrigin(req,allowed,env,{publicRequest=false}={}) {
   if(!allowed.includes(o))throw createAuthError(403,'origin_forbidden');
   return o;
 }
-function corsHeaders(o){return o?{'access-control-allow-origin':o,'access-control-allow-credentials':'false','vary':'Origin'}:{};}
+function corsHeaders(o){return o?{'access-control-allow-origin':o,'access-control-allow-credentials':'false','vary':'Origin'}:{ };}
+function dbErrorStatus(error) {
+  const code=String(error?.message||'');
+  if(code==='copilot_origin_forbidden')return 403;
+  if(code==='copilot_widget_not_found'||code==='copilot_session_not_found'||code==='copilot_execution_not_found')return 404;
+  if(code==='copilot_release_runtime_incomplete')return 503;
+  if(code==='copilot_release_inactive')return 409;
+  if(code==='copilot_session_invalid'||code==='copilot_turn_invalid'||code==='copilot_handoff_invalid')return 400;
+  return null;
+}
 
 export class PostgresCopilotStore {
   constructor(pool){this.pool=pool;}
@@ -202,9 +211,9 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
       if(approval&&req.method==='POST'){await mutation(req,who.session);const b=await readJson(req);exact(b,['status']);if(!['approved','denied'].includes(b.status))throw createAuthError(400,'approval_status_invalid');return send(res,200,{item:await runtimeStore.decideAgentToolApproval({...who,approvalId:approval[1],status:b.status})},env);}
       return send(res,404,{error:'not_found'},env);
     }catch(error){
-      const status=Number.isInteger(error?.status)?error.status:500;
+      const status=Number.isInteger(error?.status)?error.status:(dbErrorStatus(error)||500);
       if(status>=500)process.stderr.write('Copilot route failed: '+error.message+'\n');
-      return send(res,status,status>=500?{error:'copilot_service_unavailable'}:{error:error.code||'request_failed',message:error.message},env);
+      return send(res,status,status>=500?{error:'copilot_service_unavailable'}:{error:dbErrorStatus(error)?error.message:(error.code||'request_failed'),message:dbErrorStatus(error)?undefined:error.message},env);
     }
   }
   return {handle,store};
