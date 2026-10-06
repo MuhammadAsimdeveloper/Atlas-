@@ -29,7 +29,7 @@ function allowOrigin(req,allowed,env,{publicRequest=false}={}) {
   if(!allowed.includes(o))throw createAuthError(403,'origin_forbidden');
   return o;
 }
-function corsHeaders(o){return o?{'access-control-allow-origin':o,'access-control-allow-credentials':'false','vary':'Origin'}:{ };}
+function corsHeaders(o){return o?{'access-control-allow-origin':o,'access-control-allow-credentials':'false','cross-origin-resource-policy':'cross-origin','vary':'Origin'}:{ };}
 function dbErrorStatus(error) {
   const code=String(error?.message||'');
   if(code==='copilot_origin_forbidden')return 403;
