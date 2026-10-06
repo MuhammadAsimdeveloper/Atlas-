@@ -68,7 +68,9 @@ export async function getModelAdapter({tenantId,release}={}){
         while(true){
           const {value,done}=await reader.read(); if(done) break;
           buffer+=decoder.decode(value,{stream:true});
-          for(const line of buffer.split('\n')){
+          const lines=buffer.split(/\r?\n/);
+          buffer=lines.pop() || '';
+          for(const line of lines){
             const trimmed=line.trim();
             if(!trimmed||!trimmed.startsWith('data:')) continue;
             const data=trimmed.slice(5).trim();
@@ -77,7 +79,6 @@ export async function getModelAdapter({tenantId,release}={}){
             if(delta) yield {delta:String(delta)};
             if(json?.choices?.[0]?.finish_reason) yield {done:true,finishReason:json.choices[0].finish_reason};
           }
-          buffer=buffer.slice(buffer.lastIndexOf('\n')+1);
         }
       } finally { reader.releaseLock?.(); }
     }
