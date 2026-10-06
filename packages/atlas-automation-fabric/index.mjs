@@ -62,7 +62,7 @@ function scanUnsafe(value, path = 'config', findings = []) {
   if (typeof value === 'string') {
     if (SECRET_KEY.test(path)) findings.push({ code:'SECRET_LIKE_FIELD', path });
     if (DIRECT_TARGET_KEY.test(path)) findings.push({ code:'DIRECT_NETWORK_TARGET', path });
-    if (/(^|[^A-Za-z])(require\s*\(|child_process|process\.|eval\s*\(|Function\s*\(|import\s*\(|fetch\s*\(|axios\s*\(|XMLHttpRequest)/i.test(value)) findings.push({ code:'EXECUTABLE_OR_NETWORK_PAYLOAD', path });
+    if (EXECUTABLE_MARKERS.some(marker => value.includes(marker))) findings.push({ code:'EXECUTABLE_OR_NETWORK_PAYLOAD', path });
     return findings;
   }
   if (typeof value !== 'object') return findings;
