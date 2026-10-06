@@ -50,7 +50,7 @@ function rejectRawObject(value, path = 'input') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return;
   for (const [key, child] of Object.entries(value)) {
     if (RAW_KEYS.has(key)) throw new TypeError(path + ' cannot contain raw customer or prompt content');
-    if (key.toLowerCase().includes('secret') || key.toLowerCase().includes('token')) throw new TypeError(path + ' cannot contain secret material');
+    if (/^(?:secret|token|access_token|refresh_token|api_key|apikey|authorization|cookie|private_key|client_secret)$/i.test(key)) throw new TypeError(path + ' cannot contain secret material');
     rejectRawObject(child, path + '.' + key);
   }
 }
@@ -87,9 +87,11 @@ export function createAgentReleaseManifest({
 
 export function buildAgentJourneyContext({
   tenantId, journeyId, contactRef = null, leadRef = null, opportunityRef = null,
-  appointmentRef = null, conversationRef = null, voiceSessionRef = null, workflowExecutionRef = null
+  appointmentRef = null, conversationRef = null, voiceSessionRef = null, workflowExecutionRef = null,
+  ...extra
 } = {}) {
   ref(tenantId, 'tenantId'); ref(journeyId, 'journeyId');
+  rejectRawObject(extra, 'journeyContext');
   for (const [key,value] of Object.entries({contactRef,leadRef,opportunityRef,appointmentRef,conversationRef,voiceSessionRef,workflowExecutionRef})) {
     if (value != null) ref(value, key);
   }
