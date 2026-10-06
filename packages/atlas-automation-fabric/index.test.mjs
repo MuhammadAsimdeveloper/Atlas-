@@ -19,7 +19,7 @@ import {
   auditWorkflowSecurity
 } from './index.mjs';
 import { WORKFLOW_NODE_CATALOG } from '../atlas-target/workflow-catalog.mjs';
-import { createWorkflowGraph } from '../atlas-target/index.mjs';
+import { createWorkflowGraph, verifyWorkflowGraph } from '../atlas-target/index.mjs';
 
 const TENANT = '11111111-1111-4111-8111-111111111111';
 const ACTOR = '33333333-3333-4333-8333-333333333333';
@@ -38,6 +38,30 @@ test('V146 n8n parity catalog covers hardened core workflow concepts without ena
   assert.ok(N8N_PARITY_FEATURES.includes('mcp'));
   assert.equal(HARDENED_NODE_ADDONS.some(node => node.type === 'execute_command'), false);
   for (const type of ['loop_over_items','aggregate','remove_duplicates','sort','split_out','respond_to_webhook','error_trigger','stop_and_error','no_op','data_table','execution_data','mcp_client','mcp_server_trigger']) assert.ok(WORKFLOW_NODE_CATALOG[type], 'missing hardened workflow node: ' + type);
+});
+
+test('V146 new n8n-style nodes are accepted by the real Atlas graph validator', () => {
+  const graph = createWorkflowGraph({
+    tenantId: TENANT,
+    id: WORKFLOW,
+    version: 1,
+    name: 'n8n parity smoke',
+    nodes: [
+      { id: '11111111-1111-4111-8111-111111111111', type: 'trigger', config: { eventType: 'form.submitted' } },
+      { id: '22222222-2222-4222-8222-222222222222', type: 'loop_over_items', config: { batchSize: 10, maxItems: 100 } },
+      { id: '33333333-3333-4333-8333-333333333333', type: 'aggregate', config: { maxItems: 100 } },
+      { id: '44444444-4444-4444-8444-444444444444', type: 'execution_data', config: { key: 'source', value: 'crm' } },
+      { id: '55555555-5555-4555-8555-555555555555', type: 'stop_and_error', config: { errorCode: 'demo.stop', message: 'Demo terminal' } }
+    ],
+    edges: [
+      { id: '66666666-6666-4666-8666-666666666666', from: '11111111-1111-4111-8111-111111111111', to: '22222222-2222-4222-8222-222222222222', port: 'next' },
+      { id: '77777777-7777-4777-8777-777777777777', from: '22222222-2222-4222-8222-222222222222', to: '33333333-3333-4333-8333-333333333333', port: 'next' },
+      { id: '88888888-8888-4888-8888-888888888888', from: '33333333-3333-4333-8333-333333333333', to: '44444444-4444-4444-8444-444444444444', port: 'next' },
+      { id: '99999999-9999-4999-8999-999999999999', from: '44444444-4444-4444-8444-444444444444', to: '55555555-5555-4555-8555-555555555555', port: 'next' }
+    ]
+  });
+  assert.equal(verifyWorkflowGraph(graph), true);
+  assert.equal(graph.nodes.find(node => node.type === 'loop_over_items').guard, 'max_items_and_iterations');
 });
 
 test('V146 policy bounds concurrency, retries, loops, timeout and execution data retention', () => {
