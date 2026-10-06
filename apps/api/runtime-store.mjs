@@ -317,10 +317,59 @@ export class PostgresRuntimeStore {
   async recordAgentTurnPlan({ actorId, tenantId, plan }) {
     if(!plan || !UUID.test(plan.planId||'') || !UUID.test(plan.sessionId||'') || !UUID.test(plan.agentId||'') || typeof plan.releaseId!=='string' || !/^[A-Za-z0-9_.:/@+-]{1,180}$/.test(plan.releaseId) || !Number.isInteger(plan.releaseVersion) || plan.releaseVersion<1 || !SHA256.test(plan.promptHash||'') || !SHA256.test(plan.idempotencyKey||'')) throw createAuthError(400,'agent_turn_plan_invalid');
     return this.#tenantTransaction({actorId,tenantId},async client=>{
-      await client.query('INSERT INTO atlas_agent_turn_plans(tenant_id,plan_id,session_id,turn_id,agent_id,release_id,release_version,prompt_hash,tool_plan,approval_refs,workflow_invocation_ref,journey_context,idempotency_key,status,checksum) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13,$14,$15) ON CONFLICT(tenant_id,idempotency_key) DO NOTHING',
-        [tenantId,plan.planId,plan.sessionId,plan.turnId,plan.agentId,plan.releaseId,plan.releaseVersion,plan.promptHash,JSON.stringify(plan.toolCalls||[]),JSON.stringify(plan.approvalRefs||[]),plan.workflowInvocationRef||null,JSON.stringify(plan.journeyContext||{}),plan.idempotencyKey,'planned',sha256(plan)]);
+      await client.query('INSERT INTO atlas_agent_turn_plans(tenant_id,plan_id,session_id,turn_id,agent_id,release_id,release_version,release_snapshot,prompt_hash,tool_plan,approval_refs,workflow_invocation_ref,journey_context,idempotency_key,status,checksum) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10::jsonb,$11::jsonb,$12,$13::jsonb,$14,$15,$16) ON CONFLICT(tenant_id,idempotency_key) DO NOTHING',
+        [tenantId,plan.planId,plan.sessionId,plan.turnId,plan.agentId,plan.releaseId,plan.releaseVersion,JSON.stringify(plan.releaseSnapshot||{}),plan.promptHash,JSON.stringify(plan.toolCalls||[]),JSON.stringify(plan.approvalRefs||[]),plan.workflowInvocationRef||null,JSON.stringify(plan.journeyContext||{}),plan.idempotencyKey,'planned',sha256(plan)]);
       return plan.planId;
     });
+  }
+
+  async queueAgentTurnExecution({ actorId, tenantId, executionId, planId }) {
+    if(!UUID.test(executionId||'') || !UUID.test(planId||'')) throw createAuthError(400,'agent_turn_execution_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows:plans}=await client.query('SELECT plan_id,session_id,turn_id,release_id,release_version,prompt_hash,journey_context,idempotency_key FROM atlas_agent_turn_plans WHERE tenant_id=$1 AND plan_id=$2',[tenantId,planId]);
+      if(!plans.length) throw createAuthError(404,'agent_turn_plan_not_found');
+      const plan=plans[0];
+      const inputRef=plan.journey_context?.conversationRef || plan.journey_context?.journeyId;
+      if(typeof inputRef!=='string' || !/^[A-Za-z0-9][A-Za-z0-9_.:/@-]{2,240}$/.test(inputRef)) throw createAuthError(409,'agent_turn_input_ref_missing');
+      const checksum=sha256({tenantId,executionId,planId:plan.plan_id,sessionId:plan.session_id,turnId:plan.turn_id,releaseId:plan.release_id,releaseVersion:plan.release_version,promptHash:plan.prompt_hash,inputRef:inputRef,idempotencyKey:plan.idempotency_key});
+      const existing=await client.query('SELECT execution_id,version,status FROM atlas_agent_turn_executions WHERE tenant_id=$1 AND plan_id=$2',[tenantId,plan.plan_id]);
+      const resolvedExecutionId=existing.rows[0]?.execution_id || executionId;
+      if(!existing.rows.length){
+        await client.query('INSERT INTO atlas_agent_turn_executions(tenant_id,execution_id,plan_id,session_id,turn_id,release_id,release_version,prompt_hash,input_ref,idempotency_key,checksum) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',[tenantId,resolvedExecutionId,plan.plan_id,plan.session_id,plan.turn_id,plan.release_id,plan.release_version,plan.prompt_hash,inputRef,plan.idempotency_key,checksum]);
+      }
+      const jobId=randomUUID();
+      const {rows:jobs}=await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7) AS job_id',[tenantId,jobId,'agent.turn.execute',JSON.stringify({executionId:resolvedExecutionId}),plan.idempotency_key,null,5]);
+      return { executionId:resolvedExecutionId, jobId:jobs[0]?.job_id || jobId };
+    });
+  }
+
+  async getAgentTurnExecution({ actorId, tenantId, executionId }) {
+    if(!UUID.test(executionId||'')) throw createAuthError(400,'agent_turn_execution_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query('SELECT execution_id,plan_id,session_id,turn_id,release_id,release_version,status,prompt_hash,input_ref,result_ref,output_hash,tool_calls,input_tokens,output_tokens,latency_ms,waiting_reason,error_code,idempotency_key,version,checksum,created_at,updated_at FROM atlas_agent_turn_executions WHERE tenant_id=$1 AND execution_id=$2',[tenantId,executionId]);
+      if(!rows.length) throw createAuthError(404,'agent_turn_execution_not_found');
+      return rows[0];
+    });
+  }
+
+  async listAgentTurnExecutions({ actorId, tenantId, sessionId=null, status=null, limit=50 }) {
+    if(!Number.isInteger(limit)||limit<1||limit>200) throw createAuthError(400,'agent_turn_execution_invalid');
+    if(sessionId!==null&&!UUID.test(sessionId)) throw createAuthError(400,'agent_session_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query('SELECT execution_id,plan_id,session_id,turn_id,release_id,release_version,status,prompt_hash,input_ref,result_ref,output_hash,tool_calls,input_tokens,output_tokens,latency_ms,waiting_reason,error_code,idempotency_key,version,created_at,updated_at FROM atlas_agent_turn_executions WHERE tenant_id=$1 AND ($2::uuid IS NULL OR session_id=$2) AND ($3::text IS NULL OR status=$3) ORDER BY created_at DESC LIMIT $4',[tenantId,sessionId,status,limit]);
+      return rows;
+    });
+  }
+
+  async getAgentTurnForWorker({ tenantId, jobId, workerId }) {
+    if(!UUID.test(tenantId||'')||!UUID.test(jobId||'')||!workerId||!/^[A-Za-z0-9_.:-]{1,120}$/.test(workerId)) throw new Error('worker agent turn reference invalid');
+    const {rows}=await this.pool.query('SELECT * FROM atlas_v148_get_agent_turn_for_job($1,$2,$3)',[tenantId,jobId,workerId]);
+    return rows[0] || null;
+  }
+
+  async updateAgentTurnForWorker({ tenantId, jobId, workerId, executionId, expectedVersion, status, resultRef=null, outputHash=null, toolCalls=0, inputTokens=0, outputTokens=0, latencyMs=null, waitingReason=null, errorCode=null, checksum }) {
+    const {rows}=await this.pool.query('SELECT atlas_v148_update_agent_turn_for_job($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15) AS updated',[tenantId,jobId,workerId,executionId,expectedVersion,status,resultRef?JSON.stringify(resultRef):null,outputHash,toolCalls,inputTokens,outputTokens,latencyMs,waitingReason,errorCode,checksum]);
+    return Boolean(rows[0]?.updated);
   }
 
   async recordAgentHandoff({ actorId, tenantId, handoff }) {
