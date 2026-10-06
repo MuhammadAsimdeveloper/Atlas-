@@ -4,6 +4,18 @@ import { createBookingCalendar } from '../packages/atlas-target/index.mjs';
 import { assessSeoReadiness } from '../packages/atlas-seo/index.mjs';
 import { actionAllowed } from '../packages/atlas-core/production-frontier.mjs';
 import { runLeadToBookingJourney } from '../packages/atlas-journey/index.mjs';
+import {
+  validateAutomationNode,
+  createApprovalRequest,
+  decideApproval,
+  planExecutionRetry,
+  createWorkflowEnvironment,
+  planEnvironmentPromotion,
+  createAiWorkflowProposal,
+  createMcpServerManifest,
+  authorizeMcpToolCall,
+  auditWorkflowSecurity
+} from '../packages/atlas-automation-fabric/index.mjs';
 
 const source = await readFile(new URL('../docs/MIROFISH-ATLAS-DECISION-RECORD-2026-10.md', import.meta.url), 'utf8');
 
@@ -174,6 +186,46 @@ scenarios.push(['public SEO refuses insecure origin', () => {
     });
     return { blocked: Array.isArray(result.issues) && result.issues.some(issue => /HTTPS/i.test(issue)) };
 }, result => result.blocked === true]);
+
+scenarios.push(['n8n direct network target blocked', () => {
+  const journey = runLeadToBookingJourney(baseInput());
+  let blocked = false;
+  try { validateAutomationNode({ tenantId: TENANT, node: { id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', type: 'http_request', config: { url: 'https://example.com' } } }); } catch { blocked = true; }
+  return { ...journey, blocked };
+}, result => result.blocked === true]);
+
+scenarios.push(['n8n unsafe retry blocked', () => {
+  const journey = runLeadToBookingJourney(baseInput());
+  let blocked = false;
+  try {
+    planExecutionRetry({ tenantId: TENANT, workflowId: journey.lead.id, workflowVersion: 1, executionId: 'ffffffff-ffff-4fff-8fff-ffffffffffff', nodeId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', attempt: 2, maxAttempts: 4, retrySafe: false });
+  } catch { blocked = true; }
+  return { ...journey, blocked };
+}, result => result.blocked === true]);
+
+scenarios.push(['n8n human approval rejects self approval', () => {
+  const journey = runLeadToBookingJourney(baseInput());
+  const request = createApprovalRequest({ tenantId: TENANT, workflowId: journey.lead.payload.pipelineId, executionId: '11111111-1111-4111-8111-111111111111', nodeId: '22222222-2222-4222-8222-222222222222', requestedByActorId: ACTOR, actionKey: 'publish_social_post', argumentsHash: 'a'.repeat(64), expiresAt: '2026-10-06T08:00:00.000Z' });
+  return { ...journey, approvalStatus: decideApproval({ request, tenantId: TENANT, approvedByActorId: ACTOR, decision: 'approved', now: NOW }).status };
+}, result => result.approvalStatus === 'denied']);
+
+scenarios.push(['n8n protected production promotion', () => {
+  const journey = runLeadToBookingJourney(baseInput());
+  const dev = createWorkflowEnvironment({ tenantId: TENANT, id: '33333333-3333-4333-8333-333333333333', name: 'Development', stage: 'development', protected: false, branchRef: 'development' });
+  const prod = createWorkflowEnvironment({ tenantId: TENANT, id: '44444444-4444-4444-8444-444444444444', name: 'Production', stage: 'production', protected: true, branchRef: 'production' });
+  return { ...journey, promotion: planEnvironmentPromotion({ tenantId: TENANT, source: dev, target: prod, workflowId: journey.lead.payload.pipelineId, workflowVersion: 1, manifestSha256: 'a'.repeat(64), approvedByActorId: '55555555-5555-4555-8555-555555555555', sourceChangedAfterApproval: false }) };
+}, result => result.promotion.status === 'ready']);
+
+scenarios.push(['n8n MCP capability isolation', () => {
+  const journey = runLeadToBookingJourney(baseInput());
+  const manifest = createMcpServerManifest({ tenantId: TENANT, serverId: '66666666-6666-4666-8666-666666666666', tools: [{ name: 'search_contacts', risk: 'read', capability: 'crm.read' }, { name: 'send_message', risk: 'network', capability: 'communications.send' }] });
+  return { ...journey, mcp: authorizeMcpToolCall({ manifest, tenantId: TENANT, toolName: 'send_message', actorCapabilities: ['crm.read'], argumentsValue: { body: 'blocked' } }) };
+}, result => result.mcp.allowed === false && result.mcp.code === 'CAPABILITY_DENIED']);
+
+scenarios.push(['n8n workflow security audit fails closed', () => {
+  const journey = runLeadToBookingJourney(baseInput());
+  return { ...journey, security: auditWorkflowSecurity({ tenantId: TENANT, workflow: { tenantId: TENANT, id: journey.lead.id, version: 1, nodes: [{ id: '77777777-7777-4777-8777-777777777777', type: 'trigger', config: { eventType: 'webhook.received' } }, { id: '88888888-8888-4888-8888-888888888888', type: 'http_request', config: { url: 'https://example.com' } }] } }) };
+}, result => result.security.status === 'blocked']);
 
 scenarios.push(['agent destructive action needs approval', () => {
   const journey = runLeadToBookingJourney(baseInput());
