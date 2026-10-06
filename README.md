@@ -1,8 +1,21 @@
-# Atlas Business Operating System — V148
+# Atlas Business Operating System — V151
 
-V148 is the current repository release. It hardens the AI execution frontier with a provider-neutral model runtime, governed agent turns, redacted execution timelines, durable worker-mediated turn state, and plan-first AI workflow authoring. External model providers, telephony, managed Redis/KMS/WAF/CDN/object storage, production credentials and measured disaster/load evidence remain explicit deployment gates.
+V151 is the current repository release. It extends the AI execution frontier with a tenant-grounded customer-support Copilot, hardened voice-agent turns, a deterministic n8n-style node runtime, support-agent evaluation/training artifacts, and governed agent skills. External model, speech, telephony, knowledge-provider and production infrastructure activation remain explicit deployment gates.
 
 See [V148 gap register](docs/ATLAS-GAP-REGISTER-V148-2026-10.md) for the remaining incomplete product and production features.
+
+## V151 — AI agents, voice agents, n8n runtime and customer-support Copilot
+
+- Customer-support Copilot grounds factual answers in tenant-approved knowledge and escalates uncertainty, privacy, complaints and sensitive intents.
+- Support-agent “training” is implemented as an evaluation/grounding curriculum using hashes, expected intents, knowledge references, reviewer outcomes and failure codes; no foundation-model fine-tuning is falsely claimed.
+- Voice-agent runtime enforces AI disclosure, outbound consent, call windows, transfer budgets, interruption limits and reference-only transcript evidence.
+- n8n-style native nodes now have deterministic bounded handlers for loops, split/aggregate, deduplication, sorting, filtering, branching, waits, execution metadata and terminal errors.
+- Connector/AI side-effect nodes remain behind Atlas's existing approval, idempotency, provider and worker boundaries.
+- New governed skills expose Customer Support Agent, Voice Agent Operator and n8n Automation Operator.
+
+**Production truth boundary:** repository code and tests establish policy/runtime contracts; they do not by themselves activate a model provider, speech stack, telephony account, knowledge index or customer-facing public widget.
+
+See the V151 AI/n8n milestone notes and V148 gap register for the remaining external activation work.
 
 ## V144 — Runtime control-plane integration
 
