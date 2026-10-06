@@ -114,7 +114,7 @@ export async function invokeModelTurn({ request, adapter, input, signal, onDelta
           const delta = bounded(String(event.delta), 'model delta', 2000);
           if (assembled.length + delta.length > maxChars) throw Object.assign(new Error('Model response exceeds output budget'), { code: 'MODEL_OUTPUT_LIMIT' });
           assembled += delta;
-          onDelta(delta);
+          await onDelta(delta);
         }
         if (event?.done) finishReason = event.finishReason || finishReason;
       }
