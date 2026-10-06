@@ -64,6 +64,7 @@ export function createAgentTurnJobHandler({
     });
     const redacted=result.redacted||{};
     const outputRef=result.output==null ? null : await deliverResponse({tenantId,execution,output:result.output,channel:resolved.channel,redacted,context});
+    if(deliverStreamTerminal) await deliverStreamTerminal({tenantId,execution,status:result.status,sequence:(context.__agentStreamSequence||0)+1,output:result.output||null,context});
     const status = result.status==='needs_approval' ? 'waiting_approval' : result.status==='handoff' ? 'handoff' : result.status==='canceled' ? 'canceled' : result.status==='completed' ? 'completed' : 'failed';
     const checksum=execution.checksum;
     const updated=await store.updateAgentTurnForWorker({
