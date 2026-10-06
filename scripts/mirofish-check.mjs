@@ -249,8 +249,14 @@ scenarios.push(['agent approval replay is deterministic and duplicate-safe', () 
   const approval = createApprovalRequest({ tenantId:TENANT, workflowId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', executionId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nodeId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc', requestedByActorId:ACTOR, actionKey:'send_message', argumentsHash:'d'.repeat(64), expiresAt:'2026-10-06T10:00:00.000Z' });
   const first = decideApproval({ request:approval, tenantId:TENANT, approvedByActorId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd', decision:'approved', now:NOW });
   const second = decideApproval({ request:approval, tenantId:TENANT, approvedByActorId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd', decision:'approved', now:NOW });
-  return { first:first.status, second:second.status, idempotent:JSON.stringify(first) === JSON.stringify(second), requestIdStable:first.requestId === second.requestId };
-}, result => result.first === 'approved' && result.second === 'approved' && result.idempotent === true && result.requestIdStable === true]);
+  const journey = runLeadToBookingJourney(baseInput());
+  return {
+    ...journey,
+    approvalStatus: first.status,
+    approvalReplay: { first, second, idempotent:JSON.stringify(first) === JSON.stringify(second), requestIdStable:first.requestId === second.requestId },
+    report: { redacted:true }
+  };
+}, result => result.approvalStatus === 'approved' && result.approvalReplay.first.status === 'approved' && result.approvalReplay.second.status === 'approved' && result.approvalReplay.idempotent === true && result.approvalReplay.requestIdStable === true]);
 
 scenarios.push(['agent budget exhaustion fails closed', () => {
   const journey = runLeadToBookingJourney(baseInput());
