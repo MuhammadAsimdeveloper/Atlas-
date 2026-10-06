@@ -162,3 +162,11 @@ The following are **not** established by the simulation:
 - superiority over any competitor
 
 Those require product analytics, user interviews, usability tests, beta behavior and production evidence.
+
+
+## V148 deterministic simulation update — 6 October 2026
+
+The V148 simulation set was expanded for the AI execution frontier. New regression scenarios cover invalid structured model output, duplicate-safe approval replay, agent turn/tool budget exhaustion, cross-tenant workflow invocation blocking, and construction-time redaction of raw prompts/transcripts.
+
+The simulations are deliberately deterministic repository checks, not a claim that live external provider behavior has been certified. Live model providers, telephony, Redis workers, external secret/KMS, object storage and production observability remain deployment evidence gates.
+
