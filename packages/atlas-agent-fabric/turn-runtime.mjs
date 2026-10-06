@@ -10,6 +10,7 @@ import {
   createHumanHandoff
 } from './index.mjs';
 import { createModelRequest, invokeModelTurn } from './model-runtime.mjs';
+import { appendAgentTimelineEvent } from './execution-timeline.mjs';
 
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) { for (const child of Object.values(value)) freeze(child); Object.freeze(value); }
@@ -47,7 +48,7 @@ function sha(value) { return crypto.createHash('sha256').update(JSON.stringify(c
 export async function runAgentTurn({
   tenantId, actorId, release, session, runtime = null, turnId, promptHash, runtimeInput,
   outputSchema = null, adapter, tools = {}, executeTool, approvalEvidenceByTool = {},
-  workflowInvocation = null, handoff = null, onDelta = null, now = Date.now(), signal
+  workflowInvocation = null, handoff = null, onDelta = null, timeline = null, now = Date.now(), signal
 } = {}) {
   ref(tenantId, 'tenantId'); ref(actorId, 'actorId'); ref(turnId, 'turnId'); hash(promptHash, 'promptHash');
   if (!releaseValid(release, tenantId)) throw new Error('Agent release is invalid or cross-tenant');
@@ -98,6 +99,7 @@ export async function runAgentTurn({
     }
     workingSession = budget.session;
 
+    if (timeline) timeline = appendAgentTimelineEvent(timeline, { type:'model.started', turnId:turn === 0 ? turnId : turnId + ':' + turn, now });
     const request = createModelRequest({
       tenantId,
       agentRelease: release,
@@ -123,16 +125,20 @@ export async function runAgentTurn({
       now
     });
 
+    if (timeline) timeline = appendAgentTimelineEvent(timeline, { type:modelResult.status === 'canceled' ? 'turn.failed' : 'model.completed', turnId:turn === 0 ? turnId : turnId + ':' + turn, status:modelResult.status === 'canceled' ? 'canceled' : 'failed', reason:modelResult.redacted?.code || null, inputTokens:modelResult.redacted?.usage?.inputTokens || 0, outputTokens:modelResult.redacted?.usage?.outputTokens || 0, now });
     if (modelResult.status === 'failed' || modelResult.status === 'canceled') {
       return freeze({ status:modelResult.status, output:null, redacted:{...modelResult.redacted, tenantId, sessionId:session.id, releaseId:release.releaseId, turnId, rawPromptStored:false, transcriptStored:false, toolCalls:toolCallsUsed, journeyContextHash:journey.contextHash} });
     }
 
     if (modelResult.status === 'completed') {
+      if (timeline) timeline = appendAgentTimelineEvent(timeline, { type:'model.completed', turnId:turn === 0 ? turnId : turnId + ':' + turn, status:'ok', inputTokens:modelResult.redacted?.usage?.inputTokens || 0, outputTokens:modelResult.redacted?.usage?.outputTokens || 0, now });
       if (outputSchema) validateAgentOutput(modelResult.output, outputSchema);
+      if (timeline) timeline = appendAgentTimelineEvent(timeline, { type:'turn.completed', turnId, status:'ok', now });
       return freeze({
         status:'completed',
         output:modelResult.output,
         session:workingSession,
+        timeline,
         redacted:{
           tenantId, sessionId:session.id, agentId:release.agentId, releaseId:release.releaseId, turnId,
           rawPromptStored:false, transcriptStored:false, rawOutputStored:false,
@@ -157,6 +163,7 @@ export async function runAgentTurn({
       workingSession = budgetTool.session;
       const args = proposal.arguments && typeof proposal.arguments === 'object' ? proposal.arguments : {};
       const approvalEvidence = approvalEvidenceByTool[proposal.name] || null;
+      if (timeline) timeline = appendAgentTimelineEvent(timeline, { type:'tool.proposed', turnId:turn === 0 ? turnId : turnId + ':' + turn, nodeRef:tool.name, status:'ok', now });
       const authorization = authorizeAgentToolCall({
         runtime:effectiveRuntime,
         tool,
@@ -170,6 +177,7 @@ export async function runAgentTurn({
       if (!authorization.allowed) {
         executionEvents.push({status:'needs_approval',toolName:tool.name,code:authorization.code});
         if (authorization.code === 'APPROVAL_REQUIRED') {
+          if (timeline) timeline = appendAgentTimelineEvent(timeline, { type:'approval.required', turnId:turn === 0 ? turnId : turnId + ':' + turn, nodeRef:tool.name, status:'waiting', refHash:authorization.argumentsHash, now });
           approvalRefs.push(authorization.idempotencyKey);
           return freeze({
             status:'needs_approval',
@@ -186,6 +194,7 @@ export async function runAgentTurn({
         return freeze({ status:'failed', output:null, redacted:{tenantId,sessionId:session.id,releaseId:release.releaseId,turnId,rawPromptStored:false,transcriptStored:false,toolCalls:toolCallsUsed,reason:authorization.code} });
       }
       const result = await executeTool(tool, args, { tenantId, actorId, session:workingSession, signal, idempotencyKey:authorization.idempotencyKey });
+      if (timeline) timeline = appendAgentTimelineEvent(timeline, { type:'tool.completed', turnId:turn === 0 ? turnId : turnId + ':' + turn, nodeRef:tool.name, status:'ok', refHash:authorization.argumentsHash, now });
       history.push({kind:'tool_result',toolName:tool.name,result});
       if (history.length > 40) history = history.slice(-40);
       executionEvents.push({status:'completed',toolName:tool.name});
@@ -193,7 +202,8 @@ export async function runAgentTurn({
 
     if (handoff) {
       const handoffRecord = createHumanHandoff({ tenantId, sessionId:session.id, ...handoff, now });
-      return freeze({ status:'handoff', output:null, handoff:handoffRecord, redacted:{tenantId,sessionId:session.id,releaseId:release.releaseId,turnId,rawPromptStored:false,transcriptStored:false,toolCalls:toolCallsUsed,reason:'HUMAN_HANDOFF',journeyContextHash:journey.contextHash} });
+      if (timeline) timeline = appendAgentTimelineEvent(timeline, { type:'handoff.requested', turnId, status:'waiting', now });
+      return freeze({ status:'handoff', output:null, handoff:handoffRecord, timeline, redacted:{tenantId,sessionId:session.id,releaseId:release.releaseId,turnId,rawPromptStored:false,transcriptStored:false,toolCalls:toolCallsUsed,reason:'HUMAN_HANDOFF',journeyContextHash:journey.contextHash} });
     }
 
     if (workflowInvocation?.authorize) {
