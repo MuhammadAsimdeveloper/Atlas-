@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { loadInboxContentStore } from '../../api/inbox-content.mjs';
 
 const REF=/^[A-Za-z0-9][A-Za-z0-9_.:/@-]{2,240}$/;
@@ -34,3 +35,21 @@ export async function deliverResponse({tenantId,execution,output,channel='webcha
 }
 
 export const deliverResponseReady=true;
+
+export async function deliverStreamDelta({tenantId,execution,delta,sequence,context}={}) {
+  ref(tenantId,'tenantId'); const executionId=ref(execution?.execution_id||execution?.executionId,'executionId');
+  if(!Number.isSafeInteger(sequence)||sequence<1) throw Object.assign(new Error('Stream sequence is invalid'),{code:'agent_stream_invalid'});
+  const text=bounded(delta,'agent delta',2000);
+  const workerStore=context?.workerStore;
+  if(!workerStore||typeof workerStore.appendAgentStreamEvent!=='function') throw Object.assign(new Error('Agent stream worker store is unavailable'),{code:'agent_stream_store_unavailable'});
+  const contentRef='agent-stream:'+executionId+':'+sequence;
+  await store.putMessageContent({tenantId,messageId:executionId,channel:'webchat',text,html:null,attachments:[],metadata:{source:'atlas_agent_stream',executionRef:executionId,sequence}});
+  const contentHash=createHash('sha256').update(text).digest('hex');
+  await workerStore.appendAgentStreamEvent({tenantId,jobId:ref(context.jobId,'jobId'),workerId:ref(context.workerId,'workerId'),executionId,sequence,eventType:'delta',contentRef,contentHash});
+}
+export async function deliverStreamTerminal({tenantId,execution,status,sequence,context}={}) {
+  ref(tenantId,'tenantId'); const executionId=ref(execution?.execution_id||execution?.executionId,'executionId');
+  const workerStore=context?.workerStore;
+  if(!workerStore||typeof workerStore.appendAgentStreamEvent!=='function') throw Object.assign(new Error('Agent stream worker store is unavailable'),{code:'agent_stream_store_unavailable'});
+  await workerStore.appendAgentStreamEvent({tenantId,jobId:ref(context.jobId,'jobId'),workerId:ref(context.workerId,'workerId'),executionId,sequence,eventType:status==='failed'?'error':'done',contentRef:null,contentHash:null});
+}
