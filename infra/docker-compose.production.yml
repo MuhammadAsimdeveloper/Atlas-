@@ -10,6 +10,8 @@ services:
       ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
       ATLAS_WORKER_DATABASE_URL: null
       ATLAS_WORKER_HANDLERS_MODULE: null
+      ATLAS_REDIS_URL: null
+      ATLAS_REDIS_NAMESPACE: null
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
@@ -17,6 +19,8 @@ services:
       - "${ATLAS_WEBHOOK_SECRETS_PATH:?Mount the reviewed webhook secret module directory}:/app/apps/webhook-secrets:ro"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -40,7 +44,12 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     volumes:
       - atlas-redis:/data
   worker:
@@ -64,6 +73,8 @@ services:
       ATLAS_WORKER_POLL_MS: "${ATLAS_WORKER_POLL_MS:-1000}"
       ATLAS_RUNTIME_POOL_ID: "${ATLAS_RUNTIME_POOL_ID:-}"
       ATLAS_SLO_EVALUATION_INTERVAL_MS: "${ATLAS_SLO_EVALUATION_INTERVAL_MS:-30000}"
+      ATLAS_REDIS_URL: "${ATLAS_REDIS_URL:-redis://redis:6379/0}"
+      ATLAS_REDIS_NAMESPACE: "${ATLAS_REDIS_NAMESPACE:-atlas}"
       ATLAS_POSTGRES_SUPERUSER_PASSWORD: null
     volumes:
       - "${ATLAS_WORKER_SECRETS_PATH:?Mount a reviewed local secret resolver directory}:/app/apps/worker/secrets:ro"
