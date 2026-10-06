@@ -8,7 +8,7 @@ import {
 const REF = /^[A-Za-z0-9][A-Za-z0-9_.:-]{2,180}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const SAFE_REASON = /^[a-z][a-z0-9_.-]{2,79}$/;
-const RAW_KEYS = new Set(['prompt','message','body','content','transcript','recording','rawPrompt','rawMessage','customerData','customerPayload']);
+const RAW_KEYS = new Set(['prompt','message','messageBody','body','content','transcript','recording','rawPrompt','rawMessage','customerData','customerPayload']);
 
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
@@ -104,12 +104,12 @@ export function buildAgentJourneyContext({
 
 export function planAgentTurn({
   tenantId, sessionId, agentRelease, turnId, promptHash, toolCalls = [], approvalRefs = [],
-  workflowInvocationRef = null, journeyContext, now = Date.now()
+  workflowInvocationRef = null, journeyContext, now = Date.now(), ...extra
 } = {}) {
   ref(tenantId, 'tenantId'); ref(sessionId, 'sessionId'); ref(turnId, 'turnId');
+  rejectRawObject(extra, 'agentTurn');
   if (!verifyManifest(agentRelease) || agentRelease.tenantId !== tenantId) throw new Error('Agent release manifest is invalid or cross-tenant');
   hashRef(promptHash, 'promptHash');
-  if (arguments && Object.hasOwn(arguments, 'prompt')) throw new TypeError('Raw prompts cannot enter agent turn planning');
   rejectRawObject(journeyContext);
   if (!journeyContext || journeyContext.tenantId !== tenantId || journeyContext.redacted !== true || journeyContext.payloadMode !== 'reference_only') throw new Error('Journey context is not a redacted tenant-bound context');
   ref(journeyContext.journeyId, 'journeyId');
