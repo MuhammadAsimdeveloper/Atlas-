@@ -138,7 +138,7 @@ const NETWORK_LOCATION_FIELD = /^(?:url|uri|host|hostname|endpoint_url|callback_
 const CONFIG_REFERENCE_PHONE = /[+()\s]/;
 
 function opaqueWorkflowReference(value, label) {
-  if (typeof value === 'string' && /^(?:TEMPLATE_[A-Z0-9_]{1,120}|[A-Z][A-Z0-9_]{2,119}_PLACEHOLDER)$/.test(value)) return value;
+  if (typeof value === 'string' && value.length <= 132 && value.endsWith('_PLACEHOLDER') && [...value].every(char => /[A-Z0-9_]/.test(char))) return value;
   const result = reference(value, label);
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result);
   const numericAddress = /^[+\d(). -]+$/.test(result) && (result.match(/\d/g) || []).length >= 7;
