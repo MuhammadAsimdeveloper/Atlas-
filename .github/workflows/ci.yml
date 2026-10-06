@@ -37,7 +37,7 @@ jobs:
       - name: Upload launch-safe preview artifact
         uses: actions/upload-artifact@v4
         with:
-          name: atlas-v145-static-preview-node-${{ matrix.node }}
+          name: atlas-v148-static-preview-node-${{ matrix.node }}
           path: dist/atlas-site
           if-no-files-found: error
           retention-days: 14
