@@ -4,6 +4,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createPostgresPoolConfig } from '../api/database-config.mjs';
 import { PostgresRuntimeStore } from '../api/runtime-store.mjs';
 import { AtlasQueueWorker } from './runtime.mjs';
+import { createRedisWakeupTransport } from '../../packages/atlas-runtime/redis-client.mjs';
 
 const env = process.env;
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -29,6 +30,7 @@ const pool = new Pool(await createPostgresPoolConfig(workerEnv, {
 pool.on('error', () => process.stderr.write('Atlas worker database pool error.\n'));
 
 const store = new PostgresRuntimeStore(pool);
+const redisWakeup = env.ATLAS_REDIS_URL ? createRedisWakeupTransport(env.ATLAS_REDIS_URL, env.ATLAS_REDIS_NAMESPACE || 'atlas') : null;
 await store.assertSafeWorkerRole();
 const worker = new AtlasQueueWorker({
   store,
@@ -43,6 +45,16 @@ const worker = new AtlasQueueWorker({
 });
 
 let stopping = false;
+let wakeLoop = null;
+if (redisWakeup) {
+  const queues = [...new Set(Object.keys(jobHandlers))];
+  wakeLoop = (async () => {
+    while (!stopping && queues.length) {
+      try { await redisWakeup.receive(queues.map(q => `\${env.ATLAS_REDIS_NAMESPACE || 'atlas'}:wake:\${q}`), 5); worker.wakeNow(); }
+      catch (error) { process.stderr.write(`Atlas Redis wakeup degraded: \${error?.message || 'unknown'}\\n`); await new Promise(r => setTimeout(r, 2000)); }
+    }
+  })();
+}
 const shutdown = signal => {
   if (stopping) return;
   stopping = true;
@@ -55,5 +67,7 @@ try {
   process.stdout.write(`Atlas queue worker ${worker.workerId} started with ${Object.keys(jobHandlers).length} job and ${Object.keys(eventHandlers).length} outbox handlers.\n`);
   await worker.run();
 } finally {
+  await Promise.resolve(wakeLoop).catch(()=>{});
+  await redisWakeup?.close?.();
   await pool.end();
 }
