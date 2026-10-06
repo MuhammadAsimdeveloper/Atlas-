@@ -260,6 +260,26 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION atlas_v153_public_stream(
+  p_tenant_id UUID,p_session_id UUID,p_execution_id UUID,p_after BIGINT DEFAULT 0
+) RETURNS TABLE(
+  sequence BIGINT,event_type TEXT,content_ref TEXT,content_hash CHAR(64),
+  execution_status TEXT,error_code TEXT
+) LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+  SELECT e.sequence,e.event_type,e.content_ref,e.content_hash,x.status,x.error_code
+  FROM public.atlas_v153_copilot_sessions s
+  JOIN public.atlas_v153_copilot_stream_events e
+    ON e.tenant_id=s.tenant_id AND e.execution_id=p_execution_id
+  JOIN public.atlas_agent_turn_executions x
+    ON x.tenant_id=s.tenant_id AND x.execution_id=p_execution_id
+  WHERE s.tenant_id=p_tenant_id AND s.session_id=p_session_id
+    AND s.revoked_at IS NULL AND s.expires_at>now() AND e.sequence>p_after
+  ORDER BY e.sequence ASC LIMIT 100;
+$;
+
+GRANT EXECUTE ON FUNCTION atlas_v153_public_stream(UUID,UUID,UUID,BIGINT) TO atlas_app;
+REVOKE ALL ON FUNCTION atlas_v153_public_stream(UUID,UUID,UUID,BIGINT) FROM PUBLIC;
+
 CREATE OR REPLACE FUNCTION atlas_v153_request_handoff(
   p_tenant_id UUID,p_session_id UUID,p_reason TEXT,p_handoff_id UUID,p_queue_ref TEXT
 ) RETURNS TABLE(conversation_id UUID,handoff_id UUID,status TEXT) LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
