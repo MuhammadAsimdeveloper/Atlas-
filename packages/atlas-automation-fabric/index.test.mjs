@@ -18,6 +18,7 @@ import {
   createAiWorkflowProposal,
   auditWorkflowSecurity
 } from './index.mjs';
+import { WORKFLOW_NODE_CATALOG } from '../atlas-target/workflow-catalog.mjs';
 import { createWorkflowGraph } from '../atlas-target/index.mjs';
 
 const TENANT = '11111111-1111-4111-8111-111111111111';
@@ -36,6 +37,7 @@ test('V146 n8n parity catalog covers hardened core workflow concepts without ena
   assert.ok(N8N_PARITY_FEATURES.includes('ai_workflow_builder'));
   assert.ok(N8N_PARITY_FEATURES.includes('mcp'));
   assert.equal(HARDENED_NODE_ADDONS.some(node => node.type === 'execute_command'), false);
+  for (const type of ['loop_over_items','aggregate','remove_duplicates','sort','split_out','respond_to_webhook','error_trigger','stop_and_error','no_op','data_table','execution_data','mcp_client','mcp_server_trigger']) assert.ok(WORKFLOW_NODE_CATALOG[type], 'missing hardened workflow node: ' + type);
 });
 
 test('V146 policy bounds concurrency, retries, loops, timeout and execution data retention', () => {
