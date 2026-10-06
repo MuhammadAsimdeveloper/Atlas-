@@ -278,6 +278,18 @@ $v153$;
 GRANT EXECUTE ON FUNCTION atlas_v153_public_stream(UUID,UUID,UUID,BIGINT) TO atlas_app;
 REVOKE ALL ON FUNCTION atlas_v153_public_stream(UUID,UUID,UUID,BIGINT) FROM PUBLIC;
 
+CREATE OR REPLACE FUNCTION atlas_v153_public_origin(
+  p_tenant_id UUID,p_session_id UUID
+) RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $v153$
+  SELECT c.allowed_origins
+  FROM public.atlas_v153_copilot_sessions s
+  JOIN public.atlas_v153_copilot_configs c
+    ON c.tenant_id=s.tenant_id AND c.config_id=s.config_id
+  WHERE s.tenant_id=p_tenant_id AND s.session_id=p_session_id
+    AND s.revoked_at IS NULL AND s.expires_at>now() AND c.status='active'
+  LIMIT 1;
+$v153$;
+
 CREATE OR REPLACE FUNCTION atlas_v153_public_execution(
   p_tenant_id UUID,p_session_id UUID,p_execution_id UUID
 ) RETURNS TABLE(status TEXT,error_code TEXT,version INTEGER) LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $v153$
@@ -286,7 +298,9 @@ CREATE OR REPLACE FUNCTION atlas_v153_public_execution(
   JOIN public.atlas_agent_turn_executions e ON e.tenant_id=s.tenant_id AND e.session_id=s.session_id AND e.execution_id=p_execution_id
   WHERE s.tenant_id=p_tenant_id AND s.session_id=p_session_id AND s.revoked_at IS NULL AND s.expires_at>now();
 $v153$;
+GRANT EXECUTE ON FUNCTION atlas_v153_public_origin(UUID,UUID) TO atlas_app;
 GRANT EXECUTE ON FUNCTION atlas_v153_public_execution(UUID,UUID,UUID) TO atlas_app;
+REVOKE ALL ON FUNCTION atlas_v153_public_origin(UUID,UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v153_public_execution(UUID,UUID,UUID) FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION atlas_v153_request_handoff(
