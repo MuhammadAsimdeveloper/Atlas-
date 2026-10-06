@@ -1,3 +1,11 @@
+## 153.0.0 — Authenticated Copilot Chat Hub + Public Webchat
+- Added authenticated tenant-scoped Copilot Chat Hub configuration, widget embed generation, human handoff queue and agent approval inbox.
+- Added public webchat sessions signed by the existing HMAC support-session gateway with exact origin allowlists and expiry.
+- Connected public customer turns to the durable unified-inbox/agent-turn worker path with idempotent execution creation.
+- Added real model-delta streaming persistence and authenticated fetch/SSE delivery.
+- Added staging E2E coverage for session, turn, stream, history and handoff flows.
+- No live provider credentials, public endpoint, or external infrastructure are claimed without deployment evidence.
+
 # Changelog
 
 ## 152.0.0 — Customer Support Activation and Voice Streaming
