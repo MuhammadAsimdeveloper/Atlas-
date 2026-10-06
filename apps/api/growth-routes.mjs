@@ -8,6 +8,7 @@ import { enforceRateLimit, securityHeaders } from './security.mjs';
 import { createPromotionManifest, routeEvent } from '../../packages/atlas-core/production-frontier.mjs';
 import { auditWorkflowSecurity, createAiWorkflowProposal } from '../../packages/atlas-automation-fabric/index.mjs';
 import { planAgentTurn, buildAgentJourneyContext, authorizeAgentWorkflowInvocation, createHumanHandoff } from '../../packages/atlas-agent-fabric/index.mjs';
+import { planVoiceAgentJourney } from '../../packages/atlas-voice-journey/index.mjs';
 
 const MAX_BODY_BYTES = 110_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -256,6 +257,16 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
         const body = await readJson(req);
         exact(body, ['agentRelease','workflowId','workflowVersion','risk','approvalRef']);
         return send(res, 200, { authorization:authorizeAgentWorkflowInvocation({ tenantId:who.tenantId, actorId:who.actorId, ...body }) }, env);
+      }
+      if (path === '/api/v1/growth/voice/journey-outcomes/reconcile' && req.method === 'POST') {
+        await requireMutation(req, who.session);
+        if (env.ATLAS_VOICE_JOURNEY_RECONCILIATION_ENABLED !== 'true') return send(res, 503, { error: 'voice_journey_reconciliation_disabled', message: 'Voice journey reconciliation is disabled until the provider/runtime integration is explicitly activated.' }, env);
+        if (!runtimeStore?.recordVoiceJourneyOutcome) throw createAuthError(503, 'voice_journey_runtime_unavailable');
+        const body = await readJson(req);
+        exact(body, ['journeyId','voiceSession','contactRef','conversationRef','leadRef','appointmentRef','workflowId','workflowVersion','outcome','eventRef','handoffQueueRef','now']);
+        const plan = planVoiceAgentJourney({ tenantId:who.tenantId, ...body });
+        await runtimeStore.recordVoiceJourneyOutcome({ ...who, outcome:plan });
+        return send(res, 201, { outcome:plan }, env);
       }
       if (path === '/api/v1/growth/agents/handoffs' && req.method === 'POST') {
         await requireMutation(req, who.session);
