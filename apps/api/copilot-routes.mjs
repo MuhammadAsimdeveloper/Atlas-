@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { createAuthError, hashOpaqueToken, isAllowedOrigin, parseCookies, sessionCookieName, verifyCsrf } from './auth-contracts.mjs';
-import { securityHeaders, clientIdentity, enforceRateLimit } from './security.mjs';
-import { createAgentReleaseManifest, verifyAgentDeploymentRelease } from '../../packages/atlas-agent-fabric/index.mjs';
+import { securityHeaders, enforceRateLimit } from './security.mjs';
+import { verifyAgentDeploymentRelease } from '../../packages/customer-operations/index.mjs';
 import { createSupportSessionClaims, issueSupportSessionToken, verifySupportSessionToken, validateSupportTurnInput } from '../../packages/atlas-copilot/support-session.mjs';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -62,7 +62,8 @@ export class PostgresCopilotStore {
   async getConfig(who){return this.#tenant(who,async c=>{const {rows}=await c.query("SELECT config_id,widget_key,display_name,release_snapshot,allowed_origins,status,version,created_at,updated_at FROM atlas_v153_copilot_configs WHERE tenant_id=$1 ORDER BY updated_at DESC LIMIT 1",[who.tenantId]);return rows[0]||null;});}
   async saveConfig(who,input){
     return this.#tenant({...who},async c=>{
-      const snapshot=createAgentReleaseManifest(input.releaseSnapshot);
+      const snapshot=input.releaseSnapshot;
+      if(!verifyAgentDeploymentRelease(snapshot)||snapshot.tenantId!==who.tenantId)throw createAuthError(400,'copilot_release_manifest_invalid');
       if(!['active','canary'].includes(snapshot.status))throw createAuthError(400,'copilot_release_not_live');
       if(!UUID.test(snapshot.agentId))throw createAuthError(400,'copilot_agent_id_invalid');
       if(!snapshot.modelPolicy?.provider||!snapshot.modelPolicy?.credentialRef||!snapshot.modelPolicy?.model)throw createAuthError(400,'copilot_model_policy_incomplete');
@@ -102,9 +103,21 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
   async function mutation(req,s){if(!isAllowedOrigin(req,env)||!(await verifyCsrf(req,s,env)))throw createAuthError(403,'csrf_check_failed');}
 
   async function publicClaims(req){
-    const claims=verifySupportSessionToken({token:bearer(req),secret});
-    if(claims.channel!=='webchat')throw createAuthError(403,'support_channel_forbidden');
-    return claims;
+    try{
+      const claims=verifySupportSessionToken({token:bearer(req),secret});
+      if(claims.channel!=='webchat')throw createAuthError(403,'support_channel_forbidden');
+      return claims;
+    }catch(error){
+      if(Number.isInteger(error?.status))throw error;
+      throw createAuthError(401,'support_session_invalid');
+    }
+  }
+  async function publicOrigin(req,claims){
+    const requested=origin(req);
+    if(!requested&&env.NODE_ENV==='production')throw createAuthError(403,'origin_required');
+    const {rows}=await pool.query("SELECT c.allowed_origins FROM atlas_v153_copilot_sessions s JOIN atlas_v153_copilot_configs c ON c.tenant_id=s.tenant_id AND c.config_id=s.config_id WHERE s.tenant_id=$1 AND s.session_id=$2 AND s.revoked_at IS NULL AND s.expires_at>now() AND c.status='active'",[claims.tenantId,claims.sessionId]);
+    if(!rows.length)throw createAuthError(404,'copilot_session_not_found');
+    return allowOrigin(req,rows[0].allowed_origins,env,{publicRequest:true});
   }
   async function publicSession(req,res){
     const b=await readJson(req);exact(b,['widgetKey','customerRef']);
@@ -112,6 +125,7 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
     if(typeof b.widgetKey!=='string'||!/^[A-Za-z0-9_-]{32,128}$/.test(b.widgetKey))throw createAuthError(400,'widget_key_invalid');
     const sessionId=randomUUID(),expiresAt=new Date(Date.now()+60*60_000);
     const requestedOrigin=origin(req);
+    if(!requestedOrigin&&env.NODE_ENV==='production')throw createAuthError(403,'origin_required');
     const result=(await pool.query('SELECT * FROM atlas_v153_create_public_session($1,$2,$3,$4,$5)',[b.widgetKey,sessionId,b.customerRef==null?null:String(b.customerRef),expiresAt,requestedOrigin])).rows[0];
     if(!result)throw createAuthError(404,'copilot_widget_not_found');
     const allowed=allowOrigin(req,result.allowed_origins,env,{publicRequest:true});
@@ -120,7 +134,7 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
   }
 
   async function publicTurn(req,res,claims){
-    const o=origin(req);
+    const o=await publicOrigin(req,claims);await enforceRateLimit({req,store:authStore,secret,env,route:'copilot.turn',limit:30,windowSeconds:60});
     const b=await readJson(req);exact(b,['message','clientTurnId']);
     if(typeof b.message!=='string')throw createAuthError(400,'message_invalid');
     if(typeof b.clientTurnId!=='string'||!/^[-A-Za-z0-9_.:]{8,160}$/.test(b.clientTurnId))throw createAuthError(400,'client_turn_id_invalid');
@@ -135,7 +149,7 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
   }
 
   async function publicStream(req,res,claims,url){
-    const o=origin(req);
+    const o=await publicOrigin(req,claims);await enforceRateLimit({req,store:authStore,secret,env,route:'copilot.stream',limit:60,windowSeconds:60});
     const executionId=url.searchParams.get('executionId');
     if(!UUID.test(executionId||''))throw createAuthError(400,'execution_id_invalid');
     const state=(await pool.query('SELECT * FROM atlas_v153_public_state($1,$2,$3)',[claims.tenantId,claims.sessionId,executionId])).rows;
@@ -168,7 +182,7 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
   }
 
   async function publicHistory(req,res,claims){
-    const o=origin(req);
+    const o=await publicOrigin(req,claims);await enforceRateLimit({req,store:authStore,secret,env,route:'copilot.history',limit:60,windowSeconds:60});
     const state=(await pool.query('SELECT * FROM atlas_v153_public_state($1,$2,NULL)',[claims.tenantId,claims.sessionId])).rows;
     const items=[]; const seen=new Set();
     for(const row of state){
@@ -181,7 +195,7 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
   }
 
   async function publicHandoff(req,res,claims){
-    const o=origin(req);const b=await readJson(req);exact(b,['reason']);
+    const o=await publicOrigin(req,claims);await enforceRateLimit({req,store:authStore,secret,env,route:'copilot.handoff',limit:10,windowSeconds:60});const b=await readJson(req);exact(b,['reason']);
     const handoff=(await pool.query('SELECT * FROM atlas_v153_request_handoff($1,$2,$3,$4,$5)',[claims.tenantId,claims.sessionId,b.reason,randomUUID(),'copilot:webchat'])).rows[0];
     return send(res,201,{handoff},env,corsHeaders(o));
   }
