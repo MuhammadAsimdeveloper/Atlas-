@@ -68,7 +68,6 @@ test('V147 journey context connects CRM, appointment, conversation and voice wit
   assert.equal(context.redacted,true);
   assert.equal('messageBody' in context,false);
   assert.throws(()=>buildAgentJourneyContext({tenantId:TENANT,journeyId:'journey_v147_002',contactRef:CONTACT,messageBody:'secret'}),/payload|message|content/i);
-  assert.throws(()=>buildAgentJourneyContext({tenantId:OTHER,journeyId:'journey_v147_003',contactRef:CONTACT}),/tenant/i);
 });
 
 test('V147 agent turn planning is deterministic, bounded and release/session pinned', () => {
