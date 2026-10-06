@@ -8,11 +8,11 @@ const sha=v=>crypto.createHash('sha256').update(JSON.stringify(v)).digest('hex')
 const ref=(v,l)=>{if(typeof v!=='string'||!REF.test(v))throw new TypeError(l+' invalid');return v;};
 const int=(v,l,min,max)=>{if(!Number.isSafeInteger(v)||v<min||v>max)throw new TypeError(l+' out of bounds');return v;};
 
-export function createVoiceStreamSession({tenantId,voiceSessionRef,codec='pcm16',sampleRate=8000,channels=1,maxDurationMs=30*60_000,maxFrameBytes=32*1024}={}){
+export function createVoiceStreamSession({tenantId,voiceSessionRef,codec='pcm16',sampleRate=8000,channels=1,maxDurationMs=30*60_000,maxFrameBytes=32*1024,startedAt=Date.now()}={}
  ref(tenantId,'tenantId');ref(voiceSessionRef,'voiceSessionRef');
  if(!CODEC.has(codec))throw new TypeError('unsupported voice codec');
- int(sampleRate,'sampleRate',8000,48000);int(channels,'channels',1,2);int(maxDurationMs,'maxDurationMs',30_000,30*60_000);int(maxFrameBytes,'maxFrameBytes',1024,MAX_FRAME_BYTES);
- const body={tenantId,voiceSessionRef,codec,sampleRate,channels,maxDurationMs,maxFrameBytes,startedAt:Date.now()};
+ int(sampleRate,'sampleRate',8000,48000);int(channels,'channels',1,2);int(maxDurationMs,'maxDurationMs',30_000,30*60_000);int(maxFrameBytes,'maxFrameBytes',1024,MAX_FRAME_BYTES);int(startedAt,'startedAt',0,Number.MAX_SAFE_INTEGER);
+ const body={tenantId,voiceSessionRef,codec,sampleRate,channels,maxDurationMs,maxFrameBytes,startedAt};
  return Object.freeze({...body,sessionChecksum:sha(body)});
 }
 
