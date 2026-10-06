@@ -143,25 +143,47 @@ BEGIN
     RAISE EXCEPTION 'agent_input_parameters_invalid';
   END IF;
   IF NOT EXISTS (
-    SELECT 1 FROM public.atlas_runtime_jobs j
-    WHERE j.tenant_id=p_tenant_id AND j.job_id=p_job_id AND j.job_type='agent.turn.execute'
-      AND j.status='leased' AND j.lease_owner=p_worker_id AND j.lease_until>now()
-  ) THEN RAISE EXCEPTION 'worker_job_lease_invalid'; END IF;
+    SELECT 1
+    FROM public.atlas_runtime_jobs j
+    WHERE j.tenant_id=p_tenant_id
+      AND j.job_id=p_job_id
+      AND j.job_type='agent.turn.execute'
+      AND j.status='leased'
+      AND j.lease_owner=p_worker_id
+      AND j.lease_until>now()
+  ) THEN
+    RAISE EXCEPTION 'worker_job_lease_invalid';
+  END IF;
   PERFORM set_config('app.tenant_id',p_tenant_id::text,true);
   RETURN QUERY
-  SELECT e.tenant_id,e.execution_id,c.conversation_id,m.message_id,c.channel,c.provider_connection_id,
-         m.sender_ref,m.recipient_ref,m.subject,m.content_ref
+  SELECT e.tenant_id,
+         e.execution_id,
+         c.conversation_id,
+         m.message_id,
+         c.channel,
+         c.provider_connection_id,
+         m.sender_ref,
+         m.recipient_ref,
+         m.subject,
+         m.content_ref
   FROM public.atlas_agent_turn_executions e
-  JOIN public.atlas_ai_agent_sessions s ON s.tenant_id=e.tenant_id AND s.session_id=e.session_id
-  JOIN public.atlas_v122_conversations c ON c.tenant_id=e.tenant_id
-    AND e.input_ref ~ '^inbox:conversation:[0-9a-fA-F-]{36}
+  JOIN public.atlas_ai_agent_sessions s
+    ON s.tenant_id=e.tenant_id AND s.session_id=e.session_id
+  JOIN public.atlas_v122_conversations c
+    ON c.tenant_id=e.tenant_id
+   AND e.input_ref ~ '^inbox:conversation:[0-9a-fA-F-]{36}$'
+   AND c.conversation_id=NULLIF(REPLACE(e.input_ref,'inbox:conversation:',''),'')::uuid
+  JOIN LATERAL (
     SELECT m.message_id,m.sender_ref,m.recipient_ref,m.subject,m.content_ref
     FROM public.atlas_v122_messages m
-    WHERE m.tenant_id=e.tenant_id AND m.conversation_id=c.conversation_id
+    WHERE m.tenant_id=e.tenant_id
+      AND m.conversation_id=c.conversation_id
       AND m.direction='inbound'
-    ORDER BY m.created_at DESC,m.message_id DESC LIMIT 1
+    ORDER BY m.created_at DESC,m.message_id DESC
+    LIMIT 1
   ) m ON true
-  WHERE e.tenant_id=p_tenant_id AND e.execution_id=p_execution_id
+  WHERE e.tenant_id=p_tenant_id
+    AND e.execution_id=p_execution_id
     AND e.status IN ('queued','running','retryable');
 END;
 $$;
