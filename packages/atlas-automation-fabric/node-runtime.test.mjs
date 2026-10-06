@@ -7,7 +7,7 @@ test('V151 n8n node runtime bounds and implements collection nodes',()=>{
  const input=[{id:1,tags:['a','b'],score:2},{id:2,tags:['b'],score:1},{id:2,tags:['c'],score:3}];
  assert.equal(executeN8nNode({tenantId:T,node:{...base,type:'remove_duplicates',config:{key:'id'}},input}).items.length,2);
  assert.deepEqual(executeN8nNode({tenantId:T,node:{...base,type:'sort',config:{key:'score'}},input}).items.map(x=>x.score),[1,2,3]);
- assert.equal(executeN8nNode({tenantId:T,node:{...base,type:'split_out',config:{field:'tags'}},input}).items.length,6);
+ assert.equal(executeN8nNode({tenantId:T,node:{...base,type:'split_out',config:{field:'tags'}},input}).items.length,4);
 });
 test('V151 condition/switch/wait/stop are deterministic and side-effect free',()=>{
  const condition=executeN8nNode({tenantId:T,node:{...base,type:'condition',config:{key:'score',value:2}},input:[{score:2}]});
@@ -33,5 +33,5 @@ test('V151 loop evidence envelopes do not persist item payloads',()=>{
  const result=executeN8nNode({tenantId:T,node:{...base,type:'loop_over_items',config:{batchSize:1}},input:[{email:'private@example.test'}]});
  const envelope=createNodeExecutionEnvelope({tenantId:T,workflowId:'workflow-123',executionId:'exec-456',nodeId:'node-123',nodeType:'loop_over_items',inputCount:1,outputCount:1,control:result.control});
  assert.equal('batches' in envelope.control,false);
- assert.equal('email' in JSON.stringify(envelope),false);
+ assert.equal(JSON.stringify(envelope).includes('email'),false);
 });
