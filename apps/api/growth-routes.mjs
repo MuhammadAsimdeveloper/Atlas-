@@ -7,6 +7,7 @@ import { simulateWorkflow } from '../../packages/atlas-target/workflow-simulator
 import { enforceRateLimit, securityHeaders } from './security.mjs';
 import { createPromotionManifest, routeEvent } from '../../packages/atlas-core/production-frontier.mjs';
 import { auditWorkflowSecurity, createAiWorkflowProposal } from '../../packages/atlas-automation-fabric/index.mjs';
+import { planAgentTurn, buildAgentJourneyContext, authorizeAgentWorkflowInvocation, createHumanHandoff } from '../../packages/atlas-agent-fabric/index.mjs';
 
 const MAX_BODY_BYTES = 110_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -238,6 +239,33 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
       if (path === '/api/v1/growth/agents/sessions' && req.method === 'POST') {
         await requireMutation(req,who.session); const body=await readJson(req); exact(body,['sessionId','agentReleaseRef','channel','customerRef','memoryScope']);
         return send(res,201,{sessionId:await runtimeStore.createAgentSession({...who,...body})},env);
+      }
+      if (path === '/api/v1/growth/agents/turns/plan' && req.method === 'POST') {
+        await requireMutation(req, who.session);
+        if (!runtimeStore?.getAgentSession || !runtimeStore?.recordAgentTurnPlan) throw createAuthError(503, 'agent_turn_runtime_unavailable');
+        const body = await readJson(req);
+        exact(body, ['sessionId','agentRelease','turnId','promptHash','toolCalls','approvalRefs','workflowInvocationRef','journeyContext','now']);
+        const session = await runtimeStore.getAgentSession({ ...who, sessionId: body.sessionId });
+        if (session.agent_release_ref !== body.agentRelease.releaseId) throw createAuthError(409, 'agent_release_mismatch');
+        const plan = planAgentTurn({ tenantId:who.tenantId, ...body });
+        await runtimeStore.recordAgentTurnPlan({ ...who, plan: { ...plan, agentId: body.agentRelease.agentId } });
+        return send(res, 201, { plan }, env);
+      }
+      if (path === '/api/v1/growth/agents/workflow-invocations/authorize' && req.method === 'POST') {
+        await requireMutation(req, who.session);
+        const body = await readJson(req);
+        exact(body, ['agentRelease','workflowId','workflowVersion','risk','approvalRef']);
+        return send(res, 200, { authorization:authorizeAgentWorkflowInvocation({ tenantId:who.tenantId, actorId:who.actorId, ...body }) }, env);
+      }
+      if (path === '/api/v1/growth/agents/handoffs' && req.method === 'POST') {
+        await requireMutation(req, who.session);
+        if (!runtimeStore?.getAgentSession || !runtimeStore?.recordAgentHandoff) throw createAuthError(503, 'agent_handoff_runtime_unavailable');
+        const body = await readJson(req);
+        exact(body, ['sessionId','reason','queueRef','appointmentRef','now']);
+        await runtimeStore.getAgentSession({ ...who, sessionId: body.sessionId });
+        const handoff = createHumanHandoff({ tenantId:who.tenantId, ...body });
+        await runtimeStore.recordAgentHandoff({ ...who, handoff });
+        return send(res, 201, { handoff }, env);
       }
       if (path === '/api/v1/growth/agents/approvals' && req.method === 'POST') {
         await requireMutation(req,who.session); const body=await readJson(req); exact(body,['approvalId','sessionId','actionKey']);
