@@ -60,7 +60,7 @@ export function createAgentTurnJobHandler({
       adapter,tools,executeTool,now:Date.now(),signal:context.signal,timeline:null
     });
     const redacted=result.redacted||{};
-    const outputRef=result.output==null ? null : await deliverResponse({tenantId,execution,output:result.output,redacted,context});
+    const outputRef=result.output==null ? null : await deliverResponse({tenantId,execution,output:result.output,channel:resolved.channel,redacted,context});
     const status = result.status==='needs_approval' ? 'waiting_approval' : result.status==='handoff' ? 'handoff' : result.status==='canceled' ? 'canceled' : result.status==='completed' ? 'completed' : 'failed';
     const checksum=execution.checksum;
     const updated=await store.updateAgentTurnForWorker({
