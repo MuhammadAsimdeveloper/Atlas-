@@ -54,5 +54,5 @@ export function executeN8nNode({tenantId,node,input=[],context={},policy={},now=
 export function createNodeExecutionEnvelope({tenantId,workflowId,executionId,nodeId,nodeType,inputCount,outputCount,control,now=Date.now()}={}){
   ref(tenantId,'tenantId');ref(workflowId,'workflowId');ref(executionId,'executionId');ref(nodeId,'nodeId');
   int(inputCount,'inputCount',0,MAX_ITEMS);int(outputCount,'outputCount',0,MAX_ITEMS);
-  return Object.freeze({tenantId,workflowId,executionId,nodeId,nodeType,inputCount,outputCount,control,status:control?.status||'continue',occurredAt:new Date(now).toISOString(),evidenceHash:sha({tenantId,workflowId,executionId,nodeId,nodeType,inputCount,outputCount,control})});
+  const safeControl=control&&typeof control==='object'?Object.fromEntries(['status','branch','resumeAt','waitMs','errorCode','retryable','totalItems','maxIterations'].filter(k=>k in control).map(k=>[k,control[k]])):{}; return Object.freeze({tenantId,workflowId,executionId,nodeId,nodeType,inputCount,outputCount,control:safeControl,status:safeControl.status||'continue',occurredAt:new Date(now).toISOString(),evidenceHash:sha({tenantId,workflowId,executionId,nodeId,nodeType,inputCount,outputCount,control:safeControl})});
 }
