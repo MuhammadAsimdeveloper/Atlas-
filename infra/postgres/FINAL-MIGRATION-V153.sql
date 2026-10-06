@@ -263,7 +263,7 @@ CREATE OR REPLACE FUNCTION atlas_v153_public_stream(
 ) RETURNS TABLE(
   sequence BIGINT,event_type TEXT,content_ref TEXT,content_hash CHAR(64),
   execution_status TEXT,error_code TEXT
-) LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+) LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $v153$
   SELECT e.sequence,e.event_type,e.content_ref,e.content_hash,x.status,x.error_code
   FROM public.atlas_v153_copilot_sessions s
   JOIN public.atlas_v153_copilot_stream_events e
@@ -273,19 +273,19 @@ CREATE OR REPLACE FUNCTION atlas_v153_public_stream(
   WHERE s.tenant_id=p_tenant_id AND s.session_id=p_session_id
     AND s.revoked_at IS NULL AND s.expires_at>now() AND e.sequence>p_after
   ORDER BY e.sequence ASC LIMIT 100;
-$;
+$v153$;
 
 GRANT EXECUTE ON FUNCTION atlas_v153_public_stream(UUID,UUID,UUID,BIGINT) TO atlas_app;
 REVOKE ALL ON FUNCTION atlas_v153_public_stream(UUID,UUID,UUID,BIGINT) FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION atlas_v153_public_execution(
   p_tenant_id UUID,p_session_id UUID,p_execution_id UUID
-) RETURNS TABLE(status TEXT,error_code TEXT,version INTEGER) LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+) RETURNS TABLE(status TEXT,error_code TEXT,version INTEGER) LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $v153$
   SELECT e.status,e.error_code,e.version
   FROM public.atlas_v153_copilot_sessions s
   JOIN public.atlas_agent_turn_executions e ON e.tenant_id=s.tenant_id AND e.session_id=s.session_id AND e.execution_id=p_execution_id
   WHERE s.tenant_id=p_tenant_id AND s.session_id=p_session_id AND s.revoked_at IS NULL AND s.expires_at>now();
-$;
+$v153$;
 GRANT EXECUTE ON FUNCTION atlas_v153_public_execution(UUID,UUID,UUID) TO atlas_app;
 REVOKE ALL ON FUNCTION atlas_v153_public_execution(UUID,UUID,UUID) FROM PUBLIC;
 
