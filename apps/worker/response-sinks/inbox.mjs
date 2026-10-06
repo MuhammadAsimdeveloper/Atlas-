@@ -6,7 +6,7 @@ function bounded(value,label,max=24000){ const text=typeof value==='string'?valu
 
 const store=await loadInboxContentStore(process.env);
 
-export async function deliverResponse({tenantId,execution,output,context}={}){
+export async function deliverResponse({tenantId,execution,output,channel='webchat',context}={}){
   ref(tenantId,'tenantId');
   const executionId=ref(execution?.execution_id||execution?.executionId,'executionId');
   const workerStore=context?.workerStore;
@@ -16,7 +16,7 @@ export async function deliverResponse({tenantId,execution,output,context}={}){
   await store.putMessageContent({
     tenantId,
     messageId,
-    channel:'agent',
+    channel:typeof channel==='string'&&channel.length<=40?channel:'webchat',
     text:bounded(output,'agent output'),
     html:null,
     attachments:[],
