@@ -47,7 +47,7 @@ export function applyDataMapping({mapping,context,strict=true}={}){
    const transformed=transformValue(value,item.transform,item.args);
    const parts=item.target.split('.');
    let cursor=output;
-   for(let i=1;i<parts.length;i++){const key=parts[i];if(i===parts.length-1){cursor[key]=transformed;}else{cursor[key]??={};if(typeof cursor[key]!=='object'||Array.isArray(cursor[key]))throw new Error('Mapping target path conflicts with scalar data');cursor=cursor[key];}}
+   for(let i=0;i<parts.length;i++){const key=parts[i];if(i===parts.length-1){cursor[key]=transformed;}else{cursor[key]??={};if(typeof cursor[key]!=='object'||Array.isArray(cursor[key]))throw new Error('Mapping target path conflicts with scalar data');cursor=cursor[key];}}
  }
  return freeze(output);
 }
