@@ -16,6 +16,31 @@ function workflowApproval(graph, pending, { executionId, nodeId, requestedByActo
   };
 }
 
+test('V157 P0 workflow node registry validates typed configs and binds action nodes to registered actions', async () => {
+  const { createActionRegistry, defineAction } = await import('../atlas-action-fabric/index.mjs');
+  const { createWorkflowNodeSchemaRegistry } = await import('./workflow-node-schema-registry.mjs');
+  const actionRegistry = createActionRegistry({actions:[
+    defineAction({
+      id:'crm.contact.typed-workflow-test',
+      name:'Typed Workflow Contact Action',
+      domain:'crm',
+      risk:'write',
+      inputSchema:{type:'object',required:['contactRef'],additionalProperties:false,properties:{contactRef:{type:'string',minLength:3,maxLength:180}}},
+      surfaces:['workflow']
+    })
+  ]});
+  const registry = createWorkflowNodeSchemaRegistry({actionRegistry});
+  assert.equal(registry.get('action').schemaStatus,'typed');
+  assert.equal(registry.get('edit_fields').schemaStatus,'typed');
+  assert.throws(()=>registry.validateNodeConfig('action',{actionId:'crm.missing.action'}),/registered|action/i);
+  assert.throws(()=>registry.validateNodeConfig('action',{actionId:'crm.contact.typed-workflow-test',input:{}}),/required|contactRef/i);
+  assert.doesNotThrow(()=>registry.validateNodeConfig('action',{
+    actionId:'crm.contact.typed-workflow-test',
+    input:{contactRef:'contact_1'}
+  }));
+  assert.throws(()=>registry.validateNodeConfig('action',{input:{contactRef:'contact_1'}}),/actionId/i);
+});
+
 test('CRM target enforces typed properties, tenant scope, optimistic versions, associations and pipeline governance', () => {
   const schemas = new Map([
     ['stage_id', defineCrmProperty({ key:'stage_id', type:'select', label:'Stage', options:['new','qualified','won'], required:true })],
