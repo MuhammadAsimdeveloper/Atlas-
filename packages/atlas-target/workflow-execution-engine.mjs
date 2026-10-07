@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { verifyWorkflowGraph } from './index.mjs';
 import { normalizeWorkflowError } from './workflow-runtime-contracts.mjs';
 
-const EXECUTION_STATUSES = Object.freeze(['queued','running','waiting','waiting_approval','retryable','completed','failed','canceled','dead_letter']);
+const EXECUTION_STATUSES = Object.freeze(['queued','running','waiting','waiting_approval','retryable','completed','failed','reconciliation_required','canceled','dead_letter']);
 const TERMINAL_STATUSES = new Set(['completed','failed','canceled','dead_letter']);
 const STEP_STATUSES = Object.freeze(['running','completed','failed','needs_approval']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -345,14 +345,63 @@ export function failWorkflowStep({
     externalOutcome:normalizedError.externalOutcome,
     retryable:normalizedError.retryable
   };
+  const reconciliation = normalizedError.externalOutcome === 'unknown' ? deepFreeze({
+    reconciliationId:'reconcile_' + crypto.randomUUID().replaceAll('-', ''),
+    executionId:execution.executionId,
+    tenantId:execution.tenantId,
+    workflowId:execution.workflowId,
+    graphChecksum:execution.graphChecksum,
+    nodeId,
+    errorCode:normalizedError.code,
+    category:normalizedError.category,
+    status:'required',
+    resolution:null,
+    resolvedByActorId:null,
+    requestedAt:new Date(failedAt).toISOString(),
+    resolvedAt:null
+  }) : null;
   return transition(execution, {
-    status: retryAllowed ? 'retryable' : 'dead_letter',
-    currentNodeId: retryAllowed ? nodeId : null,
-    retryAt: retryAllowed ? new Date(retryAt).toISOString() : null,
-    lastErrorCode: errorCode,
+    status: normalizedError.externalOutcome === 'unknown' ? 'reconciliation_required' : (retryAllowed ? 'retryable' : 'dead_letter'),
+    currentNodeId: normalizedError.externalOutcome === 'unknown' ? nodeId : (retryAllowed ? nodeId : null),
+    retryAt: normalizedError.externalOutcome === 'unknown' ? null : (retryAllowed ? new Date(retryAt).toISOString() : null),
+    lastErrorCode: normalizedError.code,
+    reconciliation,
     steps: appendStep(execution, step),
-    endedAt: retryAllowed ? null : new Date(failedAt).toISOString(),
+    endedAt: normalizedError.externalOutcome === 'unknown' || retryAllowed ? null : new Date(failedAt).toISOString(),
     updatedAt: new Date(failedAt).toISOString()
+  });
+}
+
+export function resolveWorkflowReconciliation({
+  execution,
+  reconciliationId,
+  resolution,
+  resolvedByActorId,
+  now = Date.now()
+} = {}) {
+  assertMutable(execution);
+  if (execution.status !== 'reconciliation_required') throw new Error('Workflow execution is not awaiting reconciliation');
+  const pending = execution.reconciliation;
+  if (!pending || pending.status !== 'required') throw new Error('No pending reconciliation exists');
+  if (pending.reconciliationId !== reconciliationId) throw new Error('Workflow reconciliation ID mismatch');
+  if (!['confirmed_success','confirmed_failure'].includes(resolution)) throw new Error('Workflow reconciliation resolution is invalid');
+  const actor = reference(resolvedByActorId, 'resolvedByActorId');
+  const resolvedAt = new Date(timestamp(now, 'now')).toISOString();
+  const next = deepFreeze({
+    ...pending,
+    status:'resolved',
+    resolution,
+    resolvedByActorId:actor,
+    resolvedAt
+  });
+  return transition(execution, {
+    reconciliation:next,
+    status:resolution === 'confirmed_success' ? 'queued' : 'dead_letter',
+    currentNodeId:resolution === 'confirmed_success' ? pending.nodeId : null,
+    retryAt:null,
+    endedAt:resolution === 'confirmed_success' ? null : resolvedAt,
+    lastErrorCode:resolution === 'confirmed_success' ? null : pending.errorCode,
+    updatedAt:resolvedAt
   });
 }
 
