@@ -63,6 +63,29 @@ test('V157 P0 workflow node registry validates typed configs and binds action no
   }),/registered|action/i);
 });
 
+test('V157 P0 node registry validates typed outputs and returns reference-safe output metadata', async () => {
+  const { createActionRegistry, defineAction } = await import('../atlas-action-fabric/index.mjs');
+  const { createWorkflowNodeSchemaRegistry } = await import('./workflow-node-schema-registry.mjs');
+  const actionRegistry = createActionRegistry({actions:[
+    defineAction({
+      id:'crm.contact.output-test',
+      name:'Output Test',
+      domain:'crm',
+      risk:'read',
+      outputSchema:{type:'object',required:['status','score'],additionalProperties:false,properties:{status:{type:'string',enum:['ok','failed']},score:{type:'number',minimum:0,maximum:100}}},
+      surfaces:['workflow']
+    })
+  ]});
+  const registry = createWorkflowNodeSchemaRegistry({actionRegistry});
+  assert.equal(registry.validateNodeOutput('action',{actionId:'crm.contact.output-test'},{status:'ok',score:91}),true);
+  assert.throws(()=>registry.validateNodeOutput('action',{actionId:'crm.contact.output-test'},{status:'ok',score:'91'}),/schema|score/i);
+  const summary=registry.summarizeNodeOutput('action',{actionId:'crm.contact.output-test'},{status:'ok',score:91});
+  assert.equal(summary.valid,true);
+  assert.equal(typeof summary.outputHash,'string');
+  assert.equal(summary.outputHash.length,64);
+  assert.equal('output' in summary,false);
+});
+
 test('V157 P0 node registry covers the entire catalog and exposes deterministic schema metadata', async () => {
   const { createWorkflowNodeSchemaRegistry, WORKFLOW_NODE_SCHEMA_REGISTRY_SUMMARY } = await import('./workflow-node-schema-registry.mjs');
   const registry=createWorkflowNodeSchemaRegistry();
