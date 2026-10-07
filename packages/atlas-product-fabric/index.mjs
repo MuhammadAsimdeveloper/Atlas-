@@ -54,6 +54,33 @@ const features = [
   explicit('automation.snapshots','automation','Execution snapshots','P1','implemented-contract'),
   explicit('automation.environments','automation','Development/staging/production environments','P1','implemented'),
   explicit('automation.promotion','automation','Workflow promotion/diff/rollback','P1','implemented-contract'),
+  explicit('crm.custom_objects','crm','Advanced custom objects','P2'),
+  explicit('crm.buying_committee','crm','Buying committees','P2'),
+  explicit('crm.predictive_scoring','crm','Predictive lead scoring','P2'),
+  explicit('crm.import_export','crm','Bulk import/export','P2'),
+  explicit('marketing.drip_campaigns','marketing','Drip campaigns','P2'),
+  explicit('marketing.attribution','marketing','Attribution','P2'),
+  explicit('marketing.social_scheduler','marketing','Social scheduler','P2'),
+  explicit('education.course_builder','education','Course builder','P2'),
+  explicit('education.community','education','Community','P2'),
+  explicit('commerce.cpq','commerce','CPQ','P2'),
+  explicit('commerce.usage_billing','commerce','Usage billing','P2'),
+  explicit('portal.customer','portal','Customer Portal','P2'),
+  explicit('portal.partner','portal','Partner Portal','P2'),
+  explicit('portal.freelancer','portal','Freelancer Portal','P2'),
+  explicit('portal.agency','portal','Agency Portal','P2'),
+  explicit('portal.vendor','portal','Vendor Portal','P2'),
+  explicit('projects.gantt','projects','Gantt','P2'),
+  explicit('security.sso','security','SSO','P4','externally-gated'),
+  explicit('security.scim','security','SCIM','P4','externally-gated'),
+  explicit('security.passkeys','security','Passkeys','P4','externally-gated'),
+  explicit('security.kms','security','KMS','P4','externally-gated'),
+  explicit('reliability.multi_region','reliability','Multi-region','P4','externally-gated'),
+  explicit('reliability.otlp','reliability','OTEL export','P4','externally-gated'),
+  explicit('reliability.waf','reliability','WAF','P4','externally-gated'),
+  explicit('developer.atlas_api','developer','Atlas API','P3'),
+  explicit('developer.atlas_sdk','developer','Atlas SDK','P3'),
+  explicit('developer.atlas_mcp','developer','Atlas MCP','P3'),
 ];
 
 addMany(features,'P1','connector',[
@@ -202,8 +229,12 @@ addMany(features,'P5','production',[
 ],'externally-gated');
 
 // Additional gaps that materially improve Atlas beyond the requested surface.
-const gaps = [];
-addMany(gaps,'P1','core',[
+const gaps = [
+  explicit('core.idempotency','core','Idempotency keys','P1','implemented-foundation'),
+  explicit('core.event_bus','core','Event bus','P1','implemented-foundation'),
+  explicit('core.outbox_inbox','core','Outbox/inbox pattern','P1','implemented-foundation'),
+  explicit('core.schema_registry','core','Schema registry','P1','implemented-foundation'),
+];addMany(gaps,'P1','core',[
   'Idempotency keys','Outbox/inbox pattern','Event bus','Event replay','Schema registry','Schema compatibility checks',
   'Feature flags','Tenant quotas','Rate quotas','Cost controls','Usage metering','Request correlation IDs','Audit event immutability',
   'Global search','Notification center','Timezone/DST policy','Localization','Currency normalization',
