@@ -37,4 +37,6 @@ Two V157 P0 foundation slices are implemented:
 
 Together they make action schemas executable, add an immutable action registry, execute a bounded declarative expression language through the existing mapping path, and resolve safe expression-bound action inputs before typed schema/provider/approval enforcement.
 
-The next unfinished P0 capability is the unified workflow-node schema registry and graph-to-action binding layer. Continue by extending the existing workflow catalog/runtime contracts; do not create a second automation engine.
+The unified workflow-node schema registry and graph-to-action binding layer is now implemented as a foundation slice in [V157 P0 — Unified Workflow Node Schema Registry](V157-P0-WORKFLOW-NODE-SCHEMA-REGISTRY.md).
+
+The next unfinished P0 capability is typed output propagation plus execution-state/error contracts across the graph. Continue by extending the existing workflow execution/control-plane contracts; do not create a second automation engine.
