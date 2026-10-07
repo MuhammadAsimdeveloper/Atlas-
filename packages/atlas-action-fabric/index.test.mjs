@@ -31,3 +31,38 @@ test('capability compiler creates one canonical surface map',()=>{
  const a=getAction('crm.contact.upsert');const b=buildBusinessCapability({action:a});
  assert.equal(b.actionId,a.id);assert.deepEqual(Object.keys(b.surfaces).sort(),['agent','api','mcp','portal','ui','webhook','workflow']);
 });
+
+test('typed action schemas reject invalid payloads and enforce required fields',()=>{
+ const action=defineAction({
+  id:'crm.contact.typed_test',
+  name:'Typed Contact Test',
+  domain:'crm',
+  risk:'write',
+  inputSchema:{
+   type:'object',
+   required:['contactRef','score'],
+   additionalProperties:false,
+   properties:{
+    contactRef:{type:'string',minLength:3,maxLength:180},
+    score:{type:'number',minimum:0,maximum:100}
+   }
+  },
+  surfaces:['api','workflow']
+ });
+ assert.throws(()=>createInvocation({
+  tenantId:'tenant_1',
+  actionId:action.id,
+  requestId:'req_1',
+  actorRef:'user_1',
+  idempotencyKey:'idem-typed-123',
+  input:{contactRef:'contact_1',score:'high'}
+ }),error=>error?.code==='schema_validation_failed');
+ assert.throws(()=>createInvocation({
+  tenantId:'tenant_1',
+  actionId:action.id,
+  requestId:'req_1',
+  actorRef:'user_1',
+  idempotencyKey:'idem-typed-124',
+  input:{contactRef:'contact_1'}
+ }),error=>error?.code==='schema_validation_failed');
+});
