@@ -1,7 +1,7 @@
 const PERMISSIONS = [
   ['dashboard.read', 'Read dashboard'], ['contacts.read', 'View contacts'], ['contacts.write', 'Edit contacts'],
   ['workflows.read', 'View automations'], ['workflows.write', 'Edit automations'], ['workflows.activate', 'Activate automations'],
-  ['inbox.read', 'View conversations'], ['inbox.respond', 'Respond to customers'], ['billing.read', 'View billing'],
+  ['inbox.read', 'View conversations'], ['inbox.respond', 'Respond to customers'], ['copilot.manage', 'Manage Copilot'], ['billing.read', 'View billing'],
   ['billing.manage', 'Manage billing'], ['reports.read', 'View reports'], ['integrations.read', 'View integrations'], ['integrations.manage', 'Manage integrations']
 ];
 const state = { csrf: null, me: null, dashboard: null, organizations: [], members: [], invitations: [], roles: [], inviteToken: null, activePanel: null };
