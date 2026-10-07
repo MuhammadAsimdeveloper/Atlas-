@@ -11,7 +11,7 @@ const nextTests=await read('packages/atlas-next/index.test.mjs');
 const checks=[
 ['transaction module',module.includes('createOrder')&&module.includes('reserveInventory')&&module.includes('buildPortalScope'), 'transactional package present'],
 ['transaction regression tests',tests.includes('inventory reservations prevent double allocation')&&tests.includes('payments are provider-event idempotent'), 'transaction tests present'],
-['forced RLS',migration.includes('FORCE ROW LEVEL SECURITY')&&migration.includes('current_setting('"'"'app.tenant_id'"'"',true)'), 'tenant RLS present'],
+['forced RLS',migration.includes('FORCE ROW LEVEL SECURITY')&&migration.includes("current_setting('app.tenant_id',true)")'), 'tenant RLS present'],
 ['db idempotency',migration.includes('atlas_v156_idempotency')&&migration.includes('PRIMARY KEY (tenant_id, key, scope)'), 'idempotency is database-backed'],
 ['provider uniqueness',migration.includes('PRIMARY KEY (tenant_id, provider, provider_event_id)'), 'provider events are uniquely reconciled'],
 ['action input security',action.includes('FORBIDDEN_INPUT_KEYS')&&action.includes('credential_in_input'), 'credential input rejected'],
