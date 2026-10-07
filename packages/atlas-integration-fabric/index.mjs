@@ -6,7 +6,7 @@ const ID = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/;
 const ALLOWED_AUTH = new Set(['oauth2', 'api_key', 'basic', 'bearer', 'hmac', 'none']);
 const METHODS = new Set(['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS']);
 const PRIVATE_HOSTS = new Set(['localhost','localhost.localdomain','ip6-localhost','ip6-loopback']);
-const PRIVATE_IPV4 = /^(10\\.|127\\.|169\\.254\\.|192\\.168\\.|172\\.(?:1[6-9]|2[0-9]|3[0-1])\\.|0\\.)/;
+const PRIVATE_IPV4 = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(?:1[6-9]|2[0-9]|3[0-1])\.|0\.)/;
 const PRIVATE_IPV6 = /^(::1|fc|fd|fe80:)/i;
 
 export const AUTH_MODES = FREEZE({
@@ -334,7 +334,7 @@ export function buildSoapRequest({ url, action, envelope, contentType='text/xml;
   assertSafeConnectorUrl(url);
   const soapAction = boundedText(action, 'SOAP action', 500);
   const body = boundedText(envelope, 'SOAP envelope', 50000);
-  if (!/^<[^>]+[\\s\\S]*>\\s*$/.test(body)) throw new TypeError('SOAP envelope is invalid');
+  if (!/^<[^>]+[\s\S]*>\s*$/.test(body)) throw new TypeError('SOAP envelope is invalid');
   return FREEZE({
     url,
     method:'POST',
