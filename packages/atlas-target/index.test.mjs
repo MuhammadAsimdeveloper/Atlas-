@@ -63,6 +63,21 @@ test('V157 P0 workflow node registry validates typed configs and binds action no
   }),/registered|action/i);
 });
 
+test('V157 P0 node registry covers the entire catalog and exposes deterministic schema metadata', async () => {
+  const { createWorkflowNodeSchemaRegistry, WORKFLOW_NODE_SCHEMA_REGISTRY_SUMMARY } = await import('./workflow-node-schema-registry.mjs');
+  const registry=createWorkflowNodeSchemaRegistry();
+  assert.equal(registry.summary.total, WORKFLOW_NODE_TYPES.length);
+  assert.equal(WORKFLOW_NODE_SCHEMA_REGISTRY_SUMMARY.total, WORKFLOW_NODE_TYPES.length);
+  for(const type of WORKFLOW_NODE_TYPES){
+    const contract=registry.get(type);
+    assert.equal(contract.type,type);
+    assert.equal(typeof contract.schemaVersion,'number');
+    assert.equal(typeof contract.schemaStatus,'string');
+  }
+  assert.equal(registry.list({schemaStatus:'typed'}).some(c=>c.type==='action'),true);
+  assert.equal(registry.list({schemaStatus:'typed'}).some(c=>c.type==='edit_fields'),true);
+});
+
 test('CRM target enforces typed properties, tenant scope, optimistic versions, associations and pipeline governance', () => {
   const schemas = new Map([
     ['stage_id', defineCrmProperty({ key:'stage_id', type:'select', label:'Stage', options:['new','qualified','won'], required:true })],
