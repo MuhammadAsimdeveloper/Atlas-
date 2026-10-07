@@ -33,9 +33,9 @@ packages/atlas-target/workflow-runtime-contracts.mjs adds deterministic error cl
 
 Each normalized error exposes only bounded contract metadata: code, category, retryable and externalOutcome.
 
-Provider/network failures may be retryable in principle, but an unknown external outcome is not blindly retried by the durable workflow execution engine. failWorkflowStep() now records error category, external outcome and retryability and only schedules automatic retry when the outcome is known.
+Provider/network failures may be retryable in principle, but an unknown external outcome is not blindly retried by the durable workflow execution engine. failWorkflowStep() now records error category, external outcome and retryability and moves unknown outcomes into a durable reconciliation_required state.
 
-This follows the parity-plan rule that unknown external outcomes must enter reconciliation rather than be hidden behind a green result or blindly replayed.
+resolveWorkflowReconciliation() provides an explicit, replay-safe operator resolution: confirmed_success returns the exact node to queued execution; confirmed_failure dead-letters the execution. This follows the parity-plan rule that unknown external outcomes must enter reconciliation rather than be hidden behind a green result or blindly replayed.
 
 ## TDD coverage
 
@@ -60,5 +60,5 @@ Still unfinished:
 - connector-derived input/output schemas
 - automatic output-shape propagation from one node into the next node's input schema
 - complete connector_action/provider operation binding
-- durable reconciliation worker/state for unknown external outcomes
+- reconciliation worker/queue integration for unknown external outcomes
 - remaining credential, execution inspector and test/preview parity work
