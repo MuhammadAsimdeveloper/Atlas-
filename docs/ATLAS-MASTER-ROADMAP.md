@@ -1,3 +1,13 @@
+## V157 — Deep n8n parity + optional Operator Copilot
+
+V157 establishes the next major roadmap direction: Atlas must deliver deep functional parity with n8n's workflow automation surface while making the platform usable without technical automation knowledge. The chatbot/Copilot is optional and operates through the same governed application services as the visual UI, API and workers.
+
+See [Deep n8n Parity + Optional Operator Copilot Plan](ATLAS-N8N-DEEP-PARITY-AND-COPILOT-PLAN-2026-10.md) for the authoritative capability map, command/navigation model, safety contract, delivery phases and definition of done.
+
+Priority: P0 workflow foundation → P1 core execution parity → P2 connector breadth → P3 AI/agent parity + Copilot → P4 collaboration/environments → P5 scale/operations → P6 zero-training UX.
+
+Non-negotiable: do not treat a node catalog, UI mock, provider name or saved workflow JSON as feature completion. Each parity item requires implementation, authorization, tests, execution evidence where applicable, and truthful production status.
+
 ## V156 implementation — transactional operating system
 
 V156 consolidates commerce, financial, project and portal contracts into a hardened transactional kernel: products/variants, price books, taxes/coupons, deterministic carts, inventory reservations, quote/order/checkout/subscription state machines, provider payment-event dedupe, refunds/credits, evidence-bound documents, relationship-scoped portals, project dependency safety, durable idempotency and provider reconciliation. Persistence is tenant-bound with forced Row Level Security and restricted worker grants. Live provider execution and production migration remain deployment gates.
