@@ -18,7 +18,8 @@ test('requested core domains are represented in the feature registry', () => {
   for (const id of [
     'connector.oauth2','connector.api_key','connector.custom_rest','connector.graphql',
     'connector.soap','connector.webhook','connector.credential_vault','connector.rotation',
-    'automation.visual_editor','automation.subworkflow','automation.parallel','automation.dead_letter',
+    'platform.action_registry','platform.skill_registry','platform.data_contracts','platform.interfaces','platform.synthetic_tests',
+    'automation.visual_editor','automation.error_routes','automation.subworkflow','automation.parallel','automation.dead_letter',
     'crm.custom_objects','crm.buying_committee','crm.predictive_scoring','crm.import_export',
     'marketing.drip_campaigns','marketing.attribution','marketing.social_scheduler',
     'education.course_builder','education.community','commerce.cpq','commerce.usage_billing',
