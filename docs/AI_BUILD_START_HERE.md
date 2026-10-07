@@ -27,3 +27,11 @@ Inspect current V-series architecture and production truth boundary first. Use T
 Business agents → event/automation engine → connector lifecycle → unified inbox/communications → approvals → knowledge → analytics/SLOs → shared SEO/API/audit utilities → production deployment evidence.
 
 Implement the next unfinished capability from the roadmap and update its V-series documentation.
+
+## Current V157 build state
+
+The first V157 P0 foundation slice is implemented in [V157 P0 — Typed Action Registry and Schema Enforcement](V157-P0-TYPED-ACTION-REGISTRY.md).
+
+This slice makes action schemas executable through a bounded immutable action registry and registry-scoped invocation validation while preserving existing tenant, credential, consent, provider and approval gates.
+
+The next unfinished P0 capability is the shared declarative expression/data-mapping engine. Continue by extending the existing safe-data-mapping and workflow-runtime contracts; do not create a second automation engine.
