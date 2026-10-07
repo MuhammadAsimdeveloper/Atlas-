@@ -204,8 +204,8 @@ addMany(features,'P5','production',[
 // Additional gaps that materially improve Atlas beyond the requested surface.
 const gaps = [];
 addMany(gaps,'P1','core',[
-  'Idempotency keys','Outbox/inbox pattern','Event bus','Event replay','Schema compatibility checks',
-  'Feature flags','Tenant quotas','Usage metering','Request correlation IDs','Audit event immutability',
+  'Idempotency keys','Outbox/inbox pattern','Event bus','Event replay','Schema registry','Schema compatibility checks',
+  'Feature flags','Tenant quotas','Rate quotas','Cost controls','Usage metering','Request correlation IDs','Audit event immutability',
   'Global search','Notification center','Timezone/DST policy','Localization','Currency normalization',
   'Consent ledger','Suppression lists','Provider webhooks reconciliation'
 ],'implemented-foundation');
