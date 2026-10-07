@@ -211,7 +211,7 @@ export function transitionSubscription({subscription,to,expectedVersion=subscrip
   const next={...clone(subscription),status:to,reason:text(reason||'system','reason',300),version:subscription.version+1,updatedAt:new Date().toISOString()};return freeze({...next,checksum:hash(next)});
 }
 
-export function createRefundRequest({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,requiresApprovalAboveMinor=100000,approval=null}={}){
+export function createRefundRequest({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,capturedMinor=null,alreadyRefundedMinor=0,requiresApprovalAboveMinor=100000,approval=null}={}){
   assertRef(tenantId,'tenantId');assertRef(refundId,'refundId');assertRef(paymentId,'paymentId');positiveMoney(amountMinor,'amountMinor');text(reason,'reason',500);idem(idempotencyKey);money(requiresApprovalAboveMinor,'requiresApprovalAboveMinor');
   const approvalRequired=amountMinor>requiresApprovalAboveMinor;if(approvalRequired&&approval?.status!=='approved')return freeze({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,status:'needs_approval',approvalRequired:true});
   return freeze({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,status:'approved',approvalRequired:false,refundHash:hash({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey})});
