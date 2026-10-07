@@ -35,6 +35,43 @@ export function splitSseBuffer(buffer){
   return Object.freeze({lines:lines.slice(0,-1),remainder:lines.at(-1)||''});
 }
 
+export function parseSseDataLine(line){
+  if(typeof line!=='string') throw new TypeError('SSE line must be a string');
+  const trimmed=line.trim();
+  if(!trimmed||!trimmed.startsWith('data:')) return null;
+  const data=trimmed.slice(5).trim();
+  if(data==='[DONE]') return Object.freeze({end:true});
+  const json=JSON.parse(data);
+  const event={};
+  const delta=json?.choices?.[0]?.delta?.content;
+  if(delta) event.delta=String(delta);
+  const finishReason=json?.choices?.[0]?.finish_reason;
+  if(finishReason){event.done=true;event.finishReason=String(finishReason);}
+  return Object.keys(event).length?Object.freeze(event):null;
+}
+
+export async function* parseOpenAiSseChunks(chunks){
+  let buffer='';
+  const decoder=new TextDecoder();
+  for await(const chunk of chunks){
+    buffer+=typeof chunk==='string'?chunk:decoder.decode(chunk,{stream:true});
+    const parsed=splitSseBuffer(buffer);
+    buffer=parsed.remainder;
+    for(const line of parsed.lines){
+      const event=parseSseDataLine(line);
+      if(!event) continue;
+      if(event.end) return;
+      yield event;
+    }
+  }
+  buffer+=decoder.decode();
+  if(buffer){
+    const event=parseSseDataLine(buffer);
+    if(event?.end) return;
+    if(event) yield event;
+  }
+}
+
 function toMessages(input){
   const history=Array.isArray(input?.history)?input.history.slice(-20):[];
   const prompt=typeof input?.prompt==='string'?input.prompt:'';
@@ -69,24 +106,12 @@ export async function getModelAdapter({tenantId,release}={}){
       const response=await fetch(baseUrl+'/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+secret},body:JSON.stringify({model,messages:toMessages(input),temperature:0,stream:true}),signal});
       if(!response.ok) throw Object.assign(new Error('Model provider stream failed with HTTP '+response.status),{code:'model_provider_http'});
       if(!response.body) throw Object.assign(new Error('Model provider returned no stream body'),{code:'model_provider_stream_missing'});
-      const reader=response.body.getReader(); const decoder=new TextDecoder(); let buffer='';
+      const reader=response.body.getReader();
       try {
-        while(true){
-          const {value,done}=await reader.read(); if(done) break;
-          buffer+=decoder.decode(value,{stream:true});
-          const parsed=splitSseBuffer(buffer);
-          buffer=parsed.remainder;
-          for(const line of parsed.lines){
-            const trimmed=line.trim();
-            if(!trimmed||!trimmed.startsWith('data:')) continue;
-            const data=trimmed.slice(5).trim();
-            if(data==='[DONE]') return;
-            const json=JSON.parse(data); const delta=json?.choices?.[0]?.delta?.content;
-            if(delta) yield {delta:String(delta)};
-            if(json?.choices?.[0]?.finish_reason) yield {done:true,finishReason:json.choices[0].finish_reason};
-          }
-        }
+        const chunks=(async function*(){while(true){const {value,done}=await reader.read();if(done)return;yield value;}})();
+        for await(const event of parseOpenAiSseChunks(chunks)) yield event;
       } finally { reader.releaseLock?.(); }
+
     }
   });
 }

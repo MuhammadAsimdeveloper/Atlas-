@@ -9,7 +9,7 @@ export const TENANT_ROLES = new Set(['owner', 'admin', 'member', 'viewer', 'bill
 export const AUTH_ROLE_KEYS = new Set(['admin', 'member', 'viewer', 'billing_admin']);
 export const CUSTOM_PERMISSION_CATALOG = Object.freeze([
   'dashboard.read', 'contacts.read', 'contacts.write', 'workflows.read', 'workflows.write',
-  'workflows.activate', 'inbox.read', 'inbox.respond', 'billing.read', 'billing.manage',
+  'workflows.activate', 'inbox.read', 'inbox.respond', 'copilot.manage', 'billing.read', 'billing.manage',
   'reports.read', 'integrations.read', 'integrations.manage'
 ]);
 const CSRF_SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { splitSseBuffer } from './openai-compatible.mjs';
+import { splitSseBuffer, parseSseDataLine, parseOpenAiSseChunks } from './openai-compatible.mjs';
 import { createModelAdapter, createModelRequest, invokeModelTurn } from '../../../packages/atlas-agent-fabric/model-runtime.mjs';
 
 const TENANT='11111111-1111-4111-8111-111111111111';
@@ -13,6 +13,14 @@ test('OpenAI-compatible SSE splitting retains only the unterminated final line',
   const second=splitSseBuffer(first.remainder+'}\n');
   assert.deepEqual(second.lines,['data: {"b":}']);
   assert.equal(second.remainder,'');
+});
+
+test('OpenAI-compatible stream flushes a final SSE event without a trailing newline',async()=>{
+  const events=[];
+  for await(const event of parseOpenAiSseChunks(['data: {"choices":[{"delta":{"content":"tail"}}]}'])) events.push(event);
+  assert.deepEqual(events,[{delta:'tail'}]);
+  assert.deepEqual(parseSseDataLine('data: {"choices":[{"finish_reason":"stop"}]}'),{done:true,finishReason:'stop'});
+  assert.deepEqual(parseSseDataLine('data: [DONE]'),{end:true});
 });
 
 test('model latency is measured from actual invocation start rather than caller timestamp',async()=>{

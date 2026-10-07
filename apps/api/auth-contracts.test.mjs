@@ -56,6 +56,8 @@ test('custom tenant roles accept only the fixed non-platform permission catalog'
   const role = validateCustomRole({ key: 'custom:service-coordinator', name: 'Service coordinator', permissions: ['contacts.read', 'workflows.read', 'contacts.read'] });
   assert.deepEqual(role.permissions, ['contacts.read', 'workflows.read']);
   assert.throws(() => validateCustomRole({ key: 'platform_owner', name: 'Global owner', permissions: [] }), { code: 'invalid_role_key' });
+  const copilotRole = validateCustomRole({ key: 'custom:copilot-manager', name: 'Copilot manager', permissions: ['copilot.manage'] });
+  assert.deepEqual(copilotRole.permissions, ['copilot.manage']);
   assert.throws(() => validateCustomRole({ key: 'custom:danger', name: 'Danger', permissions: ['platform.admin'] }), { code: 'invalid_role_permissions' });
 });
 
