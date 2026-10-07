@@ -92,25 +92,26 @@ export function createWorkflowNodeSchemaRegistry({actionRegistry=null,actions=nu
   }
   return true;
  };
+ const validateNodeOutput=(type,nodeConfig={},output)=>{
+  const contract=map.get(type);
+  if(!contract) fail('node_type_not_registered','Workflow node type is not registered: '+type);
+  let outputSchema=contract.outputSchema;
+  if(type==='action'){
+    ref(nodeConfig?.actionId,'actionId');
+    const action=resolvedActionRegistry.get(nodeConfig.actionId);
+    if(!action) fail('action_not_registered','Workflow action is not registered: '+nodeConfig.actionId);
+    outputSchema=action.outputSchema||GENERIC_SCHEMA;
+  }
+  validateJsonSchema(output,outputSchema,'node.output');
+  return true;
+ };
  return freeze({
   version:1,
   get,
   list,
   has:type=>typeof type==='string'&&map.has(type),
   validateNodeConfig,
-  validateNodeOutput(type,nodeConfig={},output){
-    const contract=map.get(type);
-    if(!contract)fail('node_type_not_registered','Workflow node type is not registered: '+type);
-    let outputSchema=contract.outputSchema;
-    if(type==='action'){
-      ref(nodeConfig?.actionId,'actionId');
-      const action=resolvedActionRegistry.get(nodeConfig.actionId);
-      if(!action)fail('action_not_registered','Workflow action is not registered: '+nodeConfig.actionId);
-      outputSchema=action.outputSchema||GENERIC_SCHEMA;
-    }
-    validateJsonSchema(output,outputSchema,'node.output');
-    return true;
-  },
+  validateNodeOutput,
   summarizeNodeOutput(type,nodeConfig={},output){
     validateNodeOutput(type,nodeConfig,output);
     return freeze({valid:true, schemaVersion:map.get(type).schemaVersion, outputHash:digest(canonical(output))});
