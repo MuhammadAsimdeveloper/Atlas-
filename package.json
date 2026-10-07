@@ -23,7 +23,10 @@
     "db:migrate": "node scripts/migrate.mjs",
     "capabilities:check": "node scripts/capabilities-check.mjs",
     "service:check": "node --test packages/atlas-core/service-operations.test.mjs packages/atlas-core/oauth.test.mjs apps/worker/integration-runtime.test.mjs",
-    "copilot:staging": "node scripts/copilot-staging-test.mjs"
+    "copilot:staging": "node scripts/copilot-staging-test.mjs",
+    "connector:check": "node --test packages/atlas-integration-fabric/index.test.mjs",
+    "customer:lifecycle:check": "node --test packages/atlas-customer-lifecycle/index.test.mjs",
+    "action:fabric:check": "node --test packages/atlas-action-fabric/index.test.mjs"
   },
   "engines": {
     "node": ">=20"
