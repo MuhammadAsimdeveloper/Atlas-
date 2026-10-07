@@ -37,7 +37,7 @@ jobs:
         run: docker build -t atlas-ci:${{ github.sha }} .
       - run: npm audit --audit-level=moderate
       - name: Upload launch-safe preview artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: atlas-v153-static-preview-node-${{ matrix.node }}
           path: dist/atlas-site
