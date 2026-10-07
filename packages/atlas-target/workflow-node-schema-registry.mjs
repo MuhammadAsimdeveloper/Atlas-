@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { WORKFLOW_NODE_CATALOG, WORKFLOW_NODE_TYPES } from './workflow-catalog.mjs';
 import { createActionRegistry, getAction } from '../atlas-action-fabric/index.mjs';
 import { validateJsonSchema } from '../atlas-action-fabric/schema.mjs';
@@ -7,6 +8,8 @@ const clone=value=>structuredClone(value);
 const freeze=value=>{if(value&&typeof value==='object'&&!Object.isFrozen(value)){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 const fail=(code,message,details={})=>{const error=new TypeError(message);error.code=code;Object.assign(error,details);throw error;};
 const ref=(value,label)=>{if(typeof value!=='string'||!REF.test(value))fail('invalid_reference',label+' must be a bounded reference');return value;};
+function digest(value){return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');}
+function canonical(value){return Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;}
 
 const GENERIC_SCHEMA=Object.freeze({type:'object',additionalProperties:true});
 const CONTRACT_SCHEMAS={
@@ -95,6 +98,23 @@ export function createWorkflowNodeSchemaRegistry({actionRegistry=null,actions=nu
   list,
   has:type=>typeof type==='string'&&map.has(type),
   validateNodeConfig,
+  validateNodeOutput(type,nodeConfig={},output){
+    const contract=map.get(type);
+    if(!contract)fail('node_type_not_registered','Workflow node type is not registered: '+type);
+    let outputSchema=contract.outputSchema;
+    if(type==='action'){
+      ref(nodeConfig?.actionId,'actionId');
+      const action=resolvedActionRegistry.get(nodeConfig.actionId);
+      if(!action)fail('action_not_registered','Workflow action is not registered: '+nodeConfig.actionId);
+      outputSchema=action.outputSchema||GENERIC_SCHEMA;
+    }
+    validateJsonSchema(output,outputSchema,'node.output');
+    return true;
+  },
+  summarizeNodeOutput(type,nodeConfig={},output){
+    validateNodeOutput(type,nodeConfig,output);
+    return freeze({valid:true, schemaVersion:map.get(type).schemaVersion, outputHash:digest(canonical(output))});
+  },
   summary:freeze({total:map.size,typed:[...map.values()].filter(c=>c.schemaStatus==='typed').length,generic:[...map.values()].filter(c=>c.schemaStatus==='catalog-generic').length})
  });
 }
