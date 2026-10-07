@@ -1,3 +1,7 @@
+## V156 implementation — transactional operating system
+
+V156 consolidates the commerce, financial, projects and portals layer into a hardened transactional kernel. It adds typed product/variant/price-book/tax/coupon contracts, deterministic cart pricing, inventory reservations with state hashes, quote/order/checkout/subscription state machines, provider payment-event dedupe contracts, refund/credit controls, evidence-bound document approvals, relationship-scoped portal authorization, project dependency safety, durable idempotency records and provider reconciliation. PostgreSQL persistence uses forced tenant RLS and restricted API/worker grants. This is staged functionality; provider credentials, live payment execution, managed secrets and production migration remain explicit deployment gates.
+
 # Atlas master roadmap and verified implementation status
 
 This branch advances the verified status to V148. Atlas prioritizes connected business outcomes while keeping external-provider and infrastructure claims fail-closed.
