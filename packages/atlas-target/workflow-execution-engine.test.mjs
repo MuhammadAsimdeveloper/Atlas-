@@ -37,6 +37,21 @@ function graph() {
   });
 }
 
+test('V157 P0 workflow error taxonomy is deterministic and never hides unknown external outcomes', async () => {
+  const { normalizeWorkflowError } = await import('./workflow-runtime-contracts.mjs');
+  const timeout=normalizeWorkflowError({code:'timeout',message:'provider call timed out',source:'connector'});
+  assert.deepEqual(timeout,{code:'timeout',category:'timeout',retryable:true,externalOutcome:'known'});
+  const provider=normalizeWorkflowError({code:'provider_500',message:'provider failed',source:'connector'});
+  assert.equal(provider.category,'provider');
+  assert.equal(provider.retryable,true);
+  assert.equal(provider.externalOutcome,'unknown');
+  const denied=normalizeWorkflowError({code:'approval_required',message:'approval is required',source:'policy'});
+  assert.equal(denied.retryable,false);
+  assert.equal(denied.externalOutcome,'none');
+  assert.equal(normalizeWorkflowError({code:'provider_retry_unsafe',message:'non-idempotent provider operation',source:'connector'}).retryable,false);
+  assert.throws(()=>normalizeWorkflowError({code:'BAD CODE',message:'x',source:'connector'}),/error code|invalid/i);
+});
+
 test('execution pins workflow version/checksum and starts at the trigger', () => {
   const state = createWorkflowExecution({
     tenantId,
