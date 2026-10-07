@@ -80,3 +80,36 @@ test('typed action schemas reject invalid payloads and enforce required fields',
  });
  assert.equal(valid.actionId,action.id);
 });
+
+test('typed action inputs can resolve allowlisted expressions before schema validation',()=>{
+ const action=defineAction({
+  id:'crm.contact.expression-test',
+  name:'Expression Contact Test',
+  domain:'crm',
+  risk:'write',
+  inputSchema:{type:'object',required:['score'],additionalProperties:false,properties:{score:{type:'number',minimum:0,maximum:100}}},
+  surfaces:['api','workflow']
+ });
+ const registry=createActionRegistry({actions:[action]});
+ const invocation=createInvocation({
+  registry,
+  tenantId:'tenant_1',
+  actionId:action.id,
+  requestId:'req_expr_1',
+  actorRef:'user_1',
+  idempotencyKey:'idem-expr-125',
+  input:{score:{$expression:'input.customer.score'}},
+  expressionContext:{input:{customer:{score:88}}}
+ });
+ assert.equal(invocation.input.score,88);
+ assert.throws(()=>createInvocation({
+  registry,
+  tenantId:'tenant_1',
+  actionId:action.id,
+  requestId:'req_expr_2',
+  actorRef:'user_1',
+  idempotencyKey:'idem-expr-126',
+  input:{score:{$expression:'process.env.SECRET'}},
+  expressionContext:{input:{}}
+ }),/allowlisted|invalid|expression/i);
+});
