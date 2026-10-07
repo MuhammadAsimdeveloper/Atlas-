@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {defineAction,getAction,listActions,compileActionSurfaces,createInvocation,syntheticTestPlan,buildBusinessCapability,ACTION_CATALOG_COUNT} from './index.mjs';
+import {defineAction,getAction,listActions,compileActionSurfaces,createInvocation,createActionRegistry,syntheticTestPlan,buildBusinessCapability,ACTION_CATALOG_COUNT} from './index.mjs';
 
 test('business actions are reusable across API/workflow/MCP/agent/UI/portal surfaces',()=>{
  const a=defineAction({id:'crm.contact.upsert',name:'Upsert Contact',domain:'crm',risk:'write',surfaces:['api','workflow','mcp','agent','ui','portal']});
@@ -34,7 +34,7 @@ test('capability compiler creates one canonical surface map',()=>{
 
 test('typed action schemas reject invalid payloads and enforce required fields',()=>{
  const action=defineAction({
-  id:'crm.contact.typed_test',
+  id:'crm.contact.typed-test',
   name:'Typed Contact Test',
   domain:'crm',
   risk:'write',
@@ -49,7 +49,10 @@ test('typed action schemas reject invalid payloads and enforce required fields',
   },
   surfaces:['api','workflow']
  });
+ const registry=createActionRegistry({actions:[action]});
+ assert.equal(registry.get(action.id).definitionHash,action.definitionHash);
  assert.throws(()=>createInvocation({
+  registry,
   tenantId:'tenant_1',
   actionId:action.id,
   requestId:'req_1',
@@ -58,6 +61,7 @@ test('typed action schemas reject invalid payloads and enforce required fields',
   input:{contactRef:'contact_1',score:'high'}
  }),error=>error?.code==='schema_validation_failed');
  assert.throws(()=>createInvocation({
+  registry,
   tenantId:'tenant_1',
   actionId:action.id,
   requestId:'req_1',
@@ -65,4 +69,14 @@ test('typed action schemas reject invalid payloads and enforce required fields',
   idempotencyKey:'idem-typed-124',
   input:{contactRef:'contact_1'}
  }),error=>error?.code==='schema_validation_failed');
+ const valid=createInvocation({
+  registry,
+  tenantId:'tenant_1',
+  actionId:action.id,
+  requestId:'req_1',
+  actorRef:'user_1',
+  idempotencyKey:'idem-typed-125',
+  input:{contactRef:'contact_1',score:90}
+ });
+ assert.equal(valid.actionId,action.id);
 });
