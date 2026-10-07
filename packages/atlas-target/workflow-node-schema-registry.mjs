@@ -11,7 +11,7 @@ const ref=(value,label)=>{if(typeof value!=='string'||!REF.test(value))fail('inv
 const GENERIC_SCHEMA=Object.freeze({type:'object',additionalProperties:true});
 const CONTRACT_SCHEMAS={
  trigger:Object.freeze({
-  inputSchema:{type:'object',required:['eventType'],additionalProperties:false,properties:{eventType:{type:'string',minLength:3,maxLength:180}}}
+  inputSchema:{type:'object',required:['eventType'],additionalProperties:true,properties:{eventType:{type:'string',minLength:3,maxLength:180}}}
  }),
  action:Object.freeze({
   inputSchema:{type:'object',required:['actionId'],additionalProperties:false,properties:{
@@ -22,7 +22,7 @@ const CONTRACT_SCHEMAS={
   }}
  }),
  edit_fields:Object.freeze({
-  inputSchema:{type:'object',required:['mapping'],additionalProperties:false,properties:{
+  inputSchema:{type:'object',required:['mapping'],additionalProperties:true,properties:{
     mapping:{type:'array',minItems:1,maxItems:100,items:{type:'object',additionalProperties:false,properties:{
       source:{type:'string',minLength:3,maxLength:180},
       expression:{type:'string',minLength:1,maxLength:4000},
