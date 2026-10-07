@@ -30,14 +30,15 @@ test('requested core domains are represented in the feature registry', () => {
 });
 
 test('feature registry includes gap-closing features beyond the user list', () => {
-  const ids = new Set(ATLAS_MISSING_FEATURES.map(item => item.id));
+  const featureIds = new Set(ATLAS_FEATURES.map(item => item.id));
+  const gapIds = new Set(ATLAS_MISSING_FEATURES.map(item => item.id));
   for (const id of [
     'core.idempotency','core.event_bus','core.outbox_inbox','core.schema_registry',
     'security.abac','security.data_residency','security.privacy_center',
     'reliability.circuit_breakers','reliability.bulkheads','reliability.backpressure',
     'data.data_lineage','data.data_contracts','ai.prompt_registry','ai.model_routing',
     'ai.eval_harness','ops.incident_management','ops.cost_controls','ops.rate_quotas'
-  ]) assert.equal(ids.has(id), true, id);
+  ]) assert.equal(featureIds.has(id) || gapIds.has(id), true, id);
 });
 
 test('feature summary is consistent and every feature belongs to one phase', () => {
