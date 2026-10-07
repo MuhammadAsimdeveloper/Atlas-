@@ -16,7 +16,7 @@ const CONTRACT_SCHEMAS={
  action:Object.freeze({
   inputSchema:{type:'object',required:['actionId'],additionalProperties:false,properties:{
     actionId:{type:'string',minLength:3,maxLength:180},
-    input:{type:['object']},
+    input:{type:'object',additionalProperties:true},
     connectionRef:{type:'string',minLength:3,maxLength:180},
     operationRef:{type:'string',minLength:3,maxLength:180}
   }}
