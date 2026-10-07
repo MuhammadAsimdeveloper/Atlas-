@@ -90,7 +90,7 @@ export function definePrivateConnector({tenantId,id,name,category,auth,baseUrl,s
   assertRef(tenantId,'tenantId'); assertId(id,'connectorId'); assertId(category,'category');
   if(typeof name!=='string'||name.length<2||name.length>120) throw new TypeError('name is invalid');
   if(!AUTH.has(auth)) throw new TypeError('unsupported auth');
-  const url=new URL(baseUrl); if(url.protocol!=='https:') throw new TypeError('private connector baseUrl must use HTTPS');
+  const url=new URL(baseUrl); if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash) throw new TypeError('private connector baseUrl must be HTTPS without embedded credentials/query');
   if(!Array.isArray(scopes)||scopes.length>100) throw new RangeError('scopes out of bounds');
   return Object.freeze({tenantId,id,name,category,auth,baseUrl:url.origin,scopes:[...scopes],version,status:'private'});
 }
@@ -101,14 +101,14 @@ export function validateConnectorManifest(manifest) {
   if(typeof manifest.name!=='string'||manifest.name.length<2||manifest.name.length>120) throw new TypeError('manifest.name invalid');
   if(!CONNECTOR_TIERS.has(manifest.tier??'community')) throw new TypeError('manifest.tier invalid');
   if(!AUTH.has(manifest.auth?.type??'none')) throw new TypeError('manifest.auth.type invalid');
-  const baseUrl=new URL(manifest.baseUrl); if(baseUrl.protocol!=='https:') throw new TypeError('manifest.baseUrl must use HTTPS');
+  const baseUrl=new URL(manifest.baseUrl); if(baseUrl.protocol!=='https:'||baseUrl.username||baseUrl.password||baseUrl.search||baseUrl.hash) throw new TypeError('manifest.baseUrl must be HTTPS without embedded credentials/query');
   if(manifest.webhook?.enabled && manifest.webhook.verification!=='signed') throw new TypeError('webhooks require signed verification');
   return Object.freeze({id,name:manifest.name,tier:manifest.tier??'community',auth:{type:manifest.auth?.type??'none'},baseUrl:baseUrl.origin});
 }
 
 export function createCredentialEnvelope({tenantId,connectionId,connectorId,version,secretRef,expiresAt=null,rotatedAt=null}={}) {
   assertRef(tenantId,'tenantId'); assertRef(connectionId,'connectionId'); assertId(connectorId,'connectorId'); assertId(version,'version'); assertRef(secretRef,'secretRef');
-  if(typeof secretRef==='string' && /secret|token|key|password/i.test(secretRef)===false) throw new TypeError('secretRef must be an opaque secret reference');
+  if(!/^(?:vault|kms|secret|credential)_[A-Za-z0-9_.:-]{3,160}$/.test(secretRef)) throw new TypeError('secretRef must be an opaque vault/KMS reference');
   if(expiresAt!==null && !Number.isSafeInteger(expiresAt)) throw new TypeError('expiresAt must be epoch milliseconds');
   if(rotatedAt!==null && !Number.isSafeInteger(rotatedAt)) throw new TypeError('rotatedAt must be epoch milliseconds');
   return Object.freeze({tenantId,connectionId,connectorId,version,secretRef,expiresAt,rotatedAt,secretState:expiresAt!==null&&expiresAt<=Date.now()?'expired':'active'});
