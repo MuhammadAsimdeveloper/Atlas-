@@ -271,6 +271,7 @@ test('V148 safe data mapping supports allowlisted transforms and forbids code/ne
 
 test('V157 P0 expression engine evaluates bounded typed expressions and rejects executable syntax', async () => {
   const { compileExpression, evaluateExpression } = await import('../atlas-core/expression-engine.mjs');
+  const { validateDataMapping, applyDataMapping } = await import('./safe-data-mapping.mjs');
   const context={input:{customer:{email:'Lead@Example.COM',score:42,active:true,tags:['a','b']}}};
   assert.equal(evaluateExpression({expression:'lowercase(input.customer.email)',context}),'lead@example.com');
   assert.equal(evaluateExpression({expression:'input.customer.score * 2 + 1',context}),85);
