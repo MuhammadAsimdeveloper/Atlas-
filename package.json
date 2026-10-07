@@ -26,7 +26,8 @@
     "copilot:staging": "node scripts/copilot-staging-test.mjs",
     "connector:check": "node --test packages/atlas-integration-fabric/index.test.mjs",
     "customer:lifecycle:check": "node --test packages/atlas-customer-lifecycle/index.test.mjs",
-    "action:fabric:check": "node --test packages/atlas-action-fabric/index.test.mjs"
+    "action:fabric:check": "node --test packages/atlas-action-fabric/index.test.mjs",
+    "transactional:check": "node --test packages/atlas-transactional-os/index.test.mjs"
   },
   "engines": {
     "node": ">=20"

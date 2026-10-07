@@ -31,7 +31,7 @@ function idem(v){if(!/^[A-Za-z0-9._:-]{8,255}$/.test(v||''))throw new TypeError(
 function boundedInt(v,l,min,max){if(!Number.isSafeInteger(v)||v<min||v>max)throw new RangeError(l+' out of bounds');return v;}
 function safeArray(v,l,max){if(!Array.isArray(v)||v.length>max)throw new RangeError(l+' out of bounds');return v;}
 
-export function defineProduct({tenantId,productId,name,type='service,status='active',description='',variants=[]}={}){
+export function defineProduct({tenantId,productId,name,type='service',status='active',description='',variants=[]}={}){
   assertRef(tenantId,'tenantId');assertId(productId,'productId');text(name,'name',160);if(!PRODUCT_TYPES.has(type)||!PRODUCT_STATUS.has(status))throw new TypeError('product type/status invalid');
   text(description||'','description',2000);safeArray(variants,'variants',500);
   const seen=new Set();
@@ -211,7 +211,7 @@ export function transitionSubscription({subscription,to,expectedVersion=subscrip
   const next={...clone(subscription),status:to,reason:text(reason||'system','reason',300),version:subscription.version+1,updatedAt:new Date().toISOString()};return freeze({...next,checksum:hash(next)});
 }
 
-export function createRefundRequest({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,requiresApprovalAboveMinor=100000,approval=null}={}){
+export function createRefundRequest({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,capturedMinor=null,alreadyRefundedMinor=0,requiresApprovalAboveMinor=100000,approval=null}={}){
   assertRef(tenantId,'tenantId');assertRef(refundId,'refundId');assertRef(paymentId,'paymentId');positiveMoney(amountMinor,'amountMinor');text(reason,'reason',500);idem(idempotencyKey);money(requiresApprovalAboveMinor,'requiresApprovalAboveMinor');
   const approvalRequired=amountMinor>requiresApprovalAboveMinor;if(approvalRequired&&approval?.status!=='approved')return freeze({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,status:'needs_approval',approvalRequired:true});
   return freeze({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,status:'approved',approvalRequired:false,refundHash:hash({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey})});

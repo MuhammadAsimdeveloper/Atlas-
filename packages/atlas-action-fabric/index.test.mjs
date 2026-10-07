@@ -16,6 +16,8 @@ test('side effects fail closed until provider and approval gates pass',()=>{
  assert.equal(ok.tenantId,'tenant_1');
 });
 
+test('action inputs reject credentials and excessive recursion',()=>{assert.throws(()=>createInvocation({tenantId:'tenant_1',actionId:'crm.contact.upsert',requestId:'req_1',actorRef:'user_1',idempotencyKey:'idem-12345678',input:{password:'secret'}}),/credential/);assert.throws(()=>createInvocation({tenantId:'tenant_1',actionId:'crm.contact.upsert',requestId:'req_1',actorRef:'user_1',idempotencyKey:'idem-12345678',input:{nested:{token:'x'}}}),/credential/);});
+
 test('synthetic connector/action tests cannot enable real side effects',()=>{
  const p=syntheticTestPlan({tenantId:'tenant_1',actionId:'workflow.execute',fixtures:[{input:{ok:true}}]});
  assert.equal(p.mode,'synthetic');assert.equal(p.sideEffects,'disabled');

@@ -255,6 +255,12 @@ try {
   check('P126 unified communications runtime', unifiedInbox.includes('buildOutboundIdempotencyKey') && unifiedInboxTests.includes('delivery state machine') && inboxMigration.includes('atlas_v126_inbox_events') && inboxMigration.includes('atlas_v126_get_message_for_worker') && inboxStore.includes('communication.message.send') && inboxRoutes.includes('/api/v1/inbox/webhooks/') && inboxWorker.includes('communication.message.send'), 'Inbox queueing, webhook ingress, worker delivery and provider receipts are wired through V125');
   check('P126 reference-only content boundary', inboxMigration.includes("content_ref text") && !/message_body|conversation_body/i.test(inboxMigration) && await read('apps/inbox-content/README.md').then(text => text.includes('encrypted object storage/KMS')), 'Customer message content remains outside PostgreSQL and queue payloads behind the reviewed content module');
   const capabilityFabric = await read('packages/atlas-core/capability-fabric.mjs');
+  const transactionalModule = await read('packages/atlas-transactional-os/index.mjs');
+  const transactionalTest = await read('packages/atlas-transactional-os/index.test.mjs');
+  const transactionalMigration = await read('infra/postgres/FINAL-MIGRATION-V156.sql');
+  check('V156 transactional OS foundation', transactionalModule.includes('createOrder') && transactionalModule.includes('reserveInventory') && transactionalModule.includes('buildPortalScope') && transactionalTest.includes('payments are provider-event idempotent') && transactionalMigration.includes('FORCE ROW LEVEL SECURITY') && transactionalMigration.includes('atlas_v156_provider_reconciliation'), 'Transactional commerce, inventory, portal, project and reconciliation contracts are present with forced tenant isolation.');
+  const actionFabric = await read('packages/atlas-action-fabric/index.mjs');
+  check('V155 universal business action fabric', actionFabric.includes('compileActionSurfaces') && actionFabric.includes('syntheticTestPlan') && actionFabric.includes('provider_unverified'), 'Business actions remain reusable across API/workflow/MCP/agent/UI/portal surfaces with side-effect gates.');
   const capabilityCheck = await read('scripts/capabilities-check.mjs');
   const capabilityMigration = await read('infra/postgres/FINAL-MIGRATION-V122.sql');
   const capabilityGrants = await read('infra/postgres/API-ROLE-GRANTS-V122.sql');

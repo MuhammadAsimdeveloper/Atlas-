@@ -55,7 +55,7 @@ test('payment events are provider-idempotent and state transitions are bounded',
 test('subscriptions and refunds require safe state transitions / approval',()=>{
  const sub=createSubscription({tenantId,subscriptionId:'sub-1',customerRef:'cust',priceBookId:'pb',variantId:'v'});
  assert.equal(transitionSubscription({subscription:sub,to:'active'}).status,'active');
- assert.equal(createRefundRequest({tenantId,refundId:'r1',paymentId:'p1',amountMinor:200000,reason:'large refund',idempotencyKey:'refund-12345678'}).status,'needs_approval');
+ assert.equal(createRefundRequest({tenantId,refundId:'r1',paymentId:'p1',amountMinor:200000,reason:'large refund',idempotencyKey:'refund-12345678'}).status,'needs_approval');assert.throws(()=>createRefundRequest({tenantId,refundId:'r2',paymentId:'p1',amountMinor:9000,capturedMinor:10000,alreadyRefundedMinor:2000,reason:'over balance',idempotencyKey:'refund-12345679'}),/refundable balance/);
 });
 
 test('credits and portals are relationship scoped',()=>{

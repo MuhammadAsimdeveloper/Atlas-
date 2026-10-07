@@ -1,3 +1,7 @@
+## V156 implementation — transactional operating system
+
+V156 consolidates commerce, financial, project and portal contracts into a hardened transactional kernel: products/variants, price books, taxes/coupons, deterministic carts, inventory reservations, quote/order/checkout/subscription state machines, provider payment-event dedupe, refunds/credits, evidence-bound documents, relationship-scoped portals, project dependency safety, durable idempotency and provider reconciliation. Persistence is tenant-bound with forced Row Level Security and restricted worker grants. Live provider execution and production migration remain deployment gates.
+
 # Atlas master roadmap and verified implementation status
 
 This branch advances the verified status to V148. Atlas prioritizes connected business outcomes while keeping external-provider and infrastructure claims fail-closed.

@@ -77,8 +77,11 @@ test('V107 financial OS uses integer minor units, metering and reconciled paymen
     taxMinor:500,creditMinor:300
   });
   assert.equal(invoice.totalMinor,5500);
-  assert.equal(reconcileProviderPayment({tenantId:'t1',provider:'stripe',providerEventId:'evt_1',amountMinor:5500,currency:'USD',invoiceId:invoice.id}).status,'reconciled');
-  assert.equal(reconcileProviderPayment({tenantId:'t1',provider:'stripe',providerEventId:'evt_1',amountMinor:5500,currency:'USD',invoiceId:invoice.id}).status,'duplicate');
+  const first=reconcileProviderPayment({tenantId:'t1',provider:'stripe',providerEventId:'evt_1',amountMinor:5500,currency:'USD',invoiceId:invoice.id});
+  const second=reconcileProviderPayment({tenantId:'t1',provider:'stripe',providerEventId:'evt_1',amountMinor:5500,currency:'USD',invoiceId:invoice.id});
+  assert.equal(first.status,'ready_to_reconcile');
+  assert.equal(first.reconciliationKey,second.reconciliationKey);
+  assert.equal(first.uniqueConstraint,'(tenant_id, provider, provider_event_id)');
 });
 
 test('V108 freelancer workspace separates work permissions, approvals and secrets', () => {
