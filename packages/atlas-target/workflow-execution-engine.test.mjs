@@ -52,6 +52,23 @@ test('V157 P0 workflow error taxonomy is deterministic and never hides unknown e
   assert.throws(()=>normalizeWorkflowError({code:'BAD CODE',message:'x',source:'connector'}),/error code|invalid/i);
 });
 
+test('V157 P0 unknown provider outcomes dead-letter instead of blindly retrying', () => {
+  const first=createWorkflowExecution({
+    tenantId,
+    executionId,
+    workflow:graph(),
+    triggerEventRef:'event_2026_error_1',
+    createdByActorId:'99999999-9999-4999-8999-999999999999'
+  });
+  const advanced=completeWorkflowStep({execution:first,nodeId:'start',attempt:1,now:'2026-10-05T10:00:00Z'});
+  const failed=failWorkflowStep({execution:advanced,nodeId:'task',attempt:1,errorCode:'provider_500',now:'2026-10-05T10:00:01Z'});
+  assert.equal(failed.status,'dead_letter');
+  assert.equal(failed.steps.at(-1).errorCategory,'provider');
+  assert.equal(failed.steps.at(-1).externalOutcome,'unknown');
+  assert.equal(failed.steps.at(-1).retryable,true);
+  assert.equal(failed.retryAt,null);
+});
+
 test('execution pins workflow version/checksum and starts at the trigger', () => {
   const state = createWorkflowExecution({
     tenantId,
