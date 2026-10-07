@@ -1,4 +1,5 @@
 import { normalizeActionSchemas, validateJsonSchema } from './schema.mjs';
+import { evaluateExpression } from '../atlas-core/expression-engine.mjs';
 import crypto from 'node:crypto';
 
 const ID=/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
@@ -29,6 +30,24 @@ function validateInput(value,depth=0){
   throw Object.assign(new Error('unsupported action input value'),{code:'input_value_invalid'});
 }
 function bounded(v,l,max){if(!Array.isArray(v)||v.length>max)throw new RangeError(l+' must contain <= '+max+' items');return v;}
+function isPlainObject(v){return v!==null&&typeof v==='object'&&!Array.isArray(v)&&Object.getPrototypeOf(v)===Object.prototype&&Object.getOwnPropertySymbols(v).length===0;}
+function resolveExpressionValue(value,context,depth=0){
+  if(depth>8)throw Object.assign(new Error('action expression nesting too deep'),{code:'expression_too_deep'});
+  if(Array.isArray(value)){if(value.length>500)throw Object.assign(new Error('action input array too large'),{code:'input_too_large'});return value.map(item=>resolveExpressionValue(item,context,depth+1));}
+  if(!isPlainObject(value))return value;
+  const keys=Object.keys(value);
+  if(keys.length>100)throw Object.assign(new Error('action input object too large'),{code:'input_too_large'});
+  if(keys.length===1&&keys[0]==='$expression'){
+    if(typeof value.$expression!=='string')throw Object.assign(new Error('action expression must be text'),{code:'expression_invalid'});
+    return evaluateExpression({expression:value.$expression,context});
+  }
+  return Object.fromEntries(keys.map(key=>[key,resolveExpressionValue(value[key],context,depth+1)]));
+}
+export function resolveActionInputExpressions({input={},context}={}){
+  if(!isPlainObject(input)&&!Array.isArray(input))throw new TypeError('action input must be a plain object or array');
+  if(!isPlainObject(context))throw new TypeError('expression context must be a plain object');
+  return clone(resolveExpressionValue(input,context));
+}
 
 export function createActionRegistry({actions=[]}={}){
   if(!Array.isArray(actions)||actions.length>500) throw new TypeError('actions must be a bounded array');
@@ -90,14 +109,15 @@ export function compileActionSurfaces(action){
   });
 }
 
-export function createInvocation({registry=DEFAULT_ACTION_REGISTRY,tenantId,actionId,requestId,actorRef,idempotencyKey,input={},mode='dry_run',providerState='verified',consent=true,approved=false}={}){
+export function createInvocation({registry=DEFAULT_ACTION_REGISTRY,tenantId,actionId,requestId,actorRef,idempotencyKey,input={},expressionContext=null,mode='dry_run',providerState='verified',consent=true,approved=false}={}){
   assertRef(tenantId,'tenantId');assertId(actionId,'actionId');assertRef(requestId,'requestId');assertRef(actorRef,'actorRef');assertRef(idempotencyKey,'idempotencyKey');
   if(!registry||typeof registry.get!=='function'||typeof registry.validateInput!=='function')throw new TypeError('registry is invalid');
   if(!['dry_run','live'].includes(mode))throw new TypeError('mode invalid');
-  validateInput(input);
-  const serialized=JSON.stringify(input);if(serialized.length>100000)throw Object.assign(new Error('action input too large'),{code:'input_too_large'});
+  const resolvedInput=expressionContext===null?input:resolveActionInputExpressions({input,context:expressionContext});
+  validateInput(resolvedInput);
+  const serialized=JSON.stringify(resolvedInput);if(serialized.length>100000)throw Object.assign(new Error('action input too large'),{code:'input_too_large'});
   const action=registry.get(actionId);if(!action)throw Object.assign(new Error('action not registered'),{code:'action_not_registered'});
-  registry.validateInput(actionId,input);
+  registry.validateInput(actionId,resolvedInput);
   if(mode==='live'){
     if(action.risk==='external_side_effect'||action.risk==='financial'||action.risk==='privileged'){
       if(providerState!=='verified')throw Object.assign(new Error('provider is not verified'),{code:'provider_unverified'});
@@ -105,7 +125,7 @@ export function createInvocation({registry=DEFAULT_ACTION_REGISTRY,tenantId,acti
       if(action.approval!=='none'&&!approved)throw Object.assign(new Error('approval required'),{code:'approval_required'});
     }
   }
-  return Object.freeze({tenantId,actionId,requestId,actorRef,idempotencyKey,mode,providerState,consent,approved,input:clone(input),actionHash:hash({tenantId,actionId,requestId,idempotencyKey,mode,input})});
+  return Object.freeze({tenantId,actionId,requestId,actorRef,idempotencyKey,mode,providerState,consent,approved,input:clone(resolvedInput),actionHash:hash({tenantId,actionId,requestId,idempotencyKey,mode,input:resolvedInput})});
 }
 
 export function syntheticTestPlan({tenantId,actionId,fixtures=[],expectedOutcomes=['success','retry','failure']}={}){
