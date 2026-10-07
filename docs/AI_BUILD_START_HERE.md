@@ -1,3 +1,11 @@
+## Mandatory product direction — V157
+
+Atlas must support an optional Operator Copilot so non-technical users can complete automation work by plain-language request or command, while every feature remains fully usable through the visual UI. The Copilot can plan, build, navigate, test, inspect, repair and explain work, but it never bypasses tenant permissions, approvals, credentials, quotas or audit logging.
+
+Atlas also has a deep n8n parity target. Read [docs/ATLAS-N8N-DEEP-PARITY-AND-COPILOT-PLAN-2026-10.md](ATLAS-N8N-DEEP-PARITY-AND-COPILOT-PLAN-2026-10.md) before implementing workflow or agent changes. Parity means the actual workflow engine, triggers, branching, loops, data transforms, waits, sub-workflows, error handling, execution inspector, retries/replay, credentials, connector ecosystem, AI workflow builder, agents, MCP, approvals, templates, environments, observability, governance and scale — not merely UI or catalog entries.
+
+Implementation rule: extend the existing Atlas V-series workflow/runtime contracts and durable execution/control plane. Do not greenfield a second automation engine and do not copy n8n proprietary source, UI or branding. Reimplement documented behavior behind Atlas's tenant-safe, approval-aware contracts.
+
 # AI BUILD START HERE — Atlas
 
 ## Authority
