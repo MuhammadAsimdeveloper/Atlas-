@@ -19,7 +19,7 @@ test('node catalog covers n8n-depth control primitives',()=>{
 test('private connector definitions are tenant bound and HTTPS only',()=>{
   const c=definePrivateConnector({tenantId:'tenant_1',id:'acme-api',name:'Acme API',category:'private',auth:'oauth2',baseUrl:'https://api.acme.test',scopes:['read']});
   assert.equal(c.tenantId,'tenant_1'); assert.equal(c.baseUrl,'https://api.acme.test');
-  assert.throws(()=>definePrivateConnector({tenantId:'tenant_1',id:'acme-api',name:'Acme API',category:'private',auth:'oauth2',baseUrl:'http://api.acme.test'}),/HTTPS/);
+  assert.throws(()=>definePrivateConnector({tenantId:'tenant_1',id:'acme-api',name:'Acme API',category:'private',auth:'oauth2',baseUrl:'http://api.acme.test'}),/HTTPS/);\n  assert.throws(()=>definePrivateConnector({tenantId:'tenant_1',id:'acme-api',name:'Acme API',category:'private',auth:'oauth2',baseUrl:'https://user:pass@api.acme.test'}),/embedded credentials/);
 });
 
 test('community manifests require signed webhooks',()=>{
@@ -30,7 +30,7 @@ test('community manifests require signed webhooks',()=>{
 
 test('credential envelopes contain references, never secret material',()=>{
   const c=createCredentialEnvelope({tenantId:'tenant_1',connectionId:'conn_1',connectorId:'stripe',version:'v1',secretRef:'vault_ref_abc',expiresAt:Date.now()+10000});
-  assert.equal(c.secretRef,'vault_ref_abc'); assert.equal(Object.keys(c).includes('token'),false);
+  assert.equal(c.secretRef,'vault_ref_abc'); assert.equal(Object.keys(c).includes('token'),false);\n  assert.throws(()=>createCredentialEnvelope({tenantId:'tenant_1',connectionId:'conn_1',connectorId:'stripe',version:'v1',secretRef:'sk_live_real_secret'}),/opaque/);
   assert.equal(rotateCredential({current:c,nextSecretRef:'vault_ref_def'}).secretRef,'vault_ref_def');
   assert.throws(()=>rotateCredential({current:c,nextSecretRef:'vault_ref_abc'}),/new secret/);
 });
