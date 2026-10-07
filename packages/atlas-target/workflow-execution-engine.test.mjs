@@ -10,7 +10,8 @@ import {
   resumeWorkflowExecution,
   failWorkflowStep,
   cancelWorkflowExecution,
-  replayWorkflowExecution
+  replayWorkflowExecution,
+  resolveWorkflowReconciliation
 } from './workflow-execution-engine.mjs';
 
 const tenantId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -52,7 +53,7 @@ test('V157 P0 workflow error taxonomy is deterministic and never hides unknown e
   assert.throws(()=>normalizeWorkflowError({code:'BAD CODE',message:'x',source:'connector'}),/error code|invalid/i);
 });
 
-test('V157 P0 unknown provider outcomes dead-letter instead of blindly retrying', () => {
+test('V157 P0 unknown provider outcomes require explicit reconciliation and support replay-safe operator resolution', () => {
   const first=createWorkflowExecution({
     tenantId,
     executionId,
@@ -62,11 +63,33 @@ test('V157 P0 unknown provider outcomes dead-letter instead of blindly retrying'
   });
   const advanced=completeWorkflowStep({execution:first,nodeId:'start',attempt:1,now:'2026-10-05T10:00:00Z'});
   const failed=failWorkflowStep({execution:advanced,nodeId:'task',attempt:1,errorCode:'provider_500',now:'2026-10-05T10:00:01Z'});
-  assert.equal(failed.status,'dead_letter');
+  assert.equal(failed.status,'reconciliation_required');
   assert.equal(failed.steps.at(-1).errorCategory,'provider');
   assert.equal(failed.steps.at(-1).externalOutcome,'unknown');
   assert.equal(failed.steps.at(-1).retryable,true);
   assert.equal(failed.retryAt,null);
+  assert.equal(failed.reconciliation.status,'required');
+  assert.equal(failed.reconciliation.errorCode,'provider_500');
+
+  const resolved=resolveWorkflowReconciliation({
+    execution:failed,
+    reconciliationId:failed.reconciliation.reconciliationId,
+    resolution:'confirmed_success',
+    resolvedByActorId:'99999999-9999-4999-8999-999999999999',
+    now:'2026-10-05T10:00:02Z'
+  });
+  assert.equal(resolved.status,'queued');
+  assert.equal(resolved.currentNodeId,'task');
+  assert.equal(resolved.reconciliation.status,'resolved');
+  assert.equal(resolved.reconciliation.resolution,'confirmed_success');
+  assert.equal(resolved.reconciliation.resolvedByActorId,'99999999-9999-4999-8999-999999999999');
+  assert.equal(resolveWorkflowReconciliation({
+    execution:resolved,
+    reconciliationId:failed.reconciliation.reconciliationId,
+    resolution:'confirmed_success',
+    resolvedByActorId:'99999999-9999-4999-8999-999999999999',
+    now:'2026-10-05T10:00:03Z'
+  }),resolved);
 });
 
 test('execution pins workflow version/checksum and starts at the trigger', () => {
