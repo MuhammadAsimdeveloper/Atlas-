@@ -39,6 +39,28 @@ test('V157 P0 workflow node registry validates typed configs and binds action no
     input:{contactRef:'contact_1'}
   }));
   assert.throws(()=>registry.validateNodeConfig('action',{input:{contactRef:'contact_1'}}),/actionId/i);
+  const graph = createWorkflowGraph({
+    tenantId:'t1', id:'wf-action-1', version:1, name:'Typed action workflow',
+    actionRegistry,
+    nodes:[
+      {id:'start',type:'trigger',config:{eventType:'contact.created'}},
+      {id:'act',type:'action',config:{actionId:'crm.contact.typed-workflow-test',input:{contactRef:'contact_1'}}},
+      {id:'done',type:'stop',config:{}}
+    ],
+    edges:[{from:'start',to:'act',port:'next'},{from:'act',to:'done',port:'next'}]
+  });
+  assert.equal(graph.nodes.find(node=>node.id==='act').type,'action');
+  assert.equal(graph.nodes.find(node=>node.id==='act').config.actionId,'crm.contact.typed-workflow-test');
+  assert.throws(()=>createWorkflowGraph({
+    tenantId:'t1', id:'wf-action-2', version:1, name:'Invalid action workflow',
+    actionRegistry,
+    nodes:[
+      {id:'start',type:'trigger',config:{eventType:'contact.created'}},
+      {id:'act',type:'action',config:{actionId:'crm.missing.action',input:{contactRef:'contact_1'}}},
+      {id:'done',type:'stop',config:{}}
+    ],
+    edges:[{from:'start',to:'act',port:'next'},{from:'act',to:'done',port:'next'}]
+  }),/registered|action/i);
 });
 
 test('CRM target enforces typed properties, tenant scope, optimistic versions, associations and pipeline governance', () => {
