@@ -47,3 +47,14 @@ test('V153 handoff decisions require inbox.respond, not only inbox.read', async 
 
   assert.equal(pool.calls.some(call => call.sql.startsWith('UPDATE atlas_agent_handoffs')), false);
 });
+
+test('V153 Copilot configuration writes require copilot.manage', async () => {
+  const { PostgresCopilotStore } = await import('./copilot-routes.mjs');
+  const pool = fakePool({permissions:['inbox.read']});
+  const store = new PostgresCopilotStore(pool);
+
+  await assert.rejects(
+    store.saveConfig({actorId:ACTOR,tenantId:TENANT}, {}),
+    error => error?.status === 403 && error?.code === 'copilot_forbidden'
+  );
+});
