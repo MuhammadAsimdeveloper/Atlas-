@@ -30,8 +30,11 @@ Implement the next unfinished capability from the roadmap and update its V-serie
 
 ## Current V157 build state
 
-The first V157 P0 foundation slice is implemented in [V157 P0 — Typed Action Registry and Schema Enforcement](V157-P0-TYPED-ACTION-REGISTRY.md).
+Two V157 P0 foundation slices are implemented:
 
-This slice makes action schemas executable through a bounded immutable action registry and registry-scoped invocation validation while preserving existing tenant, credential, consent, provider and approval gates.
+- [Typed Action Registry and Schema Enforcement](V157-P0-TYPED-ACTION-REGISTRY.md)
+- [Declarative Expression Engine](V157-P0-EXPRESSION-ENGINE.md)
 
-The next unfinished P0 capability is the shared declarative expression/data-mapping engine. Continue by extending the existing safe-data-mapping and workflow-runtime contracts; do not create a second automation engine.
+Together they make action schemas executable, add an immutable action registry, execute a bounded declarative expression language through the existing mapping path, and resolve safe expression-bound action inputs before typed schema/provider/approval enforcement.
+
+The next unfinished P0 capability is the unified workflow-node schema registry and graph-to-action binding layer. Continue by extending the existing workflow catalog/runtime contracts; do not create a second automation engine.
