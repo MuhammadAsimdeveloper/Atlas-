@@ -42,7 +42,7 @@ function dbErrorStatus(error) {
 
 export class PostgresCopilotStore {
   constructor(pool){this.pool=pool;}
-  async #tenant({actorId,tenantId},work){
+  async #tenant({actorId,tenantId},work,{permission=null}={}){
     if(!UUID.test(actorId||'')||!UUID.test(tenantId||''))throw createAuthError(409,'workspace_required');
     const c=await this.pool.connect();
     try{
@@ -53,13 +53,14 @@ export class PostgresCopilotStore {
       await c.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);
       const role=m.rows[0];
       if(!['owner','admin'].includes(role.role_key)){
+        if(typeof permission!=='string'||!permission)throw createAuthError(403,'copilot_forbidden');
         const grants=role.custom_role_id?await c.query('SELECT permissions FROM atlas_organization_roles WHERE tenant_id=$1 AND role_id=$2',[tenantId,role.custom_role_id]):{rows:[]};
-        if(!grants.rows[0]?.permissions?.includes('inbox.read'))throw createAuthError(403,'copilot_forbidden');
+        if(!Array.isArray(grants.rows[0]?.permissions)||!grants.rows[0].permissions.includes(permission))throw createAuthError(403,'copilot_forbidden');
       }
       const out=await work(c,m.rows[0]);await c.query('COMMIT');return out;
     }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
   }
-  async getConfig(who){return this.#tenant(who,async c=>{const {rows}=await c.query("SELECT config_id,widget_key,display_name,release_snapshot,allowed_origins,status,version,created_at,updated_at FROM atlas_v153_copilot_configs WHERE tenant_id=$1 ORDER BY updated_at DESC LIMIT 1",[who.tenantId]);return rows[0]||null;});}
+  async getConfig(who){return this.#tenant(who,async c=>{const {rows}=await c.query("SELECT config_id,widget_key,display_name,release_snapshot,allowed_origins,status,version,created_at,updated_at FROM atlas_v153_copilot_configs WHERE tenant_id=$1 ORDER BY updated_at DESC LIMIT 1",[who.tenantId]);return rows[0]||null;},{permission:'inbox.read'});}
   async saveConfig(who,input){
     return this.#tenant({...who},async c=>{
       const snapshot=input.releaseSnapshot;
@@ -74,9 +75,9 @@ export class PostgresCopilotStore {
       const name=typeof input.displayName==='string'&&input.displayName.trim()?input.displayName.trim().slice(0,120):'Atlas Copilot';
       const {rows}=await c.query("INSERT INTO atlas_v153_copilot_configs(tenant_id,config_id,widget_key,display_name,release_snapshot,allowed_origins,status,version,created_by) VALUES($1,$2,$3,$4,$5::jsonb,$6::jsonb,'active',1,$7) ON CONFLICT(tenant_id,config_id) DO UPDATE SET widget_key=EXCLUDED.widget_key,display_name=EXCLUDED.display_name,release_snapshot=EXCLUDED.release_snapshot,allowed_origins=EXCLUDED.allowed_origins,status='active',version=atlas_v153_copilot_configs.version+1,updated_at=now() RETURNING config_id,widget_key,display_name,release_snapshot,allowed_origins,status,version,created_at,updated_at",[who.tenantId,id,key,name,JSON.stringify(snapshot),JSON.stringify(origins),who.actorId]);
       return rows[0];
-    });
+    },{permission:'copilot.manage'});
   }
-  async listHandoffs(who){return this.#tenant({...who},c=>c.query("SELECT h.handoff_id,h.session_id,h.reason,h.queue_ref,h.status,h.requested_at,c.conversation_id,c.status AS conversation_status,c.handoff_reason,c.version FROM atlas_agent_handoffs h LEFT JOIN atlas_v122_conversations c ON c.tenant_id=h.tenant_id AND c.external_thread_ref='copilot:'||h.session_id::text WHERE h.tenant_id=$1 ORDER BY h.requested_at DESC LIMIT 200",[who.tenantId]).then(r=>r.rows));}
+  async listHandoffs(who){return this.#tenant({...who},c=>c.query("SELECT h.handoff_id,h.session_id,h.reason,h.queue_ref,h.status,h.requested_at,c.conversation_id,c.status AS conversation_status,c.handoff_reason,c.version FROM atlas_agent_handoffs h LEFT JOIN atlas_v122_conversations c ON c.tenant_id=h.tenant_id AND c.external_thread_ref='copilot:'||h.session_id::text WHERE h.tenant_id=$1 ORDER BY h.requested_at DESC LIMIT 200",[who.tenantId]).then(r=>r.rows),{permission:'inbox.read'});}
   async decideHandoff(who,id,input){
     if(!UUID.test(id)||!['accepted','resolved','canceled'].includes(input.status))throw createAuthError(400,'handoff_decision_invalid');
     return this.#tenant({...who},async c=>{
@@ -84,9 +85,10 @@ export class PostgresCopilotStore {
       if(!rows.length)throw createAuthError(404,'handoff_not_found');
       await c.query("UPDATE atlas_ai_agent_sessions SET status=CASE WHEN $3='resolved' THEN 'completed' WHEN $3='canceled' THEN 'canceled' ELSE 'handoff' END,updated_at=now() WHERE tenant_id=$1 AND session_id=$2",[who.tenantId,rows[0].session_id]);
       return rows[0];
-    });
+    },{permission:'inbox.respond'});
   }
-  async listApprovals(who){return this.#tenant({...who},c=>c.query("SELECT approval_id,session_id,action_key,status,requested_at,decided_at,decided_by FROM atlas_agent_tool_approvals WHERE tenant_id=$1 AND status='pending' ORDER BY requested_at DESC LIMIT 200",[who.tenantId]).then(r=>r.rows));}
+  async listApprovals(who){return this.#tenant({...who},c=>c.query("SELECT approval_id,session_id,action_key,status,requested_at,decided_at,decided_by FROM atlas_agent_tool_approvals WHERE tenant_id=$1 AND status='pending' ORDER BY requested_at DESC LIMIT 200",[who.tenantId]).then(r=>r.rows),{permission:'inbox.read'});}
+  async assertPermission(who,permission){return this.#tenant(who,()=>true,{permission});}
 }
 
 export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,env=process.env}={}) {
@@ -224,7 +226,7 @@ export function createCopilotApi({pool,authStore,runtimeStore,inboxContentStore,
       if(hand&&req.method==='POST'){await mutation(req,who.session);const b=await readJson(req);exact(b,['status']);return send(res,200,{item:await store.decideHandoff(who,hand[1],b)},env);}
       if(url.pathname==='/api/v1/platform/copilot/approvals'&&req.method==='GET')return send(res,200,{items:await store.listApprovals(who)},env);
       const approval=url.pathname.match(/^\/api\/v1\/platform\/copilot\/approvals\/([0-9a-f-]{36})$/i);
-      if(approval&&req.method==='POST'){await mutation(req,who.session);const b=await readJson(req);exact(b,['status']);if(!['approved','denied'].includes(b.status))throw createAuthError(400,'approval_status_invalid');return send(res,200,{item:await runtimeStore.decideAgentToolApproval({...who,approvalId:approval[1],status:b.status})},env);}
+      if(approval&&req.method==='POST'){await mutation(req,who.session);await store.assertPermission(who,'copilot.manage');const b=await readJson(req);exact(b,['status']);if(!['approved','denied'].includes(b.status))throw createAuthError(400,'approval_status_invalid');return send(res,200,{item:await runtimeStore.decideAgentToolApproval({...who,approvalId:approval[1],status:b.status})},env);}
       return send(res,404,{error:'not_found'},env);
     }catch(error){
       const status=Number.isInteger(error?.status)?error.status:(dbErrorStatus(error)||500);
