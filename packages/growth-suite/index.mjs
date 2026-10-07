@@ -481,3 +481,5 @@ export function renderGrowthPagePreview({ record, tenantId } = {}) {
 }
 
 export function growthModuleExists(module) { return MODULE_READ.has(module); }
+
+export { scoreLeadIntelligence, mapBuyingCommittee, recommendNextBestAction, forecastPipeline, scoreBidOffer, buildRevenueBoardroomSnapshot, REVENUE_INTELLIGENCE_CONTRACT } from '../atlas-revenue-intelligence/index.mjs';
