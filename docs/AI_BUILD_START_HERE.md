@@ -39,4 +39,6 @@ Together they make action schemas executable, add an immutable action registry, 
 
 The unified workflow-node schema registry and graph-to-action binding layer is now implemented as a foundation slice in [V157 P0 — Unified Workflow Node Schema Registry](V157-P0-WORKFLOW-NODE-SCHEMA-REGISTRY.md).
 
-The next unfinished P0 capability is typed output propagation plus execution-state/error contracts across the graph. Continue by extending the existing workflow execution/control-plane contracts; do not create a second automation engine.
+Typed outputs and deterministic execution error contracts are now implemented as a foundation slice in [V157 P0 — Typed Outputs and Deterministic Workflow Errors](V157-P0-TYPED-OUTPUTS-AND-ERRORS.md).
+
+The next unfinished P0 capability is automatic output-shape propagation into downstream node input validation plus durable reconciliation for unknown external outcomes. Continue by extending the existing workflow execution/control-plane contracts; do not create a second automation engine.
