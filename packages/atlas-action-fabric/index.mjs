@@ -19,6 +19,15 @@ function assertId(v,l='id'){if(typeof v!=='string'||!ID.test(v))throw Object.ass
 function assertRef(v,l='reference'){if(typeof v!=='string'||!REF.test(v))throw Object.assign(new TypeError(l+' invalid'),{code:'invalid_reference'});return v;}
 function hash(v){return crypto.createHash('sha256').update(JSON.stringify(v)).digest('hex');}
 function clone(v){return structuredClone(v);}
+const FORBIDDEN_INPUT_KEYS=new Set(['password','passwd','secret','token','access_token','refresh_token','client_secret','api_key','apikey','private_key','authorization','cookie']);
+function validateInput(value,depth=0){
+  if(depth>8)throw Object.assign(new Error('action input nesting too deep'),{code:'input_too_deep'});
+  if(value===null||typeof value==='string'||typeof value==='boolean'||(typeof value==='number'&&Number.isFinite(value)))return;
+  if(Array.isArray(value)){if(value.length>500)throw Object.assign(new Error('action input array too large'),{code:'input_too_large'});for(const item of value)validateInput(item,depth+1);return;}
+  if(typeof value==='object'){const keys=Object.keys(value);if(keys.length>100)throw Object.assign(new Error('action input object too large'),{code:'input_too_large'});for(const key of keys){if(FORBIDDEN_INPUT_KEYS.has(key.toLowerCase())||/(?:^|_)(?:secret|token|password|api[_-]?key|private[_-]?key)(?:$|_)/i.test(key))throw Object.assign(new Error('action input contains credential material'),{code:'credential_in_input'});validateInput(value[key],depth+1);}return;}
+  throw Object.assign(new Error('unsupported action input value'),{code:'input_value_invalid'});
+}
+
 function bounded(v,l,max){if(!Array.isArray(v)||v.length>max)throw new RangeError(l+' must contain <= '+max+' items');return v;}
 
 export function defineAction({id,name,domain,risk='write',approval='none',inputSchema={},outputSchema={},surfaces=['api','workflow'],requiredScopes=[],providerRefs=[]}={}){
@@ -48,6 +57,8 @@ export function compileActionSurfaces(action){
 export function createInvocation({tenantId,actionId,requestId,actorRef,idempotencyKey,input={},mode='dry_run',providerState='verified',consent=true,approved=false}={}){
   assertRef(tenantId,'tenantId');assertId(actionId,'actionId');assertRef(requestId,'requestId');assertRef(actorRef,'actorRef');assertRef(idempotencyKey,'idempotencyKey');
   if(!['dry_run','live'].includes(mode))throw new TypeError('mode invalid');
+  validateInput(input);
+  const serialized=JSON.stringify(input);if(serialized.length>100000)throw Object.assign(new Error('action input too large'),{code:'input_too_large'});
   const action=getAction(actionId);if(!action)throw Object.assign(new Error('action not registered'),{code:'action_not_registered'});
   if(mode==='live'){
     if(action.risk==='external_side_effect'||action.risk==='financial'||action.risk==='privileged'){
