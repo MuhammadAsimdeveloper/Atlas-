@@ -1,3 +1,11 @@
+## V156 — Transactional Operating System
+- Added products, variants, price books, taxes, coupons, carts, inventory reservations, quotes, orders, checkout, payment links, payment events, subscriptions, refunds and credits.
+- Added evidence-bound document approval, relationship-scoped portals and dependency-safe project operations.
+- Replaced process-memory provider reconciliation with deterministic database-backed reconciliation semantics.
+- Added forced-tenant-RLS V156 persistence and durable idempotency constraints.
+- Hardened universal business actions against credential-shaped input and payload abuse.
+- Kept V153 production release metadata unchanged until V156 migration/provider/restore evidence passes.
+
 ## 153.0.0 — Authenticated Copilot Chat Hub + Public Webchat
 - Added authenticated tenant-scoped Copilot Chat Hub configuration, widget embed generation, human handoff queue and agent approval inbox.
 - Added public webchat sessions signed by the existing HMAC support-session gateway with exact origin allowlists and expiry.
