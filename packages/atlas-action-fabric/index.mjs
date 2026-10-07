@@ -1,3 +1,4 @@
+import { normalizeActionSchemas, validateJsonSchema } from './schema.mjs';
 import crypto from 'node:crypto';
 
 const ID=/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
@@ -29,16 +30,49 @@ function validateInput(value,depth=0){
 }
 function bounded(v,l,max){if(!Array.isArray(v)||v.length>max)throw new RangeError(l+' must contain <= '+max+' items');return v;}
 
+export function createActionRegistry({actions=[]}={}){
+  if(!Array.isArray(actions)||actions.length>500) throw new TypeError('actions must be a bounded array');
+  const normalized=actions.map((action,index)=>{
+    if(!action||typeof action!=='object'||Array.isArray(action)) throw new TypeError('action '+(index+1)+' is invalid');
+    assertId(action.id,'actionId');assertId(action.domain,'domain');
+    if(typeof action.name!=='string'||action.name.length<2||action.name.length>120) throw new TypeError('action name invalid');
+    if(!RISKS.has(action.risk)||!APPROVALS.has(action.approval)) throw new TypeError('action risk or approval invalid');
+    bounded(action.surfaces||[],'surfaces',20);
+    if(!(action.surfaces||[]).every(x=>SURFACES.has(x))) throw new TypeError('unsupported action surface');
+    const schemas=normalizeActionSchemas({inputSchema:action.inputSchema||{},outputSchema:action.outputSchema||{}});
+    const body={...action,inputSchema:schemas.inputSchema,outputSchema:schemas.outputSchema};
+    const definitionHash=hash(Object.fromEntries(Object.keys(body).filter(key=>key!=='definitionHash').sort().map(key=>[key,body[key]])));
+    return Object.freeze({...body,definitionHash});
+  });
+  const ids=new Set();
+  for(const action of normalized){if(ids.has(action.id)) throw new TypeError('duplicate action id');ids.add(action.id);}
+  const byId=new Map(normalized.map(action=>[action.id,action]));
+  return Object.freeze({
+    get(id){assertId(id,'actionId');const action=byId.get(id);return action?clone(action):null;},
+    has(id){assertId(id,'actionId');return byId.has(id);},
+    list({domain=null,risk=null,surface=null}={}){
+      return normalized.filter(a=>(domain===null||a.domain===domain)&&(risk===null||a.risk===risk)&&(surface===null||a.surfaces.includes(surface))).map(clone);
+    },
+    validateInput(id,input){
+      const action=byId.get(id);if(!action) throw Object.assign(new Error('action not registered'),{code:'action_not_registered'});
+      validateJsonSchema(input,action.inputSchema,'input');return true;
+    }
+  });
+}
+
 export function defineAction({id,name,domain,risk='write',approval='none',inputSchema={},outputSchema={},surfaces=['api','workflow'],requiredScopes=[],providerRefs=[]}={}){
   assertId(id,'actionId');if(typeof name!=='string'||name.length<2||name.length>120)throw new TypeError('name invalid');
   assertId(domain,'domain');if(!RISKS.has(risk)||!APPROVALS.has(approval))throw new TypeError('invalid risk or approval');
   bounded(surfaces,'surfaces',20);if(!surfaces.every(x=>SURFACES.has(x)))throw new TypeError('unsupported surface');
   bounded(requiredScopes,'requiredScopes',50);bounded(providerRefs,'providerRefs',50);
-  return Object.freeze({id,name,domain,risk,approval,inputSchema:clone(inputSchema),outputSchema:clone(outputSchema),surfaces:[...surfaces],requiredScopes:[...requiredScopes],providerRefs:[...providerRefs],definitionHash:hash({id,name,domain,risk,approval,inputSchema,outputSchema,surfaces,requiredScopes,providerRefs})});
+  const schemas=normalizeActionSchemas({inputSchema,outputSchema});
+  const body={id,name,domain,risk,approval,inputSchema:schemas.inputSchema,outputSchema:schemas.outputSchema,surfaces:[...surfaces],requiredScopes:[...requiredScopes],providerRefs:[...providerRefs]};
+  return Object.freeze({...body,definitionHash:hash(body)});
 }
 
-export function getAction(id){assertId(id,'actionId');const action=ACTIONS.find(x=>x.id===id);return action?clone(action):null;}
-export function listActions({domain=null,risk=null,surface=null}={}){return ACTIONS.filter(a=>(domain===null||a.domain===domain)&&(risk===null||a.risk===risk)&&(surface===null||a.surfaces.includes(surface))).map(clone);}
+const DEFAULT_ACTION_REGISTRY=createActionRegistry({actions:ACTIONS});
+export function getAction(id){return DEFAULT_ACTION_REGISTRY.get(id);}
+export function listActions(filters={}){return DEFAULT_ACTION_REGISTRY.list(filters);}
 
 export function compileActionSurfaces(action){
   if(!action||typeof action!=='object')throw new TypeError('action required');
@@ -53,12 +87,14 @@ export function compileActionSurfaces(action){
   });
 }
 
-export function createInvocation({tenantId,actionId,requestId,actorRef,idempotencyKey,input={},mode='dry_run',providerState='verified',consent=true,approved=false}={}){
+export function createInvocation({registry=DEFAULT_ACTION_REGISTRY,tenantId,actionId,requestId,actorRef,idempotencyKey,input={},mode='dry_run',providerState='verified',consent=true,approved=false}={}){
   assertRef(tenantId,'tenantId');assertId(actionId,'actionId');assertRef(requestId,'requestId');assertRef(actorRef,'actorRef');assertRef(idempotencyKey,'idempotencyKey');
+  if(!registry||typeof registry.get!=='function'||typeof registry.validateInput!=='function')throw new TypeError('registry is invalid');
   if(!['dry_run','live'].includes(mode))throw new TypeError('mode invalid');
   validateInput(input);
   const serialized=JSON.stringify(input);if(serialized.length>100000)throw Object.assign(new Error('action input too large'),{code:'input_too_large'});
-  const action=getAction(actionId);if(!action)throw Object.assign(new Error('action not registered'),{code:'action_not_registered'});
+  const action=registry.get(actionId);if(!action)throw Object.assign(new Error('action not registered'),{code:'action_not_registered'});
+  registry.validateInput(actionId,input);
   if(mode==='live'){
     if(action.risk==='external_side_effect'||action.risk==='financial'||action.risk==='privileged'){
       if(providerState!=='verified')throw Object.assign(new Error('provider is not verified'),{code:'provider_unverified'});
