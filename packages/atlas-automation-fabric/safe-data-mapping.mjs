@@ -1,3 +1,4 @@
+import { compileExpression, evaluateExpression } from '../atlas-core/expression-engine.mjs';
 const PATH=/^(?:input|trigger|steps|contact|lead|deal|appointment|conversation|workflow)(?:\.[A-Za-z][A-Za-z0-9_]{0,63})+$/;
 const TARGET=/^(?:contact|lead|deal|appointment|conversation|workflow)(?:\.[A-Za-z][A-Za-z0-9_]{0,63})+$/;
 const RESERVED=new Set(['tenantId','actorId','credential','secret','token','authorization','password','cookie']);
@@ -27,13 +28,19 @@ export function validateDataMapping({mapping,maxMappings=100}={}){
  const seen=new Set();
  return mapping.map((item,index)=>{
    if(!item||typeof item!=='object'||Array.isArray(item))throw new TypeError('mapping['+index+'] must be an object');
-   const source=pathParts(item.source,'mapping source',PATH);
+   const hasSource=typeof item.source==='string';
+   const hasExpression=typeof item.expression==='string';
+   if(hasSource===hasExpression)throw new TypeError('mapping['+index+'] requires exactly one source or expression');
+   const source=hasSource?pathParts(item.source,'mapping source',PATH):null;
+   const expression=hasExpression?bounded(item.expression,'mapping expression',4000):null;
+   if(expression)compileExpression(expression);
    const target=pathParts(item.target,'mapping target',TARGET);
    const transform=bounded(item.transform||'identity','mapping transform',30);
    if(!TRANSFORMS.has(transform))throw new TypeError('mapping transform is unsupported');
+   if(expression&&transform!=='identity')throw new TypeError('expression mappings may not add a second transform');
    if(!item.target || seen.has(item.target))throw new TypeError('mapping targets must be unique');
    seen.add(item.target);
-   return freeze({source:source.join('.'),target:target.join('.'),transform,args:Array.isArray(item.args)?item.args.slice(0,5):[]});
+   return freeze({source:source?source.join('.'):null,expression,target:target.join('.'),transform,args:Array.isArray(item.args)?item.args.slice(0,5):[]});
  });
 }
 
@@ -42,9 +49,9 @@ export function applyDataMapping({mapping,context,strict=true}={}){
  if(!context||typeof context!=='object'||Array.isArray(context))throw new TypeError('mapping context is required');
  const output={};
  for(const item of normalized){
-   const value=getPath(context,item.source.split('.'));
-   if(value===undefined&&strict)throw new Error('Mapping source is unavailable: '+item.source);
-   const transformed=transformValue(value,item.transform,item.args);
+   const value=item.expression?evaluateExpression({expression:item.expression,context}):getPath(context,item.source.split('.'));
+   if(value===undefined&&strict)throw new Error('Mapping source is unavailable: '+(item.source||item.expression));
+   const transformed=item.expression?value:transformValue(value,item.transform,item.args);
    const parts=item.target.split('.');
    let cursor=output;
    for(let i=0;i<parts.length;i++){const key=parts[i];if(i===parts.length-1){cursor[key]=transformed;}else{cursor[key]??={};if(typeof cursor[key]!=='object'||Array.isArray(cursor[key]))throw new Error('Mapping target path conflicts with scalar data');cursor=cursor[key];}}
