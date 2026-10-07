@@ -64,6 +64,7 @@ export const WORKFLOW_TRIGGER_CATALOG = deepFreeze(Object.fromEntries(WORKFLOW_T
 
 const definitions = [
   ['trigger','orchestration','read',null,'native',false],
+  ['action','automation','write','registered_action_and_tenant_grant','connector',false],
   ['condition','orchestration','read',null,'native',false], ['switch','orchestration','read',null,'native',false], ['goal','orchestration','read',null,'native',false], ['random_split','orchestration','read','stable_tenant_cohort','native',false],
   ['delay','orchestration','read',null,'native',false], ['wait_until','orchestration','read',null,'native',false], ['await_event','orchestration','read','tenant_event_and_deadline','native',false], ['rate_limit_batch','orchestration','read','tenant_quota_and_bounded_rate','native',false],
   ['transform','data','read','declarative_mapping_only','native',false], ['map_array','data','read','bounded_array_mapping','native',false], ['filter_array','data','read','bounded_array_filter','native',false], ['split_batches','orchestration','read','bounded_batch_size','native',false], ['merge','data','read','declared_merge_strategy','native',false], ['text_format','data','read','bounded_transform','native',false], ['math','data','read','finite_numeric_inputs','native',false], ['set_custom_value','data','write','tenant_config_and_version','connector',false],
