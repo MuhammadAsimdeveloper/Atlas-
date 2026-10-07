@@ -31,7 +31,7 @@ function idem(v){if(!/^[A-Za-z0-9._:-]{8,255}$/.test(v||''))throw new TypeError(
 function boundedInt(v,l,min,max){if(!Number.isSafeInteger(v)||v<min||v>max)throw new RangeError(l+' out of bounds');return v;}
 function safeArray(v,l,max){if(!Array.isArray(v)||v.length>max)throw new RangeError(l+' out of bounds');return v;}
 
-export function defineProduct({tenantId,productId,name,type='service,status='active',description='',variants=[]}={}){
+export function defineProduct({tenantId,productId,name,type='service',status='active',description='',variants=[]}={}){
   assertRef(tenantId,'tenantId');assertId(productId,'productId');text(name,'name',160);if(!PRODUCT_TYPES.has(type)||!PRODUCT_STATUS.has(status))throw new TypeError('product type/status invalid');
   text(description||'','description',2000);safeArray(variants,'variants',500);
   const seen=new Set();
