@@ -2,7 +2,7 @@ const ERROR_CODE=/^[a-z][a-z0-9_.-]{0,79}$/;
 const CATEGORY_RULES=Object.freeze([
   [/^approval_|^permission_|^forbidden|^auth_/, 'policy', false, 'none'],
   [/^validation_|^invalid_|^schema_/, 'validation', false, 'none'],
-  [/^timeout$/, 'timeout', true, 'known'],
+  [/^(timeout|provider_timeout)$/, 'timeout', true, 'known'],
   [/^provider_retry_unsafe$/, 'provider', false, 'unknown'],
   [/^provider_/, 'provider', true, 'unknown'],
   [/^network_/, 'network', true, 'unknown'],
