@@ -40,9 +40,12 @@ export function createActionRegistry({actions=[]}={}){
     bounded(action.surfaces||[],'surfaces',20);
     if(!(action.surfaces||[]).every(x=>SURFACES.has(x))) throw new TypeError('unsupported action surface');
     const schemas=normalizeActionSchemas({inputSchema:action.inputSchema||{},outputSchema:action.outputSchema||{}});
-    const body={...action,inputSchema:schemas.inputSchema,outputSchema:schemas.outputSchema};
-    const definitionHash=hash(Object.fromEntries(Object.keys(body).filter(key=>key!=='definitionHash').sort().map(key=>[key,body[key]])));
-    return Object.freeze({...body,definitionHash});
+    const body={
+      id:action.id,name:action.name,domain:action.domain,risk:action.risk,approval:action.approval,
+      inputSchema:schemas.inputSchema,outputSchema:schemas.outputSchema,
+      surfaces:[...(action.surfaces||[])],requiredScopes:[...(action.requiredScopes||[])],providerRefs:[...(action.providerRefs||[])]
+    };
+    return Object.freeze({...body,definitionHash:hash(body)});
   });
   const ids=new Set();
   for(const action of normalized){if(ids.has(action.id)) throw new TypeError('duplicate action id');ids.add(action.id);}
