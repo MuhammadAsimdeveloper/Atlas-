@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { verifyWorkflowGraph } from './index.mjs';
+import { normalizeWorkflowError } from './workflow-runtime-contracts.mjs';
 
 const EXECUTION_STATUSES = Object.freeze(['queued','running','waiting','waiting_approval','retryable','completed','failed','canceled','dead_letter']);
 const TERMINAL_STATUSES = new Set(['completed','failed','canceled','dead_letter']);
@@ -318,11 +319,14 @@ export function failWorkflowStep({
 } = {}) {
   assertMutable(execution);
   if (execution.currentNodeId !== nodeId) throw new Error('Workflow step is not the current step');
-  if (!ERROR_CODE.test(errorCode || '')) throw new Error('Workflow error code is invalid');
+  const normalizedError = normalizeWorkflowError({ code:errorCode, source:'workflow_step' });
   if (!Number.isSafeInteger(attempt) || attempt < 1 || attempt > 10) throw new Error('Workflow step attempt is invalid');
   const node = nodeFor(execution, nodeId);
   const failedAt = timestamp(now, 'now');
-  const retryAllowed = errorCode !== 'provider_retry_unsafe' && attempt < node.retry.maxAttempts && node.retrySafe;
+  const retryAllowed = normalizedError.retryable
+    && normalizedError.externalOutcome !== 'unknown'
+    && attempt < node.retry.maxAttempts
+    && node.retrySafe;
   const retryAt = retryAllowed
     ? failedAt + Math.min(60 * 60_000, node.retry.backoffMs * (2 ** (attempt - 1)))
     : null;
@@ -336,7 +340,10 @@ export function failWorkflowStep({
     resultRef: null,
     startedAt: execution.steps.find(item => item.nodeId === nodeId && item.attempt === attempt)?.startedAt || new Date(failedAt).toISOString(),
     endedAt: new Date(failedAt).toISOString(),
-    errorCode
+    errorCode:normalizedError.code,
+    errorCategory:normalizedError.category,
+    externalOutcome:normalizedError.externalOutcome,
+    retryable:normalizedError.retryable
   };
   return transition(execution, {
     status: retryAllowed ? 'retryable' : 'dead_letter',
