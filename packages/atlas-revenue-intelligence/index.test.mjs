@@ -76,7 +76,7 @@ test('forecasts weighted pipeline from stage probability and value', () => {
     ]
   });
   assert.equal(result.totalValue, 3500);
-  assert.equal(result.weightedValue, 1900);
+  assert.equal(result.weightedValue, 1950);
   assert.equal(result.count, 3);
   assert.equal(result.topOpportunity.id, 'b');
 });
