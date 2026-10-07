@@ -165,6 +165,8 @@ Rules:
 ### P0 — Foundation parity
 Unify workflow graph model, typed node/action registry, expression engine, execution state machine, error model, credential references and test/preview runtime.
 
+**V157 completed slice:** typed action schema enforcement and immutable registry are implemented in packages/atlas-action-fabric. The registry now validates bounded JSON schemas at invocation time and supports explicit registry-scoped action sets. **P0 remains partial:** the workflow-node schema registry, declarative expression engine, graph-to-action binding enforcement and remaining runtime parity are still unfinished. See [V157 P0 Typed Action Registry](V157-P0-TYPED-ACTION-REGISTRY.md).
+
 ### P1 — Core workflow parity
 Triggers, actions, branching, loops, merge, data transforms, waits, sub-workflows, retries, error workflows, execution inspector, replay and cancellation.
 
