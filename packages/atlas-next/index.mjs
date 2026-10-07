@@ -278,14 +278,11 @@ export function createInvoice({ tenantId, currency='USD', lines, taxMinor=0, cre
   return freeze({...body,checksum:sha256(body)});
 }
 
-const reconciliationEvents=new Set();
 export function reconcileProviderPayment({ tenantId, provider, providerEventId, amountMinor, currency='USD', invoiceId } = {}) {
   tenantId=id(tenantId,'tenantId'); provider=text(provider,'provider',80); providerEventId=id(providerEventId,'providerEventId'); invoiceId=id(invoiceId,'invoiceId'); amountMinor=positiveMinor(amountMinor,'amountMinor');
   if(currency!=='USD') throw new Error('Payment reconciliation requires USD');
-  const key=sha256({tenantId,provider,providerEventId});
-  if(reconciliationEvents.has(key)) return {status:'duplicate',reconciliationKey:key};
-  reconciliationEvents.add(key);
-  return {status:'reconciled',reconciliationKey:key,tenantId,provider,providerEventId,amountMinor,currency,invoiceId};
+  const reconciliationKey=sha256({tenantId,provider,providerEventId});
+  return freeze({status:'ready_to_reconcile',reconciliationKey,tenantId,provider,providerEventId,amountMinor,currency,invoiceId,uniqueConstraint:'(tenant_id, provider, provider_event_id)',applySemantics:'INSERT ... ON CONFLICT DO NOTHING'});
 }
 
 export function createAgencyProject({ tenantId, projectId, budgetMinor, currency='USD', members, milestones=[] } = {}) {
