@@ -231,6 +231,11 @@ addMany(features,'P5','production',[
 // Additional gaps that materially improve Atlas beyond the requested surface.
 const gaps = [
   explicit('core.idempotency','core','Idempotency keys','P1','implemented-foundation'),
+  explicit('data.data_lineage','data','Data lineage','P3'),
+  explicit('ai.eval_harness','ai','Evaluation regression harness','P3'),
+  explicit('ops.cost_controls','ops','Cost controls','P4','externally-gated'),
+  explicit('ops.rate_quotas','ops','Rate quotas','P4','externally-gated'),
+  explicit('core.event_bus','core','Event bus','P1','implemented-foundation'),
   explicit('core.event_bus','core','Event bus','P1','implemented-foundation'),
   explicit('core.outbox_inbox','core','Outbox/inbox pattern','P1','implemented-foundation'),
   explicit('core.schema_registry','core','Schema registry','P1','implemented-foundation'),
