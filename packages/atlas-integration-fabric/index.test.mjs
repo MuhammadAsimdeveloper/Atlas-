@@ -97,7 +97,8 @@ test('HMAC signing uses a timestamped canonical payload', () => {
       secret: 'shared',
       timestamp: 1700000000,
       body: '{"ok":true}',
-      signature
+      signature,
+      now: 1700000000
     }),
     true
   );
@@ -106,7 +107,8 @@ test('HMAC signing uses a timestamped canonical payload', () => {
       secret: 'shared',
       timestamp: 1700000000,
       body: '{"ok":false}',
-      signature
+      signature,
+      now: 1700000000
     }),
     false
   );
