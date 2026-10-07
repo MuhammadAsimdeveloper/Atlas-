@@ -269,6 +269,22 @@ test('V148 safe data mapping supports allowlisted transforms and forbids code/ne
   assert.throws(()=>validateDataMapping({mapping:[{source:'input.customer.name',target:'contact.name',transform:'identity'},{source:'input.customer.email',target:'contact.name',transform:'identity'}]}),/unique/i);
 });
 
+test('V157 P0 expression engine evaluates bounded typed expressions and rejects executable syntax', async () => {
+  const { compileExpression, evaluateExpression } = await import('../atlas-core/expression-engine.mjs');
+  const context={input:{customer:{email:'Lead@Example.COM',score:42,active:true,tags:['a','b']}}};
+  assert.equal(evaluateExpression({expression:'lowercase(input.customer.email)',context}),'lead@example.com');
+  assert.equal(evaluateExpression({expression:'input.customer.score * 2 + 1',context}),85);
+  assert.equal(evaluateExpression({expression:'input.customer.active && input.customer.score > 40',context}),true);
+  assert.equal(evaluateExpression({expression:'join(input.customer.tags, " | ")',context}),'a | b');
+  assert.equal(evaluateExpression({expression:'{{ trim(input.customer.email) }}',context}),'Lead@Example.COM');
+  const mapping=validateDataMapping({mapping:[{expression:'lowercase(input.customer.email)',target:'contact.email'}]});
+  assert.equal(applyDataMapping({mapping,context}).contact.email,'lead@example.com');
+  assert.doesNotThrow(()=>compileExpression('coalesce(input.customer.missing, "fallback")'));
+  assert.throws(()=>compileExpression('process.env.SECRET'),/allowlisted|invalid|expression/i);
+  assert.throws(()=>compileExpression('fetch("https://example.com")'),/unsupported|invalid|function/i);
+  assert.throws(()=>evaluateExpression({expression:'input.customer.missing',context}),error=>error?.code==='expression_path_unavailable');
+});
+
 test('V148 edit-fields workflow node is backed by the safe mapping validator', () => {
   assert.doesNotThrow(() => createAiWorkflowProposal({
     tenantId:TENANT, requestedByActorId:ACTOR,
