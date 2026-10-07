@@ -82,6 +82,6 @@ External provider credentials and production integrations remain governed by the
 
 ## Next implementation frontier
 
-The next highest-priority P0 capability is the declarative expression/data-mapping engine, shared by workflow nodes and action inputs, with bounded paths, typed values, deterministic evaluation and preview-safe fixtures.
+The declarative expression/data-mapping slice is now implemented in [V157 P0 — Declarative Expression Engine](V157-P0-EXPRESSION-ENGINE.md), including safe mapping execution and bounded expression-bound action inputs.
 
-That work should extend the existing safe-data-mapping and workflow runtime contracts rather than creating a second automation engine.
+The next highest-priority P0 capability is the **unified workflow-node schema registry and graph-to-action binding layer**, so every catalogued node has a first-class typed input/output contract and the same action registry can be consumed consistently by workflow, API, MCP and agent surfaces.
