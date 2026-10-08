@@ -2,7 +2,7 @@ import {createPostmarkAdapter,createTwilioMessagingAdapter,createTwilioVoiceAdap
 import {createZapierWebhookAdapter,createJobberAdapter} from './integration-runtime.mjs';
 import {executeProviderAction} from '../../packages/atlas-core/provider-adapters.mjs';
 import {validateJsonSchema} from '../../packages/atlas-action-fabric/schema.mjs';
-import {assertSafeConnectorUrl, createHmacSignature} from '../../packages/atlas-integration-fabric/index.mjs';
+import {assertSafeConnectorUrl, createHmacSignature, createOAuthRefreshPlan, shouldRefreshOAuth} from '../../packages/atlas-integration-fabric/index.mjs';
 
 const KEY=/^[a-z][a-z0-9_.-]{1,79}$/;
 const REF=/^[A-Za-z0-9_.:/-]{8,240}$/;
@@ -41,6 +41,46 @@ function parseProviderResponse(text, contentType='') {
  return trimmed;
 }
 
+async function resolveConnectorSecret({resolved,operation,connectorRef,job,connection,secretResolver,credentialWriter,fetchImpl,context}) {
+ if(operation.auth!=='oauth2') {
+   if(typeof resolved!=='string'||resolved.length<8||resolved.length>4096) throw Object.assign(new Error('Provider credential could not be resolved.'),{code:'provider_secret_unavailable'});
+   return resolved;
+ }
+ let bundle;
+ if(typeof resolved==='string') bundle={accessToken:resolved,refreshToken:null,expiresAt:null};
+ else bundle=object(resolved,'oauth credential');
+ const accessToken=typeof bundle.accessToken==='string'?bundle.accessToken:null;
+ if(!accessToken) throw Object.assign(new Error('OAuth access token is unavailable.'),{code:'oauth_access_token_unavailable'});
+ const expiring=bundle.expiresAt!=null && shouldRefreshOAuth({expiresAt:bundle.expiresAt,skewSeconds:60});
+ if(!expiring) return accessToken;
+ if(typeof bundle.refreshToken!=='string'||bundle.refreshToken.length<8) throw Object.assign(new Error('OAuth credential requires reauthentication.'),{code:'oauth_reauth_required'});
+ const oauth=operation.oauth;
+ if(!oauth?.tokenUrl||!oauth?.clientId) throw Object.assign(new Error('OAuth refresh is not configured for this connector.'),{code:'oauth_refresh_not_configured'});
+ const plan=createOAuthRefreshPlan({tokenUrl:oauth.tokenUrl,refreshToken:bundle.refreshToken,clientId:oauth.clientId,scope:oauth.scope||null});
+ const response=await fetchImpl(plan.url,{method:plan.method,headers:plan.headers,body:plan.body,signal:context.signal});
+ const responseText=await response.text();
+ const parsed=parseProviderResponse(responseText,response.headers?.get?.('content-type')||'application/json');
+ if(!response.ok) throw Object.assign(new Error('OAuth refresh failed with HTTP '+response.status),{code:'oauth_refresh_failed',providerStatus:response.status});
+ if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)||typeof parsed.access_token!=='string'||parsed.access_token.length<8){
+   throw Object.assign(new Error('OAuth provider returned an invalid access token.'),{code:'oauth_refresh_invalid'});
+ }
+ const expiresIn=Number(parsed.expires_in);
+ if(!Number.isSafeInteger(expiresIn)||expiresIn<60||expiresIn>31_536_000) throw Object.assign(new Error('OAuth provider returned an invalid expiry.'),{code:'oauth_refresh_invalid'});
+ const refreshed={
+   providerKey:connectorRef,
+   accessToken:parsed.access_token,
+   refreshToken:typeof parsed.refresh_token==='string'&&parsed.refresh_token.length>=8?parsed.refresh_token:bundle.refreshToken,
+   expiresAt:new Date(Date.now()+expiresIn*1000).toISOString()
+ };
+ if(typeof credentialWriter==='function') await credentialWriter({
+   tenantId:job.tenant_id,
+   connectionId:connection.connection_id,
+   credentialRef:connection.credential_ref,
+   credential:refreshed
+ });
+ return refreshed.accessToken;
+}
+
 async function executeConnectorAction({connectorRegistry,connectionStore,secretResolver,fetchImpl,node,job,context}) {
  if(!connectorRegistry||typeof connectorRegistry.getOperationSchema!=='function') throw Object.assign(new Error('Connector schema registry is required.'),{code:'connector_registry_required'});
  const cfg=object(node.config||{},'node.config');
@@ -61,8 +101,8 @@ async function executeConnectorAction({connectorRegistry,connectionStore,secretR
  const missing=(operation.requiredScopes||[]).filter(scope=>!scopes.includes(scope));
  if(missing.length) throw Object.assign(new Error('Connector operation scope is not granted.'),{code:'connector_scope_missing',scopes:missing});
  const credentialRef=operationRef(connection.credential_ref,'credential_ref');
- const secret=await secretResolver({tenantId:job.tenant_id,connectionId:connection.connection_id,credentialRef});
- if(typeof secret!=='string'||secret.length<8||secret.length>4096) throw Object.assign(new Error('Provider credential could not be resolved.'),{code:'provider_secret_unavailable'});
+ const resolvedCredential=await secretResolver({tenantId:job.tenant_id,connectionId:connection.connection_id,credentialRef});
+ const secret=await resolveConnectorSecret({resolved:resolvedCredential,operation,connectorRef,job,connection,secretResolver,credentialWriter,fetchImpl,context});
  assertSafeConnectorUrl(operation.baseUrl);
  const url=new URL(operation.path,operation.baseUrl);
  if(url.origin!==new URL(operation.baseUrl).origin) throw Object.assign(new Error('Connector operation escaped the registered base URL.'),{code:'connector_url_escape'});
@@ -133,7 +173,7 @@ function requestForNode({node,connection,job,context}){
  throw Object.assign(new Error('Workflow node capability is not a supported provider action.'),{code:'provider_capability_unsupported'});
 }
 
-export function createProviderRuntime({connectionStore,secretResolver,fetchImpl=fetch,logger=console,connectorRegistry=null}={}){
+export function createProviderRuntime({connectionStore,secretResolver,credentialWriter=null,fetchImpl=fetch,logger=console,connectorRegistry=null}={}){
  if(!connectionStore||typeof connectionStore.getProviderConnectionForWorker!=='function')throw new TypeError('A lease-bound provider connection store is required.');
  if(typeof secretResolver!=='function')throw new TypeError('A production secret resolver is required.');
  return Object.freeze({execute:async({node,job,context})=>{
