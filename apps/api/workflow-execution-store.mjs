@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
 import {
   createWorkflowExecution,
@@ -169,7 +169,7 @@ export class PostgresWorkflowExecutionStore{
       if(!updated.rowCount) throw createAuthError(409,'workflow_execution_version_conflict','The execution changed. Refresh and try again.');
       if(next.status==='queued'){
         const idempotencyKey=digest({tenantId,executionId:next.executionId,graphChecksum:next.graphChecksum,reconciliationId:next.reconciliation.reconciliationId,resolution:'confirmed_success'});
-        const resumedJobId='reconcile_'+next.executionId+'_'+next.version;
+        const resumedJobId=randomUUID();
         await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7)',[tenantId,resumedJobId,'workflow.execute',JSON.stringify({kind:'workflow_execution',id:next.executionId,version:next.version}),idempotencyKey,null,8]);
       }
       await this.#event(client,next,{actorId,eventType:'execution.reconciled',status:next.status,nodeId:next.currentNodeId,detailsRef:{kind:'workflow_reconciliation',id:next.reconciliation.reconciliationId,version:next.version}});
