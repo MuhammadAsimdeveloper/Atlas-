@@ -257,6 +257,98 @@ export class PostgresRuntimeStore {
     });
   }
 
+  async listCredentials({ actorId, tenantId, status = null, providerKey = null, limit = 100 } = {}) {
+    if(!Number.isInteger(limit)||limit<1||limit>500) throw createAuthError(400,'credential_invalid');
+    if(status!==null && !['active','expiring','expired','revoked'].includes(status)) throw createAuthError(400,'credential_invalid');
+    if(providerKey!==null && (typeof providerKey!=='string'||!/^[a-z][a-z0-9_.-]{1,79}$/.test(providerKey))) throw createAuthError(400,'credential_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query(
+        `SELECT credential_id,provider_key,label,status,expires_at,rotated_at,last_used_at,created_at,updated_at
+         FROM atlas_v122_credentials
+         WHERE tenant_id=$1
+           AND ($2::text IS NULL OR status=$2)
+           AND ($3::text IS NULL OR provider_key=$3)
+         ORDER BY created_at DESC,credential_id DESC
+         LIMIT $4`,
+        [tenantId,status,providerKey,limit]
+      );
+      return {items:rows.map(row=>({...row,secret_ref_present:true}))};
+    });
+  }
+
+  async getCredential({ actorId, tenantId, credentialId } = {}) {
+    if(!UUID.test(credentialId||'')) throw createAuthError(400,'credential_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query(
+        `SELECT credential_id,provider_key,label,status,expires_at,rotated_at,last_used_at,created_at,updated_at
+         FROM atlas_v122_credentials WHERE tenant_id=$1 AND credential_id=$2`,
+        [tenantId,credentialId]
+      );
+      if(!rows.length) throw createAuthError(404,'credential_not_found');
+      return {...rows[0],secret_ref_present:true};
+    });
+  }
+
+  async createCredential({ actorId, tenantId, credentialId, providerKey, label, secretRef, expiresAt = null } = {}) {
+    if(!UUID.test(credentialId||'')) throw createAuthError(400,'credential_invalid');
+    if(typeof providerKey!=='string'||!/^[a-z][a-z0-9_.-]{1,79}$/.test(providerKey)) throw createAuthError(400,'credential_provider_invalid');
+    if(typeof label!=='string'||!label.trim()||label.length>120||/[\r\n\u0000]/.test(label)) throw createAuthError(400,'credential_label_invalid');
+    if(typeof secretRef!=='string'||!/^[A-Za-z0-9_.:/-]{8,240}$/.test(secretRef)) throw createAuthError(400,'credential_ref_invalid');
+    if(expiresAt!==null && !Number.isFinite(Date.parse(expiresAt))) throw createAuthError(400,'credential_expiry_invalid');
+    const expiryMs=expiresAt===null?null:Date.parse(expiresAt);
+    if(expiryMs!==null && expiryMs<=Date.now()) throw createAuthError(400,'credential_expiry_invalid','Credential expiry must be in the future.');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const result=await client.query(
+        `INSERT INTO atlas_v122_credentials(tenant_id,credential_id,provider_key,label,secret_ref,status,expires_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7)
+         RETURNING credential_id,provider_key,label,status,expires_at,rotated_at,last_used_at,created_at,updated_at`,
+        [tenantId,credentialId,providerKey,label.trim(),secretRef,'active',expiresAt]
+      );
+      return {...result.rows[0],secret_ref_present:true};
+    });
+  }
+
+  async rotateCredential({ actorId, tenantId, credentialId, secretRef, expiresAt = null } = {}) {
+    if(!UUID.test(credentialId||'')) throw createAuthError(400,'credential_invalid');
+    if(typeof secretRef!=='string'||!/^[A-Za-z0-9_.:/-]{8,240}$/.test(secretRef)) throw createAuthError(400,'credential_ref_invalid');
+    if(expiresAt!==null && !Number.isFinite(Date.parse(expiresAt))) throw createAuthError(400,'credential_expiry_invalid');
+    if(expiresAt!==null && Date.parse(expiresAt)<=Date.now()) throw createAuthError(400,'credential_expiry_invalid','Credential expiry must be in the future.');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const current=await client.query('SELECT credential_id,status FROM atlas_v122_credentials WHERE tenant_id=$1 AND credential_id=$2 FOR UPDATE',[tenantId,credentialId]);
+      if(!current.rows.length) throw createAuthError(404,'credential_not_found');
+      if(current.rows[0].status==='revoked') throw createAuthError(409,'credential_revoked','Revoked credentials cannot be rotated; create a new credential.');
+      const result=await client.query(
+        `UPDATE atlas_v122_credentials
+         SET secret_ref=$3, status='active', expires_at=$4, rotated_at=now(), updated_at=now()
+         WHERE tenant_id=$1 AND credential_id=$2
+         RETURNING credential_id,provider_key,label,status,expires_at,rotated_at,last_used_at,created_at,updated_at`,
+        [tenantId,credentialId,secretRef,expiresAt]
+      );
+      return {...result.rows[0],secret_ref_present:true};
+    });
+  }
+
+  async revokeCredential({ actorId, tenantId, credentialId } = {}) {
+    if(!UUID.test(credentialId||'')) throw createAuthError(400,'credential_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const result=await client.query(
+        `UPDATE atlas_v122_credentials
+         SET status='revoked',updated_at=now()
+         WHERE tenant_id=$1 AND credential_id=$2 AND status<>'revoked'
+         RETURNING credential_id,provider_key,label,status,expires_at,rotated_at,last_used_at,created_at,updated_at`,
+        [tenantId,credentialId]
+      );
+      if(result.rows.length) return {...result.rows[0],secret_ref_present:true};
+      const existing=await client.query(
+        `SELECT credential_id,provider_key,label,status,expires_at,rotated_at,last_used_at,created_at,updated_at
+         FROM atlas_v122_credentials WHERE tenant_id=$1 AND credential_id=$2`,
+        [tenantId,credentialId]
+      );
+      if(!existing.rows.length) throw createAuthError(404,'credential_not_found');
+      return {...existing.rows[0],secret_ref_present:true};
+    });
+  }
+
   async listConnectorInstallations({ actorId, tenantId, status = null, limit = 100 } = {}) {
     if (!Number.isInteger(limit)||limit<1||limit>500) throw createAuthError(400,'connector_invalid');
     return this.#tenantTransaction({ actorId, tenantId }, async client => {
