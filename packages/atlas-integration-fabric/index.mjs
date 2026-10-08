@@ -122,6 +122,7 @@ export function createConnectorDefinition({
       path,
       inputSchema: schemas.inputSchema,
       outputSchema: schemas.outputSchema,
+      requiredScopes: [...new Set((Array.isArray(operation.requiredScopes) ? operation.requiredScopes : []).map(value => boundedText(value,'operation scope',240)))].sort(),
       idempotent: operation.idempotent !== false,
       requiresApproval: operation.requiresApproval === true
     });
@@ -182,12 +183,16 @@ export function createConnectorSchemaRegistry({ connectors = [], tenantId = null
         tenantId: connector.tenantId,
         connectorRef: connector.id,
         operationRef: operation.id,
+        protocol: connector.protocol,
+        auth: connector.auth,
+        baseUrl: connector.baseUrl,
         method: operation.method,
         path: operation.path,
         schemaVersion: 1,
         schemaStatus: isGenericJsonSchema(schemas.inputSchema) && isGenericJsonSchema(schemas.outputSchema) ? 'generic' : 'typed',
         inputSchema: schemas.inputSchema,
         outputSchema: schemas.outputSchema,
+        requiredScopes: Object.freeze([...(operation.requiredScopes || [])].map(String)),
         idempotent: operation.idempotent === true,
         requiresApproval: operation.requiresApproval === true
       });
