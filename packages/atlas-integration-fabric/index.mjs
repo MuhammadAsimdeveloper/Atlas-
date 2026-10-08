@@ -92,7 +92,7 @@ function normalizeRequestHeaders(input) {
   for(const [rawName,rawValue] of entries){
     const name=boundedText(rawName,'request header name',80);
     const lower=name.toLowerCase();
-    if(!/^[a-z0-9-]+$/i.test(name)||FORBIDDEN_HEADERS.has(lower)||/authorization|cookie|token|secret|password|signature/i.test(lower)){
+    if(!/^[a-z0-9-]+$/i.test(name)||FORBIDDEN_HEADERS.has(lower)||lower==='idempotency-key'||lower.startsWith('x-atlas-')||/authorization|cookie|token|secret|password|signature/i.test(lower)){
       throw Object.assign(new Error('request header is forbidden'),{code:'request_header_forbidden'});
     }
     const value=boundedText(String(rawValue),'request header value',1000);
@@ -160,6 +160,10 @@ export function createConnectorDefinition({
     const schemas=normalizeActionSchemas({inputSchema:operation.inputSchema || {}, outputSchema:operation.outputSchema || {}});
     const requestHeaders=normalizeRequestHeaders(operation.requestHeaders);
     const hmac=normalizeHmacConfig(operation.hmac);
+    if(hmac){
+      const declared=new Set(Object.keys(requestHeaders).map(key=>key.toLowerCase()));
+      if(declared.has(hmac.timestampHeader.toLowerCase())||declared.has(hmac.signatureHeader.toLowerCase())) throw Object.assign(new Error('HMAC headers cannot be overridden by custom headers'),{code:'hmac_header_collision'});
+    }
     return FREEZE({
       id: opId,
       method,
