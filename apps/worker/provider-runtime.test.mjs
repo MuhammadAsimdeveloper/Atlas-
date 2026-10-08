@@ -81,3 +81,39 @@ test('V157 P0 connector_action fails closed when connection provider does not ma
  });
  await assert.rejects(()=>runtime.execute({job,context,node:{type:'connector_action',config:{connectorRef:'crm',connectionRef:connectionId,operationRef:'contacts.lookup',input:{}}}}),/connector.*match|provider.*match|operation.*binding/i);
 });
+
+
+test('V157 P0 HMAC connector operations sign the exact outbound body and allow only declared non-secret headers',async()=>{
+ const {createConnectorDefinition,createConnectorSchemaRegistry}=await import('../../packages/atlas-integration-fabric/index.mjs');
+ const connector=createConnectorDefinition({
+  tenantId,id:'aws',name:'HMAC API',auth:'hmac',baseUrl:'https://api.example.com',
+  operations:[{
+   id:'items.create',method:'POST',path:'/v1/items',
+   inputSchema:{type:'object',required:['name'],additionalProperties:false,properties:{name:{type:'string'}}},
+   outputSchema:{type:'object',required:['id'],additionalProperties:false,properties:{id:{type:'string'}}},
+   requestHeaders:{'x-atlas-client':'atlas-test'},
+   hmac:{timestampHeader:'x-atlas-timestamp',signatureHeader:'x-atlas-signature'}
+  }]
+ });
+ const registry=createConnectorSchemaRegistry({connectors:[connector]});
+ const runtime=createProviderRuntime({
+  connectionStore:store({tenant_id:tenantId,connection_id:connectionId,provider_key:'aws',channel:null,status:'verified',credential_ref:'kms/hmac',metadata:{}}),
+  connectorRegistry:registry,
+  secretResolver:async()=> 'hmac-secret-123456',
+  fetchImpl:async(url,opts)=>{
+   assert.equal(opts.headers['x-atlas-client'],'atlas-test');
+   assert.match(opts.headers['x-atlas-timestamp'],/^\\d+$/);
+   assert.match(opts.headers['x-atlas-signature'],/^t=\\d+,v1=[a-f0-9]{64}$/);
+   assert.equal(opts.headers.authorization,undefined);
+   return {ok:true,status:200,text:async()=>JSON.stringify({id:'i1'}),headers:new Headers({'content-type':'application/json'})};
+  }
+ });
+ const r=await runtime.execute({job,context,node:{type:'connector_action',config:{connectorRef:'aws',connectionRef:connectionId,operationRef:'items.create',input:{name:'x'}}}});
+ assert.deepEqual(r.output,{id:'i1'});
+});
+
+test('V157 P0 connector operation headers reject secret-bearing and hop-by-hop names at definition time',async()=>{
+ const {createConnectorDefinition}=await import('../../packages/atlas-integration-fabric/index.mjs');
+ assert.throws(()=>createConnectorDefinition({tenantId,id:'headers',name:'Headers',auth:'bearer',baseUrl:'https://api.example.com',operations:[{id:'items.get',method:'GET',path:'/items',requestHeaders:{authorization:'nope'},inputSchema:{type:'object'},outputSchema:{type:'object'}}]}),/header|forbidden|secret/i);
+ assert.throws(()=>createConnectorDefinition({tenantId,id:'headers2',name:'Headers2',auth:'bearer',baseUrl:'https://api.example.com',operations:[{id:'items.get',method:'GET',path:'/items',requestHeaders:{connection:'close'},inputSchema:{type:'object'},outputSchema:{type:'object'}}]}),/header|forbidden/i);
+});
