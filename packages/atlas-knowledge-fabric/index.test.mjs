@@ -82,3 +82,38 @@ test('V157 memory lifecycle enforces consent, retention and bounded writes',()=>
   assert.throws(()=>evaluateMemoryLifecycle({policy,tenantId,scopeRef:'conversation_1',consent:null,facts:[],now}),/consent/i);
   assert.throws(()=>evaluateMemoryLifecycle({policy,tenantId,scopeRef:'conversation_1',consent:{tenantId,scopeRef:'conversation_1',status:'granted',checkedAt:'2026-09-01T00:00:00Z',expiresAt:'2026-09-02T00:00:00Z'},facts:[],now}),/consent|expired|stale/i);
 });
+
+
+test('V157 provider-neutral embeddings are bounded and tenant-scoped without storing provider secrets',async()=>{
+ const request=createEmbeddingRequest({tenantId,storeId,modelRef:'embedding-model-v1',text:'Approved booking policy.'});
+ assert.equal(request.tenantId,tenantId);
+ assert.equal(request.storeId,storeId);
+ assert.equal(request.rawTextStored,false);
+ assert.match(request.textHash,/^[a-f0-9]{64}$/);
+ const result=await runEmbeddingAdapter({request,adapter:{embed:async(input)=>{
+   assert.equal(input.textHash,request.textHash);
+   assert.equal(input.text.length,0);
+   return {dimensions:3,vector:[0.1,0.2,0.3]};
+ }},adapterInput:{textHash:request.textHash}});
+ assert.deepEqual(result.vector,[0.1,0.2,0.3]);
+ assert.equal(result.dimensions,3);
+});
+
+test('V157 reranker preserves tenant scope, bounded hit count and stable evidence refs',async()=>{
+ const ranked=await rerankKnowledge({
+   tenantId,storeId,queryHash:'a'.repeat(64),
+   hits:[
+     {tenantId,storeId,ref:'r1',score:.7,excerpt:'first'},
+     {tenantId,storeId,ref:'r2',score:.9,excerpt:'second'},
+     {tenantId:'ffffffff-ffff-4fff-8fff-ffffffffffff',storeId,ref:'r3',score:1,excerpt:'cross tenant'}
+   ],
+   adapter:{rerank:async(input)=>{
+     assert.equal(input.tenantId,tenantId);
+     assert.deepEqual(input.refs,['r1','r2']);
+     return [{ref:'r1',score:.95},{ref:'r2',score:.55}];
+   }}
+ });
+ assert.deepEqual(ranked.map(hit=>hit.ref),['r1','r2']);
+ assert.equal(ranked[0].rerankScore,.95);
+ assert.equal(ranked[0].trust,'untrusted_knowledge');
+});
