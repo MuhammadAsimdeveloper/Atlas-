@@ -68,3 +68,27 @@ Unsupported authentication/adapter modes fail closed rather than silently degrad
 The remaining foundation gaps are strict schemas for all legacy node definitions; full connector authorization coverage for every auth mode and provider adapter; durable reconciliation worker/queue integration; credential lifecycle and external secret-store hardening; and test/preview and execution-inspector parity.
 
 External provider activation and production infrastructure remain explicit deployment gates.
+
+## Credential lifecycle extension
+
+The V122 credential table now has an authenticated tenant-scoped API layer for metadata lifecycle management:
+
+- credential creation stores only an external secret_ref;
+- list/get responses return secret_ref_present but never the vault pointer itself;
+- rotation replaces the external reference and resets the credential to active;
+- revoked credentials cannot be rotated in place;
+- revoke is idempotent;
+- expiry input is validated at the API/store boundary.
+
+The live worker continues to resolve secret material only through the explicit external secretResolver boundary. Credential lifecycle storage never places plaintext credentials in workflow definitions, queue payloads or execution state.
+
+Authenticated routes:
+
+- GET /api/v1/growth/credentials
+- POST /api/v1/growth/credentials
+- POST /api/v1/growth/credentials/:credentialId/rotate
+- POST /api/v1/growth/credentials/:credentialId/revoke
+
+## Legacy-node schema extension
+
+The workflow-node schema registry now marks a broad legacy cluster as typed instead of catalog-generic. It derives strict object schemas for reference-bearing CRM, booking, communication, integration, AI, timing, branching, batching and error/control nodes from the existing compiler semantics. Unknown config keys are rejected at graph build time, while older catalog entries not yet covered by a strict schema remain explicitly generic rather than being falsely advertised as complete.
