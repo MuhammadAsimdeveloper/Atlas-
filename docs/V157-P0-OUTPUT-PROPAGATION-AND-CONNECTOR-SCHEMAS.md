@@ -57,8 +57,14 @@ Generic upstream output is treated as unknown rather than as proof that a strict
 
 The worker now forwards resolved provider output into the pinned execution contract. Typed node outputs are validated before completion, and the durable step stores only a deterministic `outputHash` plus `outputSchemaVersion`; raw provider output is never persisted in execution state. Resolved reconciliation is also idempotent for an already-resolved identical decision.
 
+## Connector runtime extension
+
+`apps/worker/provider-runtime.mjs` now supports `connector_action` through the same tenant-scoped connector registry. A worker execution must resolve the registered operation, re-check a verified same-tenant provider connection, require the connection's provider identity to match the connector reference, verify required operation scopes, resolve `credential_ref` through the explicit external secret resolver, compose a same-origin URL, apply only supported authentication modes, validate the outbound input and inbound output against the registered schemas, and attach a stable idempotency key for idempotent operations. Raw credentials and provider response bodies are not persisted in execution state.
+
+Unsupported authentication/adapter modes fail closed rather than silently degrading to a generic network call.
+
 ## Remaining P0
 
-The remaining foundation gaps are strict schemas for all legacy node definitions; complete connector action/provider-operation authorization and credential resolution; durable reconciliation worker/queue integration; credential lifecycle and external secret-store hardening; and test/preview and execution-inspector parity.
+The remaining foundation gaps are strict schemas for all legacy node definitions; full connector authorization coverage for every auth mode and provider adapter; durable reconciliation worker/queue integration; credential lifecycle and external secret-store hardening; and test/preview and execution-inspector parity.
 
 External provider activation and production infrastructure remain explicit deployment gates.
