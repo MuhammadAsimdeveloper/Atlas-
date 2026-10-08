@@ -194,3 +194,29 @@ test('marketplace packages require signed metadata, compatibility and declared p
     permissions: ['secrets.read']
   }));
 });
+
+
+test('connector operation schemas are normalized and exposed through a tenant-scoped registry', async () => {
+  const { createConnectorSchemaRegistry } = await import('./index.mjs');
+  const connector=createConnectorDefinition({
+    tenantId:'tenant_123',
+    id:'custom.crm',
+    name:'Custom CRM',
+    auth:'bearer',
+    baseUrl:'https://api.example.com',
+    operations:[{
+      id:'contacts.list',
+      method:'GET',
+      path:'/contacts',
+      inputSchema:{type:'object',required:['page'],additionalProperties:false,properties:{page:{type:'integer',minimum:1}}},
+      outputSchema:{type:'object',required:['items'],additionalProperties:false,properties:{items:{type:'array',items:{type:'object',required:['id'],additionalProperties:false,properties:{id:{type:'string'}}}}}}
+    }]
+  });
+  const registry=createConnectorSchemaRegistry({connectors:[connector]});
+  const schema=registry.getOperationSchema({tenantId:'tenant_123',connectorRef:'custom.crm',operationRef:'contacts.list'});
+  assert.equal(schema.connectorRef,'custom.crm');
+  assert.equal(schema.operationRef,'contacts.list');
+  assert.equal(schema.schemaStatus,'typed');
+  assert.equal(schema.inputSchema.properties.page.type,'integer');
+  assert.equal(schema.outputSchema.properties.items.items.properties.id.type,'string');
+});
