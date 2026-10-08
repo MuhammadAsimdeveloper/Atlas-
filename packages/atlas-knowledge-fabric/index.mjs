@@ -137,6 +137,56 @@ export function redactKnowledgeText(value){
  return output;
 }
 
+export function createEmbeddingRequest({tenantId,storeId,modelRef,text}={}){
+ uuid(tenantId,'tenantId'); uuid(storeId,'storeId'); ref(modelRef,'modelRef');
+ if(typeof text!=='string'||!text.trim()||text.length>12000||/[\u0000]/.test(text))throw new TypeError('embedding text is invalid');
+ return freeze({tenantId,storeId,modelRef,textHash:digest(text),maxInputChars:12000,rawTextStored:false});
+}
+
+export async function runEmbeddingAdapter({request,text,adapter,signal}={}){
+ if(!request||typeof request!=='object'||request.rawTextStored!==false)throw new TypeError('embedding request is invalid');
+ uuid(request.tenantId,'tenantId'); uuid(request.storeId,'storeId'); ref(request.modelRef,'modelRef');
+ if(typeof text!=='string'||!text.trim()||text.length>request.maxInputChars)throw new TypeError('embedding text is invalid');
+ if(digest(text)!==request.textHash)throw new Error('embedding text hash mismatch');
+ if(typeof adapter?.embed!=='function')throw new TypeError('embedding adapter is required');
+ const output=await adapter.embed(Object.freeze({tenantId:request.tenantId,storeId:request.storeId,modelRef:request.modelRef,text,textHash:request.textHash,signal}));
+ if(!output||typeof output!=='object'||Array.isArray(output)||!Array.isArray(output.vector))throw new Error('embedding adapter output is invalid');
+ const dimensions=Number(output.dimensions??output.vector.length);
+ if(!Number.isSafeInteger(dimensions)||dimensions<1||dimensions>4096||output.vector.length!==dimensions)throw new Error('embedding dimensions are invalid');
+ if(output.vector.some(value=>typeof value!=='number'||!Number.isFinite(value)||Math.abs(value)>1e6))throw new Error('embedding vector contains invalid values');
+ return freeze({dimensions,vector:Object.freeze([...output.vector]),rawTextStored:false,textHash:request.textHash});
+}
+
+export async function rerankKnowledge({tenantId,storeId,queryHash,hits=[],adapter}={}){
+ uuid(tenantId,'tenantId'); uuid(storeId,'storeId'); sha(queryHash,'queryHash');
+ if(!Array.isArray(hits)||hits.length>50)throw new TypeError('rerank hits must contain 0-50');
+ const scoped=[]; const seen=new Set();
+ for(const hit of hits){
+   if(!hit||typeof hit!=='object'||Array.isArray(hit)||hit.tenantId!==tenantId||hit.storeId!==storeId)continue;
+   const hitRef=ref(hit.ref,'knowledge hit ref');
+   if(seen.has(hitRef))continue;
+   seen.add(hitRef);
+   scoped.push({...hit,ref:hitRef,trust:'untrusted_knowledge'});
+ }
+ if(!scoped.length)return freeze([]);
+ if(typeof adapter?.rerank!=='function')return freeze(scoped);
+ const output=await adapter.rerank(Object.freeze({tenantId,storeId,queryHash,refs:Object.freeze(scoped.map(hit=>hit.ref)),scores:Object.freeze(scoped.map(hit=>Number(hit.score)||0))}));
+ if(!Array.isArray(output)||output.length>50)throw new Error('reranker output is invalid');
+ const scores=new Map();
+ for(const row of output){
+   if(!row||typeof row!=='object'||Array.isArray(row))throw new Error('reranker output row is invalid');
+   const rowRef=ref(row.ref,'reranker ref');
+   if(!scoped.some(hit=>hit.ref===rowRef))throw Object.assign(new Error('Reranker returned an unknown evidence ref'),{code:'reranker_ref_invalid'});
+   const score=Number(row.score);
+   if(!Number.isFinite(score)||score<0||score>1)throw new Error('reranker score is invalid');
+   if(scores.has(rowRef))throw new Error('reranker returned duplicate evidence ref');
+   scores.set(rowRef,score);
+ }
+ const ranked=scoped.map(hit=>({...hit,rerankScore:scores.has(hit.ref)?scores.get(hit.ref):Math.max(0,Math.min(1,Number(hit.score)||0))}));
+ ranked.sort((a,b)=>b.rerankScore-a.rerankScore||Number(b.score||0)-Number(a.score||0)||a.ref.localeCompare(b.ref));
+ return freeze(ranked);
+}
+
 export function createMemoryLifecyclePolicy({scope='conversation',retentionDays=30,requireConsent=true,maxFacts=20}={}){
  if(!['none','conversation','contact','tenant'].includes(scope))throw new TypeError('memory scope is invalid');
  int(retentionDays,'retentionDays',1,90); int(maxFacts,'maxFacts',1,50);
