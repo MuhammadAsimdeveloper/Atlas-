@@ -115,12 +115,13 @@ export function createConnectorDefinition({
     if (!path.startsWith('/') || path.includes('://') || path.includes('\\\\')) {
       throw Object.assign(new Error('connector operation path must be relative'), { code:'operation_path_invalid' });
     }
+    const schemas=normalizeActionSchemas({inputSchema:operation.inputSchema || {}, outputSchema:operation.outputSchema || {}});
     return FREEZE({
       id: opId,
       method,
       path,
-      inputSchema: normalizeActionSchemas({inputSchema:operation.inputSchema || {}, outputSchema:operation.outputSchema || {}}).inputSchema,
-      outputSchema: normalizeActionSchemas({inputSchema:operation.inputSchema || {}, outputSchema:operation.outputSchema || {}}).outputSchema,
+      inputSchema: schemas.inputSchema,
+      outputSchema: schemas.outputSchema,
       idempotent: operation.idempotent !== false,
       requiresApproval: operation.requiresApproval === true
     });
