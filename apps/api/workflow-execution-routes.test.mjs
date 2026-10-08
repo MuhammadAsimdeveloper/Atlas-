@@ -37,7 +37,8 @@ async function fixture({workflowState='published'}={}) {
     async getActivationChecklist(data){calls.push(['activation',data]);return {workspace:{tenantId},steps:[{id:'capture_lead',status:'complete'},{id:'publish_workflow',status:'ready'},{id:'connect_provider',status:'blocked'}],nextAction:'publish_workflow'};},
     async cancel(data){calls.push(['cancel',data]);return {...executions.get(data.executionId),status:'canceled',version:2};},
     async approve(data){calls.push(['approve',data]);return {...executions.get(data.executionId),status:'queued',version:2};},
-    async replay(data){calls.push(['replay',data]);return {executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',status:'queued',workflowVersion:3};}
+    async replay(data){calls.push(['replay',data]);return {executionId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',status:'queued',workflowVersion:3};},
+    async reconcile(data){calls.push(['reconcile',data]);return {executionId:data.executionId,tenantId:data.tenantId,status:data.resolution==='confirmed_success'?'queued':'dead_letter',version:3};}
   };
   const growthStore={async get(data){calls.push(['workflowGet',data]);return workflowRecord(workflowState);},async getActivationChecklist(data){calls.push(['activation',data]);return {workspace:{tenantId},steps:[{id:'capture_lead',status:'complete'},{id:'publish_workflow',status:'ready'},{id:'connect_provider',status:'blocked'}],nextAction:'publish_workflow'};}};
   const env={NODE_ENV:'development',ATLAS_PLATFORM_OWNER_EMAIL:'khan@example.net',ATLAS_WORKFLOW_EXECUTION_ENABLED:'true',ATLAS_WORKFLOW_EXECUTION_HANDLER_READY:'true'};
@@ -122,4 +123,21 @@ test('activation checklist exposes the first customer outcome without claiming p
     assert.equal(api.calls.at(-1)[0], 'activation');
     assert.equal(api.calls.at(-1)[1].tenantId, tenantId);
   } finally { await api.close(); }
+});
+
+
+test('reconciliation route requires CSRF and delegates only authenticated tenant authority',async()=>{
+ const api=await fixture();
+ try{
+  let response=await fetch(api.base+'/api/v1/growth/executions/reconcile',{method:'POST',headers:{...api.headers,'x-atlas-csrf':''},body:JSON.stringify({executionId,reconciliationId:'reconcile_1',resolution:'confirmed_success',expectedVersion:2})});
+  assert.equal(response.status,403);
+  response=await fetch(api.base+'/api/v1/growth/executions/reconcile',{method:'POST',headers:api.headers,body:JSON.stringify({executionId,reconciliationId:'reconcile_1',resolution:'confirmed_success',expectedVersion:2,tenantId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'})});
+  assert.equal(response.status,400);
+  response=await fetch(api.base+'/api/v1/growth/executions/reconcile',{method:'POST',headers:api.headers,body:JSON.stringify({executionId,reconciliationId:'reconcile_1',resolution:'confirmed_success',expectedVersion:2})});
+  assert.equal(response.status,200);
+  const call=api.calls.find(([kind])=>kind==='reconcile');
+  assert.equal(call[1].tenantId,tenantId);
+  assert.equal(call[1].actorId,actorId);
+  assert.equal(call[1].resolution,'confirmed_success');
+ }finally{await api.close();}
 });
