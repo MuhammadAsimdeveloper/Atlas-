@@ -243,6 +243,41 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
         await requireMutation(req,who.session); const body=await readJson(req); exact(body,['routeId','workflowId','workflowVersion','eventType','priority','predicate','branchKey','dedupWindowSeconds']);
         return send(res,201,{routeId:await runtimeStore.createWorkflowEventRoute({...who,...body})},env);
       }
+      if (path === '/api/v1/growth/knowledge/stores' && req.method === 'GET') {
+        if (typeof runtimeStore?.listKnowledgeStores !== 'function') throw createAuthError(503,'knowledge_runtime_unavailable');
+        return send(res,200,await runtimeStore.listKnowledgeStores({...who,status:url.searchParams.get('status')||null,limit:Number(url.searchParams.get('limit')||100)}),env);
+      }
+      if (path === '/api/v1/growth/knowledge/stores' && req.method === 'POST') {
+        await requireMutation(req,who.session);
+        if (typeof runtimeStore?.createKnowledgeStore !== 'function') throw createAuthError(503,'knowledge_runtime_unavailable');
+        const body=await readJson(req); exact(body,['storeId','name','version','status','defaultSourceTypes']);
+        return send(res,201,{storeId:await runtimeStore.createKnowledgeStore({...who,...body})},env);
+      }
+      if (path === '/api/v1/growth/knowledge/documents' && req.method === 'POST') {
+        await requireMutation(req,who.session);
+        if (typeof runtimeStore?.createKnowledgeDocument !== 'function') throw createAuthError(503,'knowledge_runtime_unavailable');
+        const body=await readJson(req); exact(body,['storeId','documentId','sourceType','title','contentRef','contentHash','metadata']);
+        return send(res,201,{documentId:await runtimeStore.createKnowledgeDocument({...who,...body})},env);
+      }
+      if (path === '/api/v1/growth/knowledge/documents' && req.method === 'GET') {
+        if (typeof runtimeStore?.listKnowledgeDocuments !== 'function') throw createAuthError(503,'knowledge_runtime_unavailable');
+        const storeId=url.searchParams.get('storeId');
+        if(!UUID.test(storeId||'')) throw createAuthError(400,'knowledge_store_required');
+        return send(res,200,await runtimeStore.listKnowledgeDocuments({...who,storeId,status:url.searchParams.get('status')||null,limit:Number(url.searchParams.get('limit')||100)}),env);
+      }
+      if (path === '/api/v1/growth/knowledge/policies' && req.method === 'POST') {
+        await requireMutation(req,who.session);
+        if (typeof runtimeStore?.createKnowledgeRetrievalPolicy !== 'function') throw createAuthError(503,'knowledge_runtime_unavailable');
+        const body=await readJson(req); exact(body,['policyId','storeId','topK','minScore','reranker','allowedSourceTypes','requireCitations']);
+        return send(res,201,{policyId:await runtimeStore.createKnowledgeRetrievalPolicy({...who,...body})},env);
+      }
+      if (path === '/api/v1/growth/knowledge/policies' && req.method === 'GET') {
+        if (typeof runtimeStore?.getKnowledgeRetrievalPolicy !== 'function') throw createAuthError(503,'knowledge_runtime_unavailable');
+        const policyId=url.searchParams.get('policyId');
+        if(!UUID.test(policyId||'')) throw createAuthError(400,'knowledge_policy_required');
+        return send(res,200,{policy:await runtimeStore.getKnowledgeRetrievalPolicy({...who,policyId})},env);
+      }
+
       if (path === '/api/v1/growth/credentials' && req.method === 'GET') {
         if (typeof runtimeStore?.listCredentials !== 'function') throw createAuthError(503,'credential_runtime_unavailable');
         const status=url.searchParams.get('status');
