@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { verifyWorkflowGraph } from './index.mjs';
 import { normalizeWorkflowError } from './workflow-runtime-contracts.mjs';
+import { isGenericJsonSchema, validateJsonSchema } from '../atlas-action-fabric/schema.mjs';
 
 const EXECUTION_STATUSES = Object.freeze(['queued','running','waiting','waiting_approval','retryable','completed','failed','reconciliation_required','canceled','dead_letter']);
 const TERMINAL_STATUSES = new Set(['completed','failed','canceled','dead_letter']);
@@ -170,6 +171,7 @@ export function completeWorkflowStep({
   nodeId,
   attempt = 1,
   resultRef = null,
+  output = undefined,
   selectedPort = 'next',
   now = Date.now()
 } = {}) {
@@ -186,6 +188,8 @@ export function completeWorkflowStep({
   const finishedAt = timestamp(now, 'now');
   const stepId = 'step_' + crypto.randomUUID().replaceAll('-', '');
   const safeResultRef = resultRef == null ? null : resultReference(resultRef);
+  const hasOutput = output !== undefined;
+  if (hasOutput && !isGenericJsonSchema(node.outputSchema || {})) validateJsonSchema(output,node.outputSchema,'workflow.step.output');
   const step = {
     stepId,
     nodeId,
@@ -194,6 +198,7 @@ export function completeWorkflowStep({
     status: 'completed',
     selectedPort: boundedText(selectedPort || 'next', 'selectedPort', 40),
     resultRef: safeResultRef,
+    ...(hasOutput ? { outputHash: digest(output), outputSchemaVersion: Number.isSafeInteger(node.schemaVersion) ? node.schemaVersion : 1 } : {}),
     startedAt: execution.steps.find(item => item.nodeId === nodeId && item.attempt === attempt)?.startedAt || new Date(finishedAt).toISOString(),
     endedAt: new Date(finishedAt).toISOString(),
     errorCode: null
