@@ -124,3 +124,54 @@ test('V157 P0 connector definitions cannot override Atlas-generated idempotency 
  assert.throws(()=>createConnectorDefinition({tenantId,id:'headers3',name:'Headers3',auth:'bearer',baseUrl:'https://api.example.com',operations:[{id:'items.get',method:'GET',path:'/items',requestHeaders:{'idempotency-key':'forged'},inputSchema:{type:'object'},outputSchema:{type:'object'}}]}),/header|forbidden/i);
  assert.throws(()=>createConnectorDefinition({tenantId,id:'headers4',name:'Headers4',auth:'hmac',baseUrl:'https://api.example.com',operations:[{id:'items.get',method:'GET',path:'/items',requestHeaders:{'x-atlas-signature':'forged'},hmac:{timestampHeader:'x-atlas-timestamp',signatureHeader:'x-atlas-signature'},inputSchema:{type:'object'},outputSchema:{type:'object'}}]}),/collision|header|forbidden/i);
 });
+
+
+test('V157 P0 oauth2 connector refreshes an expiring access token inside the worker and optionally rotates the external credential',async()=>{
+ const {createConnectorDefinition,createConnectorSchemaRegistry}=await import('../../packages/atlas-integration-fabric/index.mjs');
+ const connector=createConnectorDefinition({
+  tenantId,id:'oauthcrm',name:'OAuth CRM',auth:'oauth2',baseUrl:'https://api.example.com',
+  oauth:{tokenUrl:'https://auth.example.com/token',clientId:'atlas-client',scope:'contacts.read'},
+  operations:[{
+   id:'contacts.get',method:'GET',path:'/v1/contacts',
+   inputSchema:{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},
+   outputSchema:{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},
+   idempotent:true
+  }]
+ });
+ const registry=createConnectorSchemaRegistry({connectors:[connector]});
+ let vaultWrite=null; let calls=0;
+ const runtime=createProviderRuntime({
+  connectionStore:store({tenant_id:tenantId,connection_id:connectionId,provider_key:'oauthcrm',channel:null,status:'verified',credential_ref:'vault/oauthcrm',scopes:['contacts.read'],metadata:{}}),
+  connectorRegistry:registry,
+  secretResolver:async()=>({accessToken:'old-access-token',refreshToken:'refresh-token-value',expiresAt:'2020-01-01T00:00:00.000Z'}),
+  credentialWriter:async(args)=>{vaultWrite=args;},
+  fetchImpl:async(url,opts)=>{
+   calls++;
+   if(url==='https://auth.example.com/token'){
+    assert.equal(opts.method,'POST');
+    assert.match(opts.headers['content-type'],'application/x-www-form-urlencoded');
+    const form=new URLSearchParams(opts.body);
+    assert.equal(form.get('grant_type'),'refresh_token');
+    assert.equal(form.get('refresh_token'),'refresh-token-value');
+    assert.equal(form.get('client_id'),'atlas-client');
+    return new Response(JSON.stringify({access_token:'new-access-token-123456',refresh_token:'new-refresh-token-123456',expires_in:3600,token_type:'Bearer'}),{status:200,headers:{'content-type':'application/json'}});
+   }
+   assert.equal(url,'https://api.example.com/v1/contacts?id=c1');
+   assert.equal(opts.headers.authorization,'Bearer new-access-token-123456');
+   return new Response(JSON.stringify({id:'c1'}),{status:200,headers:{'content-type':'application/json'}});
+  }
+ });
+ const r=await runtime.execute({job,context:{...context,workerId:'worker-1'},node:{type:'connector_action',config:{connectorRef:'oauthcrm',connectionRef:connectionId,operationRef:'contacts.get',input:{id:'c1'}}}});
+ assert.equal(calls,2);
+ assert.deepEqual(r.output,{id:'c1'});
+ assert.equal(vaultWrite.credential.accessToken,'new-access-token-123456');
+ assert.equal(vaultWrite.credential.refreshToken,'new-refresh-token-123456');
+ assert.equal(vaultWrite.credential.providerKey,'oauthcrm');
+});
+
+test('V157 P0 oauth2 connector fails closed when an expired credential cannot refresh',async()=>{
+ const {createConnectorDefinition,createConnectorSchemaRegistry}=await import('../../packages/atlas-integration-fabric/index.mjs');
+ const connector=createConnectorDefinition({tenantId,id:'oauthcrm2',name:'OAuth CRM 2',auth:'oauth2',baseUrl:'https://api.example.com',oauth:{tokenUrl:'https://auth.example.com/token',clientId:'atlas-client'},operations:[{id:'contacts.get',method:'GET',path:'/contacts',inputSchema:{type:'object'},outputSchema:{type:'object'}}]});
+ const runtime=createProviderRuntime({connectionStore:store({tenant_id:tenantId,connection_id:connectionId,provider_key:'oauthcrm2',channel:null,status:'verified',credential_ref:'vault/oauthcrm2',scopes:[],metadata:{}}),connectorRegistry:createConnectorSchemaRegistry({connectors:[connector]}),secretResolver:async()=>({accessToken:'expired-token',refreshToken:null,expiresAt:'2020-01-01T00:00:00.000Z'}),fetchImpl:async()=>{throw new Error('provider must not be called')}});
+ await assert.rejects(()=>runtime.execute({job,context,node:{type:'connector_action',config:{connectorRef:'oauthcrm2',connectionRef:connectionId,operationRef:'contacts.get',input:{}}}}),/refresh|reauth|credential/i);
+});
