@@ -179,6 +179,38 @@ test('V120 workflow execution access is lease-bound and mediated by the worker a
 });
 
 
+test('V157 V120 worker execution RPC persists reconciliation_required as an allowed durable state',async()=>{
+ const {db,pool}=await database();
+ const executionId=randomUUID(),jobId=randomUUID(),workflowId=randomUUID();
+ const stateChecksum=digest('workflow-state-reconciliation');
+ try{
+  await db.exec('BEGIN');
+  await db.query("SELECT set_config('app.tenant_id',$1,true)",[tenantA]);
+  await db.query(`INSERT INTO atlas_workflow_executions(
+    tenant_id,execution_id,workflow_id,workflow_version,status,started_at,summary,checksum,
+    graph_checksum,current_node_id,trigger_event_type,trigger_event_ref,state,state_checksum,
+    version,created_at,updated_at
+  ) VALUES($1,$2,$3,1,'running',now(),'{}'::jsonb,$4,$5,'start','contact.created','event-ref',$6::jsonb,$7,1,now(),now())`,
+  [tenantA,executionId,workflowId,stateChecksum,digest('workflow-graph'),JSON.stringify({currentNodeId:'start',steps:[],tenantId:tenantA,executionId,workflowId}),stateChecksum]);
+  await db.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7)',[
+    tenantA,jobId,'workflow.execute',JSON.stringify({kind:'workflow_execution',id:executionId,version:1}),digest('workflow-reconcile-job'),null,8
+  ]);
+  await db.exec('COMMIT');
+  await db.exec('SET ROLE atlas_worker;');
+  const worker=new PostgresRuntimeStore(pool);
+  const job=(await worker.claimJobs('worker-reconcile',10,60,['workflow.execute'])).find(item=>item.job_id===jobId);
+  assert.ok(job);
+  const nextState={tenantId:tenantA,executionId,workflowId,currentNodeId:'start',steps:[{nodeId:'start',status:'failed'}],status:'reconciliation_required'};
+  assert.equal(await worker.updateWorkflowExecutionForJob(job,'worker-reconcile',{
+    expectedVersion:1,status:'reconciliation_required',currentNodeId:'start',state:nextState,stateChecksum:digest(nextState)
+  }),true);
+  assert.equal((await worker.getWorkflowExecutionForJob(job,'worker-reconcile')).status,'reconciliation_required');
+ }finally{
+  try{await db.exec('RESET ROLE');}catch{}
+  await db.close();
+ }
+});
+
 test('V138 runtime capacity is globally bounded, lease-owned and recoverable', async () => {
   const { db,pool } = await database();
   try {
