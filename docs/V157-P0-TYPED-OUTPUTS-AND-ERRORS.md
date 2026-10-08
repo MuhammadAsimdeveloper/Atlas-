@@ -17,6 +17,12 @@ The registry also exposes reference-safe output metadata:
 
 Raw output is not included in the summary, keeping the execution contract compatible with Atlas redaction and reference-only persistence rules.
 
+## Downstream schema propagation
+
+Typed outputs now flow through the same graph contract used by downstream validation. When a node has a strict runtime input schema, graph construction verifies that each upstream output can satisfy its required fields and compatible types. Generic downstream inputs inherit the upstream output shape. Multiple upstream branches are merged conservatively: only common required fields and non-conflicting property schemas are retained.
+
+Connector operations contribute their normalized input/output schemas through the tenant-scoped connector schema registry, so connector-backed output can participate in the same propagation checks without placing credentials in workflow definitions.
+
 ## Error taxonomy
 
 packages/atlas-target/workflow-runtime-contracts.mjs adds deterministic error classification for:
@@ -57,8 +63,8 @@ P0 remains partial.
 Still unfinished:
 
 - strict schemas for every legacy workflow node
-- connector-derived input/output schemas
-- automatic output-shape propagation from one node into the next node's input schema
-- complete connector_action/provider operation binding
+- strict schemas for every remaining legacy node
+- execution-time worker validation of actual provider result payloads against persisted node schemas
+- complete connector_action/provider-operation authorization and credential resolution
 - reconciliation worker/queue integration for unknown external outcomes
 - remaining credential, execution inspector and test/preview parity work
