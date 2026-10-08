@@ -129,11 +129,11 @@ test('activation checklist exposes the first customer outcome without claiming p
 test('reconciliation route requires CSRF and delegates only authenticated tenant authority',async()=>{
  const api=await fixture();
  try{
-  let response=await fetch(api.base+'/api/v1/growth/executions/reconcile',{method:'POST',headers:{...api.headers,'x-atlas-csrf':''},body:JSON.stringify({executionId,reconciliationId:'reconcile_1',resolution:'confirmed_success',expectedVersion:2})});
+  let response=await fetch(api.base+'/api/v1/growth/executions/reconcile',{method:'POST',headers:{...api.headers,'x-atlas-csrf':''},body:JSON.stringify({executionId,reconciliationId:'reconcile_12345678',resolution:'confirmed_success',expectedVersion:2})});
   assert.equal(response.status,403);
-  response=await fetch(api.base+'/api/v1/growth/executions/reconcile',{method:'POST',headers:api.headers,body:JSON.stringify({executionId,reconciliationId:'reconcile_1',resolution:'confirmed_success',expectedVersion:2,tenantId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'})});
+  response=await fetch(api.base+'/api/v1/growth/executions/reconcile',{method:'POST',headers:api.headers,body:JSON.stringify({executionId,reconciliationId:'reconcile_12345678',resolution:'confirmed_success',expectedVersion:2,tenantId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'})});
   assert.equal(response.status,400);
-  response=await fetch(api.base+'/api/v1/growth/executions/reconcile',{method:'POST',headers:api.headers,body:JSON.stringify({executionId,reconciliationId:'reconcile_1',resolution:'confirmed_success',expectedVersion:2})});
+  response=await fetch(api.base+'/api/v1/growth/executions/reconcile',{method:'POST',headers:api.headers,body:JSON.stringify({executionId,reconciliationId:'reconcile_12345678',resolution:'confirmed_success',expectedVersion:2})});
   assert.equal(response.status,200);
   const call=api.calls.find(([kind])=>kind==='reconcile');
   assert.equal(call[1].tenantId,tenantId);
