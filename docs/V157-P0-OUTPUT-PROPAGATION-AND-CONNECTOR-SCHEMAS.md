@@ -53,8 +53,12 @@ Schema propagation never grants permissions, selects credentials, bypasses appro
 
 Generic upstream output is treated as unknown rather than as proof that a strict downstream contract will be satisfied.
 
+## Execution-time validation extension
+
+The worker now forwards resolved provider output into the pinned execution contract. Typed node outputs are validated before completion, and the durable step stores only a deterministic `outputHash` plus `outputSchemaVersion`; raw provider output is never persisted in execution state. Resolved reconciliation is also idempotent for an already-resolved identical decision.
+
 ## Remaining P0
 
-The remaining foundation gaps are strict schemas for all legacy node definitions; execution-time validation of actual provider result payloads in workers; complete connector action/provider-operation authorization and credential resolution; durable reconciliation worker/queue integration; credential lifecycle and external secret-store hardening; and test/preview and execution-inspector parity.
+The remaining foundation gaps are strict schemas for all legacy node definitions; complete connector action/provider-operation authorization and credential resolution; durable reconciliation worker/queue integration; credential lifecycle and external secret-store hardening; and test/preview and execution-inspector parity.
 
 External provider activation and production infrastructure remain explicit deployment gates.
