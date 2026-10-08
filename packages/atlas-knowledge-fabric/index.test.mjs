@@ -10,7 +10,10 @@ import {
   detectPromptInjection,
   redactKnowledgeText,
   createMemoryLifecyclePolicy,
-  evaluateMemoryLifecycle
+  evaluateMemoryLifecycle,
+  createEmbeddingRequest,
+  runEmbeddingAdapter,
+  rerankKnowledge
 } from './index.mjs';
 
 const tenantId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
