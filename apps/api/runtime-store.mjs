@@ -1,5 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { createAuthError } from './auth-contracts.mjs';
+import { createKnowledgeStore as normalizeKnowledgeStore, createRetrievalPolicy as normalizeRetrievalPolicy } from '../../packages/atlas-knowledge-fabric/index.mjs';
 import { nextScheduleOccurrence, assertIanaTimezone, boundedJson, eventDedupKey } from '../../packages/atlas-core/production-frontier.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -254,6 +255,108 @@ export class PostgresRuntimeStore {
     return this.#tenantTransaction({ actorId, tenantId }, async client => {
       const { rows }=await client.query(`INSERT INTO atlas_workflow_event_dedup(tenant_id,dedup_key,route_id,expires_at) VALUES($1,$2,$3,now()+make_interval(secs=>$4)) ON CONFLICT(tenant_id,dedup_key) DO UPDATE SET expires_at=EXCLUDED.expires_at WHERE atlas_workflow_event_dedup.expires_at < now() RETURNING dedup_key`,[tenantId,key,routeId,windowSeconds]);
       return { key, inserted:Boolean(rows.length) };
+    });
+  }
+
+  async listKnowledgeStores({ actorId, tenantId, status = null, limit = 100 } = {}) {
+    if(!Number.isInteger(limit)||limit<1||limit>200) throw createAuthError(400,'knowledge_store_invalid');
+    if(status!==null && !['draft','published','archived'].includes(status)) throw createAuthError(400,'knowledge_store_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query(
+        `SELECT store_id,name,version,status,checksum,default_source_types,created_at,updated_at
+         FROM atlas_v157_knowledge_stores
+         WHERE tenant_id=$1 AND ($2::text IS NULL OR status=$2)
+         ORDER BY created_at DESC,store_id DESC LIMIT $3`,
+        [tenantId,status,limit]
+      );
+      return {items:rows};
+    });
+  }
+
+  async createKnowledgeStore({ actorId, tenantId, storeId, name, version = 1, status = 'draft', defaultSourceTypes = [] } = {}) {
+    if(!UUID.test(storeId||'')) throw createAuthError(400,'knowledge_store_invalid');
+    let normalized;
+    try { normalized=normalizeKnowledgeStore({tenantId,id:storeId,name,version,status,defaultSourceTypes:defaultSourceTypes.length?defaultSourceTypes:null}); }
+    catch(error){ throw createAuthError(400,'knowledge_store_invalid',error?.message||'Knowledge store is invalid.'); }
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      await client.query(
+        `INSERT INTO atlas_v157_knowledge_stores(tenant_id,store_id,name,version,status,checksum,default_source_types)
+         VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)`,
+        [tenantId,storeId,normalized.name,normalized.version,normalized.status,normalized.checksum,JSON.stringify(normalized.defaultSourceTypes)]
+      );
+      return storeId;
+    });
+  }
+
+  async listKnowledgeDocuments({ actorId, tenantId, storeId, status = null, limit = 100 } = {}) {
+    if(!UUID.test(storeId||'')) throw createAuthError(400,'knowledge_document_invalid');
+    if(status!==null && !['active','archived'].includes(status)) throw createAuthError(400,'knowledge_document_invalid');
+    if(!Number.isInteger(limit)||limit<1||limit>500) throw createAuthError(400,'knowledge_document_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query(
+        `SELECT document_id,store_id,source_type,title,content_hash,status,metadata,created_at,updated_at
+         FROM atlas_v157_knowledge_documents
+         WHERE tenant_id=$1 AND store_id=$2 AND ($3::text IS NULL OR status=$3)
+         ORDER BY created_at DESC,document_id DESC LIMIT $4`,
+        [tenantId,storeId,status,limit]
+      );
+      return {items:rows};
+    });
+  }
+
+  async createKnowledgeDocument({ actorId, tenantId, storeId, documentId, sourceType, title, contentRef, contentHash, metadata = {} } = {}) {
+    if(!UUID.test(storeId||'')||!UUID.test(documentId||'')) throw createAuthError(400,'knowledge_document_invalid');
+    if(typeof sourceType!=='string'||sourceType.length>60) throw createAuthError(400,'knowledge_source_invalid');
+    if(typeof title!=='string'||!title.trim()||title.length>200||/[\r\n\u0000]/.test(title)) throw createAuthError(400,'knowledge_title_invalid');
+    if(typeof contentRef!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.:/@-]{2,240}$/.test(contentRef)) throw createAuthError(400,'knowledge_content_ref_invalid');
+    if(!SHA256.test(contentHash||'')) throw createAuthError(400,'knowledge_content_hash_invalid');
+    boundedJson(metadata,16000);
+    const body={tenantId,storeId,documentId,sourceType,title:title.trim(),contentRef,contentHash,metadata};
+    const checksum=digest(body);
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const store=await client.query('SELECT 1 FROM atlas_v157_knowledge_stores WHERE tenant_id=$1 AND store_id=$2',[tenantId,storeId]);
+      if(!store.rowCount) throw createAuthError(404,'knowledge_store_not_found');
+      await client.query(
+        `INSERT INTO atlas_v157_knowledge_documents(tenant_id,store_id,document_id,source_type,title,content_ref,content_hash,metadata,status,checksum)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,'active',$9)`,
+        [tenantId,storeId,documentId,sourceType,title.trim(),contentRef,contentHash,JSON.stringify(metadata),checksum]
+      );
+      return documentId;
+    });
+  }
+
+  async createKnowledgeRetrievalPolicy({ actorId, tenantId, policyId, storeId, topK = 8, minScore = .55, reranker = 'none', allowedSourceTypes = null, requireCitations = true } = {}) {
+    if(!UUID.test(policyId||'')||!UUID.test(storeId||'')) throw createAuthError(400,'knowledge_policy_invalid');
+    let policy;
+    try { policy=normalizeRetrievalPolicy({tenantId,storeId,topK,minScore,reranker,allowedSourceTypes,requireCitations}); }
+    catch(error){ throw createAuthError(400,'knowledge_policy_invalid',error?.message||'Knowledge retrieval policy is invalid.'); }
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const store=await client.query('SELECT 1 FROM atlas_v157_knowledge_stores WHERE tenant_id=$1 AND store_id=$2',[tenantId,storeId]);
+      if(!store.rowCount) throw createAuthError(404,'knowledge_store_not_found');
+      await client.query(
+        `INSERT INTO atlas_v157_knowledge_retrieval_policies(tenant_id,policy_id,store_id,top_k,min_score,reranker,allowed_source_types,require_citations)
+         VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
+        [tenantId,policyId,storeId,policy.topK,policy.minScore,policy.reranker,JSON.stringify(policy.allowedSourceTypes),policy.requireCitations]
+      );
+      return policyId;
+    });
+  }
+
+  async getKnowledgeRetrievalPolicy({ actorId, tenantId, policyId } = {}) {
+    if(!UUID.test(policyId||'')) throw createAuthError(400,'knowledge_policy_invalid');
+    return this.#tenantTransaction({actorId,tenantId},async client=>{
+      const {rows}=await client.query(
+        `SELECT policy_id,store_id,top_k,min_score,reranker,allowed_source_types,require_citations,version,created_at,updated_at
+         FROM atlas_v157_knowledge_retrieval_policies WHERE tenant_id=$1 AND policy_id=$2`,
+        [tenantId,policyId]
+      );
+      if(!rows.length) throw createAuthError(404,'knowledge_policy_not_found');
+      const row=rows[0];
+      return {
+        policyId:row.policy_id,storeId:row.store_id,topK:row.top_k,minScore:Number(row.min_score),reranker:row.reranker,
+        allowedSourceTypes:row.allowed_source_types,requireCitations:row.require_citations,version:row.version,
+        createdAt:row.created_at,updatedAt:row.updated_at
+      };
     });
   }
 
