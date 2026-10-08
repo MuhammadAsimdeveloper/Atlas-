@@ -302,3 +302,125 @@ test('agent runtime target enforces release/argument-bound approvals, budgets an
   session = completeAgentSession({ session, tenantId:'t1', status:'needs_approval' });
   assert.match(summarizeAgentExecution({ session, events:[{status:'needs_approval'}] }).headline, /approval/);
 });
+
+
+test('V157 P0 next frontier propagates connector output schemas into downstream validation', async () => {
+  const { createActionRegistry, defineAction } = await import('../atlas-action-fabric/index.mjs');
+  const { createConnectorDefinition, createConnectorSchemaRegistry } = await import('../atlas-integration-fabric/index.mjs');
+  const { createWorkflowNodeSchemaRegistry } = await import('./workflow-node-schema-registry.mjs');
+
+  const connector = createConnectorDefinition({
+    tenantId:'t1',
+    id:'crm_api',
+    name:'CRM API',
+    auth:'bearer',
+    baseUrl:'https://api.example.com',
+    operations:[{
+      id:'contact.lookup',
+      method:'POST',
+      path:'/contacts/lookup',
+      inputSchema:{
+        type:'object',
+        required:['contactRef'],
+        additionalProperties:false,
+        properties:{contactRef:{type:'string',minLength:3,maxLength:180}}
+      },
+      outputSchema:{
+        type:'object',
+        required:['contact'],
+        additionalProperties:false,
+        properties:{
+          contact:{
+            type:'object',
+            required:['id','name'],
+            additionalProperties:false,
+            properties:{
+              id:{type:'string',minLength:3},
+              name:{type:'string',minLength:1}
+            }
+          }
+        }
+      }
+    }]
+  });
+  const connectorRegistry=createConnectorSchemaRegistry({connectors:[connector]});
+  const operation=connectorRegistry.getOperationSchema({tenantId:'t1',connectorRef:'crm_api',operationRef:'contact.lookup'});
+  assert.equal(operation.schemaStatus,'typed');
+  assert.equal(operation.inputSchema.properties.contactRef.type,'string');
+  assert.equal(operation.outputSchema.properties.contact.properties.name.type,'string');
+
+  const actionRegistry=createActionRegistry({actions:[defineAction({
+    id:'crm.contact.consume',
+    name:'Consume Contact',
+    domain:'crm',
+    risk:'read',
+    inputSchema:{
+      type:'object',
+      required:['contact'],
+      additionalProperties:false,
+      properties:{
+        contact:{
+          type:'object',
+          required:['id','name'],
+          additionalProperties:false,
+          properties:{id:{type:'string'},name:{type:'string'}}
+        }
+      }
+    },
+    surfaces:['workflow']
+  })]});
+  const schemaRegistry=createWorkflowNodeSchemaRegistry({actionRegistry,connectorRegistry});
+  const graph=createWorkflowGraph({
+    tenantId:'t1',
+    id:'wf-schema-propagation',
+    name:'Connector to action',
+    actionRegistry,
+    schemaRegistry,
+    nodes:[
+      {id:'start',type:'trigger',config:{eventType:'contact.created'}},
+      {id:'lookup',type:'connector_action',config:{connectorRef:'crm_api',connectionRef:'conn_1',operationRef:'contact.lookup',input:{contactRef:'contact_1'}}},
+      {id:'consume',type:'action',config:{actionId:'crm.contact.consume'}},
+      {id:'done',type:'stop'}
+    ],
+    edges:[
+      {from:'start',to:'lookup'},
+      {from:'lookup',to:'consume'},
+      {from:'consume',to:'done'}
+    ]
+  });
+  const consume=graph.nodes.find(node=>node.id==='consume');
+  assert.equal(consume.schemaStatus,'propagated');
+  assert.equal(consume.propagatedInputSchema.properties.contact.properties.id.type,'string');
+  assert.doesNotThrow(()=>validateWorkflowNodeInput({graph,nodeId:'consume',input:{contact:{id:'c1',name:'Ada'}}}));
+  assert.throws(()=>validateWorkflowNodeInput({graph,nodeId:'consume',input:{contact:{id:'c1'}}}),/schema|name|required/i);
+  assert.equal(graph.nodes.find(node=>node.id==='lookup').outputSchema.properties.contact.type,'object');
+});
+
+test('V157 P0 connector schema binding fails closed on unknown operation, cross-tenant connector and incompatible downstream shape', async () => {
+  const { createActionRegistry, defineAction } = await import('../atlas-action-fabric/index.mjs');
+  const { createConnectorDefinition, createConnectorSchemaRegistry } = await import('../atlas-integration-fabric/index.mjs');
+  const { createWorkflowNodeSchemaRegistry } = await import('./workflow-node-schema-registry.mjs');
+  const connector=createConnectorDefinition({
+    tenantId:'t1',id:'crm_api',name:'CRM API',auth:'bearer',baseUrl:'https://api.example.com',
+    operations:[{id:'contact.lookup',method:'GET',path:'/contacts/lookup',inputSchema:{type:'object'},outputSchema:{type:'object',required:['contact'],additionalProperties:false,properties:{contact:{type:'object',required:['id'],additionalProperties:false,properties:{id:{type:'string'}}}}}}]
+  });
+  const registry=createConnectorSchemaRegistry({connectors:[connector]});
+  assert.throws(()=>registry.getOperationSchema({tenantId:'t2',connectorRef:'crm_api',operationRef:'contact.lookup'}),/tenant|scope/i);
+  assert.throws(()=>registry.getOperationSchema({tenantId:'t1',connectorRef:'crm_api',operationRef:'missing'}),/operation|registered|granted/i);
+
+  const actionRegistry=createActionRegistry({actions:[defineAction({
+    id:'crm.bad.consumer',name:'Bad Consumer',domain:'crm',risk:'read',surfaces:['workflow'],
+    inputSchema:{type:'object',required:['paymentId'],additionalProperties:false,properties:{paymentId:{type:'string'}}}
+  })]});
+  const schemaRegistry=createWorkflowNodeSchemaRegistry({actionRegistry,connectorRegistry:registry});
+  assert.throws(()=>createWorkflowGraph({
+    tenantId:'t1',id:'wf-schema-mismatch',name:'Mismatch',actionRegistry,schemaRegistry,
+    nodes:[
+      {id:'start',type:'trigger',config:{eventType:'contact.created'}},
+      {id:'lookup',type:'connector_action',config:{connectorRef:'crm_api',connectionRef:'conn_1',operationRef:'contact.lookup',input:{}}},
+      {id:'bad',type:'action',config:{actionId:'crm.bad.consumer'}},
+      {id:'done',type:'stop'}
+    ],
+    edges:[{from:'start',to:'lookup'},{from:'lookup',to:'bad'},{from:'bad',to:'done'}]
+  }),/incompatible|schema/i);
+});
