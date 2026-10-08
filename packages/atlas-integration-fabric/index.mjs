@@ -92,7 +92,7 @@ function normalizeRequestHeaders(input) {
   for(const [rawName,rawValue] of entries){
     const name=boundedText(rawName,'request header name',80);
     const lower=name.toLowerCase();
-    if(!/^[a-z0-9-]+$/i.test(name)||FORBIDDEN_HEADERS.has(lower)||lower==='idempotency-key'||lower.startsWith('x-atlas-')||/authorization|cookie|token|secret|password|signature/i.test(lower)){
+    if(!/^[a-z0-9-]+$/i.test(name)||FORBIDDEN_HEADERS.has(lower)||lower==='idempotency-key'||['x-atlas-signature','x-atlas-timestamp','x-atlas-operation-scopes'].includes(lower)||/authorization|cookie|token|secret|password|signature/i.test(lower)){
       throw Object.assign(new Error('request header is forbidden'),{code:'request_header_forbidden'});
     }
     const value=boundedText(String(rawValue),'request header value',1000);
