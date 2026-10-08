@@ -4,6 +4,7 @@ import { normalizeActionSchemas, isGenericJsonSchema } from '../atlas-action-fab
 const FREEZE = value => Object.freeze(value);
 const SHA256 = /^[a-f0-9]{64}$/i;
 const ID = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_AUTH = new Set(['oauth2', 'api_key', 'basic', 'bearer', 'hmac', 'none']);
 const METHODS = new Set(['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS']);
 const PRIVATE_HOSTS = new Set(['localhost','localhost.localdomain','ip6-localhost','ip6-loopback']);
@@ -71,6 +72,12 @@ function assertRef(value, name) {
   return value;
 }
 
+function assertTenantRef(value, name) {
+  boundedText(value, name, 160);
+  if (!ID.test(value) && !UUID.test(value)) throw new TypeError(name + ' format is invalid');
+  return value;
+}
+
 function clone(value) {
   return structuredClone(value);
 }
@@ -95,7 +102,7 @@ export function createConnectorDefinition({
   tenantId, id, name, auth='none', baseUrl, operations=[], version=1, scopes=[], rateLimit=null,
   pagination=null, oauth=null, metadata={}
 } = {}) {
-  assertRef(tenantId, 'tenantId');
+  assertTenantRef(tenantId, 'tenantId');
   assertRef(id, 'connectorId');
   boundedText(name, 'connector name', 160);
   if (!ALLOWED_AUTH.has(auth)) throw new TypeError('connector auth mode is invalid');
