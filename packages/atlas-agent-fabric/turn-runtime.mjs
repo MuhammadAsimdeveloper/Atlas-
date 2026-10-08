@@ -11,6 +11,7 @@ import {
 } from './index.mjs';
 import { createModelRequest, invokeModelTurn } from './model-runtime.mjs';
 import { appendAgentTimelineEvent } from './execution-timeline.mjs';
+import { detectPromptInjection, redactKnowledgeText, enforceKnowledgeCitations } from '../atlas-knowledge-fabric/index.mjs';
 
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) { for (const child of Object.values(value)) freeze(child); Object.freeze(value); }
@@ -48,7 +49,7 @@ function sha(value) { return crypto.createHash('sha256').update(JSON.stringify(c
 export async function runAgentTurn({
   tenantId, actorId, release, session, runtime = null, turnId, promptHash, runtimeInput,
   outputSchema = null, adapter, tools = {}, executeTool, approvalEvidenceByTool = {},
-  workflowInvocation = null, handoff = null, onDelta = null, timeline = null, now = Date.now(), signal
+  workflowInvocation = null, handoff = null, knowledgeContext = null, onDelta = null, timeline = null, now = Date.now(), signal
 } = {}) {
   ref(tenantId, 'tenantId'); ref(actorId, 'actorId'); ref(turnId, 'turnId'); hash(promptHash, 'promptHash');
   if (!releaseValid(release, tenantId)) throw new Error('Agent release is invalid or cross-tenant');
@@ -69,6 +70,31 @@ export async function runAgentTurn({
     maxResponseChars: 8000
   };
   if (effectiveRuntime.tenantId !== tenantId || effectiveRuntime.agentId !== release.agentId || effectiveRuntime.releaseId !== release.releaseId) throw new Error('Agent runtime/release mismatch');
+
+  let safeKnowledge = [];
+  let knowledgeAllowedRefs = [];
+  let knowledgeRequiresCitations = false;
+  if (knowledgeContext !== null) {
+    if (!knowledgeContext || typeof knowledgeContext !== 'object' || Array.isArray(knowledgeContext)) throw new TypeError('knowledgeContext must be an object');
+    if (knowledgeContext.tenantId !== undefined && knowledgeContext.tenantId !== tenantId) throw new Error('Agent knowledge context tenant mismatch');
+    if (!Array.isArray(knowledgeContext.hits) || knowledgeContext.hits.length > 20) throw new TypeError('knowledgeContext hits must contain 0-20 items');
+    knowledgeAllowedRefs = [...new Set((Array.isArray(knowledgeContext.allowedRefs) ? knowledgeContext.allowedRefs : knowledgeContext.hits.map(hit => hit?.ref)).filter(value => typeof value === 'string'))];
+    knowledgeRequiresCitations = knowledgeContext.requireCitations === true;
+    for (const hit of knowledgeContext.hits) {
+      if (!hit || typeof hit !== 'object' || Array.isArray(hit)) throw new TypeError('knowledge context hit is invalid');
+      ref(hit.ref, 'knowledge ref');
+      if (hit.tenantId !== tenantId) throw new Error('Agent knowledge tenant mismatch');
+      if (typeof hit.excerpt !== 'string' || hit.excerpt.length > 4000) throw new Error('Agent knowledge excerpt invalid');
+      const injection = detectPromptInjection(hit.excerpt);
+      if (injection.blocked) continue;
+      safeKnowledge.push(Object.freeze({
+        ref: hit.ref,
+        score: Number(hit.score) || 0,
+        excerpt: redactKnowledgeText(hit.excerpt),
+        trust: 'untrusted_knowledge'
+      }));
+    }
+  }
 
   const journey = runtimeInput.journeyContext || buildAgentJourneyContext({
     tenantId,
@@ -118,7 +144,8 @@ export async function runAgentTurn({
       input: {
         prompt: runtimeInput.prompt,
         history,
-        toolResults: history.filter(item => item?.kind === 'tool_result').slice(-10)
+        toolResults: history.filter(item => item?.kind === 'tool_result').slice(-10),
+        knowledge: safeKnowledge
       },
       signal,
       onDelta,
@@ -133,6 +160,14 @@ export async function runAgentTurn({
     if (modelResult.status === 'completed') {
       if (timeline) timeline = appendAgentTimelineEvent(timeline, { type:'model.completed', turnId:turn === 0 ? turnId : turnId + ':' + turn, status:'ok', inputTokens:modelResult.redacted?.usage?.inputTokens || 0, outputTokens:modelResult.redacted?.usage?.outputTokens || 0, now });
       if (outputSchema) validateAgentOutput(modelResult.output, outputSchema);
+      if (knowledgeRequiresCitations && safeKnowledge.length > 0) {
+        const citations = Array.isArray(modelResult.output?.groundingRefs) ? modelResult.output.groundingRefs : [];
+        try {
+          enforceKnowledgeCitations({answerUsesKnowledge:true,citations,allowedRefs:knowledgeAllowedRefs.length ? knowledgeAllowedRefs : safeKnowledge.map(hit => hit.ref),requireCitations:true});
+        } catch (error) {
+          return freeze({status:'failed',output:null,redacted:{tenantId,sessionId:session.id,releaseId:release.releaseId,turnId,rawPromptStored:false,transcriptStored:false,rawOutputStored:false,toolCalls:toolCallsUsed,reason:error?.code==='knowledge_citation_required'?'KNOWLEDGE_CITATION_REQUIRED':'KNOWLEDGE_CITATION_INVALID',journeyContextHash:journey.contextHash}});
+        }
+      }
       if (timeline) timeline = appendAgentTimelineEvent(timeline, { type:'turn.completed', turnId, status:'ok', now });
       return freeze({
         status:'completed',
