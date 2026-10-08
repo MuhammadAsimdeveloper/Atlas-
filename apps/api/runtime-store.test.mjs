@@ -254,3 +254,29 @@ test('V149 agent tool approvals are replay-safe and reject identity/status confl
     );
   } finally { await db.close(); }
 });
+
+
+test('V157 credential lifecycle stores only external secret references and supports tenant-scoped rotation and revocation',async()=>{
+ const {db,pool,api}=await database();
+ const credentialId=randomUUID();
+ try{
+  assert.equal(await api.createCredential({actorId:actorA,tenantId:tenantA,credentialId,providerKey:'oauthcrm',label:'CRM production',secretRef:'vault/crm-v1',expiresAt:new Date(Date.now()+86_400_000).toISOString()}),credentialId);
+  const listed=await api.listCredentials({actorId:actorA,tenantId:tenantA});
+  const row=listed.items.find(item=>item.credential_id===credentialId);
+  assert.ok(row);
+  assert.equal(row.secret_ref_present,true);
+  assert.equal('secret_ref' in row,false);
+  assert.equal(row.status,'active');
+  await assert.rejects(api.createCredential({actorId:actorA,tenantId:tenantA,credentialId:randomUUID(),providerKey:'oauthcrm',label:'Bad',secretRef:'short'}),/credential_ref_invalid|credential/i);
+  const rotated=await api.rotateCredential({actorId:actorA,tenantId:tenantA,credentialId,secretRef:'vault/crm-v2',expiresAt:new Date(Date.now()+172_800_000).toISOString()});
+  assert.equal(rotated.credentialId,credentialId);
+  assert.equal(rotated.status,'active');
+  const afterRotate=await api.listCredentials({actorId:actorA,tenantId:tenantA});
+  assert.equal(afterRotate.items.find(item=>item.credential_id===credentialId).rotated_at!=null,true);
+  assert.equal(afterRotate.items.find(item=>item.credential_id===credentialId).secret_ref,'vault/crm-v2'); // raw ref is metadata, secret material is external
+  const revoked=await api.revokeCredential({actorId:actorA,tenantId:tenantA,credentialId});
+  assert.equal(revoked.status,'revoked');
+  await assert.rejects(api.rotateCredential({actorId:actorA,tenantId:tenantA,credentialId,secretRef:'vault/crm-v3',expiresAt:new Date(Date.now()+172_800_000).toISOString()}),/revoked|rotate/i);
+  await assert.rejects(api.getCredential({actorId:actorB,tenantId:tenantB,credentialId}),{code:'credential_not_found'});
+ }finally{await db.close();}
+});
