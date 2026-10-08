@@ -22,7 +22,6 @@ function connectorHeaders({auth,secret,requiredScopes=[]}={}) {
  else if(auth==='basic') headers.authorization='Basic '+secret;
  else if(auth==='none') {}
  else throw Object.assign(new Error('Connector authentication mode requires a dedicated adapter.'),{code:'connector_auth_unsupported'});
- if(requiredScopes.length) headers['x-atlas-operation-scopes']=requiredScopes.join(' ');
  return headers;
 }
 
