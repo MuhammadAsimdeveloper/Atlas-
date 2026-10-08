@@ -12,6 +12,7 @@ const MAX_RESPONSE=250_000;
 
 function text(v,label,max=240){if(typeof v!=='string'||!v.trim()||v.length>max||/[\r\n\u0000]/.test(v))throw Object.assign(new Error(label+' is invalid'),{code:'provider_request_invalid'});return v.trim();}
 function ref(v,label){const x=text(v,label,240);if(!REF.test(x))throw Object.assign(new Error(label+' is invalid'),{code:'provider_reference_invalid'});return x;}
+function operationRef(v,label){const x=text(v,label,240);if(x.length<3||!REF.test(x))throw Object.assign(new Error(label+' is invalid'),{code:'provider_reference_invalid'});return x;}
 function object(v,label){if(!v||typeof v!=='object'||Array.isArray(v))throw Object.assign(new Error(label+' must be an object'),{code:'provider_request_invalid'});return v;}
 function boundedPayload(v){if(JSON.stringify(v).length>MAX_BODY)throw Object.assign(new Error('Provider payload exceeds the bounded execution size.'),{code:'provider_payload_too_large'});return v;}
 
@@ -38,11 +39,11 @@ function parseProviderResponse(text, contentType='') {
 async function executeConnectorAction({connectorRegistry,connectionStore,secretResolver,fetchImpl,node,job,context}) {
  if(!connectorRegistry||typeof connectorRegistry.getOperationSchema!=='function') throw Object.assign(new Error('Connector schema registry is required.'),{code:'connector_registry_required'});
  const cfg=object(node.config||{},'node.config');
- const connectorRef=ref(cfg.connectorRef,'connectorRef');
+ const connectorRef=operationRef(cfg.connectorRef,'connectorRef');
  const connectionRef=ref(cfg.connectionRef,'connectionRef');
- const operationRef=ref(cfg.operationRef,'operationRef');
+ const operationRefValue=operationRef(cfg.operationRef,'operationRef');
  if(!UUID.test(connectionRef)) throw Object.assign(new Error('Connector connection reference must be a UUID.'),{code:'provider_connection_invalid'});
- const operation=connectorRegistry.getOperationSchema({tenantId:job.tenant_id,connectorRef,operationRef});
+ const operation=connectorRegistry.getOperationSchema({tenantId:job.tenant_id,connectorRef,operationRef:operationRefValue});
  const connection=await connectionStore.getProviderConnectionForWorker(job,context.workerId,connectionRef);
  if(!connection||connection.status!=='verified') throw Object.assign(new Error('Provider connection is not verified.'),{code:'provider_not_verified'});
  if(connection.tenant_id!==job.tenant_id) throw Object.assign(new Error('Provider connection tenant mismatch.'),{code:'provider_tenant_mismatch'});
