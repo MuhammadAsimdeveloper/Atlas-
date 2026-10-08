@@ -425,3 +425,37 @@ test('V157 P0 connector schema binding fails closed on unknown operation, cross-
     edges:[{from:'start',to:'lookup'},{from:'lookup',to:'bad'},{from:'bad',to:'done'}]
   }),/incompatible|schema/i);
 });
+
+
+test('V157 P0 legacy workflow nodes expose strict input schemas for references, timing and bounded controls',async()=>{
+ const {createWorkflowNodeSchemaRegistry}=await import('./workflow-node-schema-registry.mjs');
+ const registry=createWorkflowNodeSchemaRegistry();
+ for(const [type,config,requiredField] of [
+   ['create_contact',{sourceRef:'contact_source'},'sourceRef'],
+   ['create_task',{taskTemplateRef:'task_template'},'taskTemplateRef'],
+   ['send_message',{templateRef:'template_ref',connectionRef:'connection_ref',channel:'email'},'templateRef'],
+   ['find_availability',{calendarRef:'calendar_ref'},'calendarRef'],
+   ['mcp_client',{serverRef:'server_ref',operationRef:'operation_ref'},'serverRef'],
+   ['respond_to_webhook',{responseRef:'response_ref',statusCode:200},'responseRef']
+ ]){
+   const contract=registry.get(type,config);
+   assert.equal(contract.schemaStatus,'typed',type);
+   assert.equal(contract.inputSchema.type,'object',type);
+   assert.ok(contract.inputSchema.required.includes(requiredField),type);
+   assert.throws(()=>registry.validateNodeConfig(type,{...config,[requiredField]:undefined}),/required|invalid|schema/i,type);
+ }
+ const delay=registry.get('delay',{delayMs:60000});
+ assert.equal(delay.inputSchema.properties.delayMs.type,'integer');
+ assert.throws(()=>registry.validateNodeConfig('delay',{delayMs:0}),/schema|minimum|duration/i);
+ const split=registry.get('split_batches',{batchSize:100});
+ assert.equal(split.inputSchema.properties.batchSize.type,'integer');
+ assert.throws(()=>registry.validateNodeConfig('split_batches',{batchSize:0}),/schema|minimum|batch/i);
+});
+
+test('V157 P0 strict legacy schemas reject unknown config keys instead of silently accepting them',async()=>{
+ const {createWorkflowNodeSchemaRegistry}=await import('./workflow-node-schema-registry.mjs');
+ const registry=createWorkflowNodeSchemaRegistry();
+ assert.throws(()=>registry.validateNodeConfig('create_task',{taskTemplateRef:'task_template',secretHint:'should_fail'}),/schema|additional|secret/i);
+ assert.throws(()=>registry.validateNodeConfig('send_message',{templateRef:'t',connectionRef:'c',channel:'email',recipient:'person@example.com'}),/schema|credential|recipient|direct/i);
+ assert.throws(()=>registry.validateNodeConfig('webhook',{connectionRef:'c',operationRef:'op',endpoint_url:'https://attacker.invalid'}),/schema|network|url/i);
+});
