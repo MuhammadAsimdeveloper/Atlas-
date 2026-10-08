@@ -102,7 +102,7 @@ test('V157 P0 HMAC connector operations sign the exact outbound body and allow o
   secretResolver:async()=> 'hmac-secret-123456',
   fetchImpl:async(url,opts)=>{
    assert.equal(opts.headers['x-atlas-client'],'atlas-test');
-   assert.match(opts.headers['x-atlas-timestamp'],/^\\d+$/);
+   assert.match(opts.headers['x-atlas-timestamp'],/^\d+$/);
    assert.match(opts.headers['x-atlas-signature'],/^t=\\d+,v1=[a-f0-9]{64}$/);
    assert.equal(opts.headers.authorization,undefined);
    return {ok:true,status:200,text:async()=>JSON.stringify({id:'i1'}),headers:new Headers({'content-type':'application/json'})};
@@ -149,7 +149,7 @@ test('V157 P0 oauth2 connector refreshes an expiring access token inside the wor
    calls++;
    if(url==='https://auth.example.com/token'){
     assert.equal(opts.method,'POST');
-    assert.match(opts.headers['content-type'],'application/x-www-form-urlencoded');
+    assert.match(opts.headers['content-type'],/application\/x-www-form-urlencoded/);
     const form=new URLSearchParams(opts.body);
     assert.equal(form.get('grant_type'),'refresh_token');
     assert.equal(form.get('refresh_token'),'refresh-token-value');
