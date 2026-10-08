@@ -61,4 +61,84 @@ BEGIN
 END;
 $$;
 
+
+
+CREATE TABLE IF NOT EXISTS atlas_v157_knowledge_stores(
+  tenant_id UUID NOT NULL REFERENCES atlas_organizations(tenant_id) ON DELETE CASCADE,
+  store_id UUID NOT NULL,
+  name TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','archived')),
+  checksum CHAR(64) NOT NULL CHECK (checksum ~ '^[a-f0-9]{64}),
+  default_source_types JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(default_source_types)='array' AND jsonb_array_length(default_source_types)<=50),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id,store_id),
+  CHECK (octet_length(name)<=320)
+);
+CREATE TABLE IF NOT EXISTS atlas_v157_knowledge_documents(
+  tenant_id UUID NOT NULL,
+  store_id UUID NOT NULL,
+  document_id UUID NOT NULL,
+  source_type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content_ref TEXT NOT NULL CHECK (content_ref ~ '^[A-Za-z0-9][A-Za-z0-9_.:/@-]{2,240}),
+  content_hash CHAR(64) NOT NULL CHECK (content_hash ~ '^[a-f0-9]{64}),
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(metadata)='object' AND octet_length(metadata::text)<=16000),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
+  checksum CHAR(64) NOT NULL CHECK (checksum ~ '^[a-f0-9]{64}),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id,document_id),
+  FOREIGN KEY (tenant_id,store_id) REFERENCES atlas_v157_knowledge_stores(tenant_id,store_id) ON DELETE CASCADE,
+  CHECK (octet_length(title)<=400)
+);
+CREATE TABLE IF NOT EXISTS atlas_v157_knowledge_chunks(
+  tenant_id UUID NOT NULL,
+  store_id UUID NOT NULL,
+  document_id UUID NOT NULL,
+  chunk_id UUID NOT NULL,
+  chunk_ref TEXT NOT NULL CHECK (chunk_ref ~ '^[A-Za-z0-9][A-Za-z0-9_.:/@-]{2,240}),
+  content_hash CHAR(64) NOT NULL CHECK (content_hash ~ '^[a-f0-9]{64}),
+  embedding_ref TEXT,
+  ordinal INTEGER NOT NULL CHECK (ordinal BETWEEN 0 AND 9999),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id,chunk_id),
+  UNIQUE (tenant_id,document_id,ordinal),
+  FOREIGN KEY (tenant_id,store_id) REFERENCES atlas_v157_knowledge_stores(tenant_id,store_id) ON DELETE CASCADE,
+  FOREIGN KEY (tenant_id,store_id,document_id) REFERENCES atlas_v157_knowledge_documents(tenant_id,store_id,document_id) ON DELETE CASCADE,
+  CHECK (embedding_ref IS NULL OR embedding_ref ~ '^[A-Za-z0-9][A-Za-z0-9_.:/@-]{2,240})
+);
+CREATE TABLE IF NOT EXISTS atlas_v157_knowledge_retrieval_policies(
+  tenant_id UUID NOT NULL REFERENCES atlas_organizations(tenant_id) ON DELETE CASCADE,
+  policy_id UUID NOT NULL,
+  store_id UUID NOT NULL,
+  top_k INTEGER NOT NULL CHECK (top_k BETWEEN 1 AND 20),
+  min_score NUMERIC(4,3) NOT NULL CHECK (min_score BETWEEN 0 AND 1),
+  reranker TEXT NOT NULL CHECK (reranker IN ('none','weighted','cross_encoder')),
+  allowed_source_types JSONB NOT NULL CHECK (jsonb_typeof(allowed_source_types)='array' AND jsonb_array_length(allowed_source_types)<=50),
+  require_citations BOOLEAN NOT NULL DEFAULT TRUE,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id,policy_id),
+  FOREIGN KEY (tenant_id,store_id) REFERENCES atlas_v157_knowledge_stores(tenant_id,store_id) ON DELETE CASCADE
+);
+
+DO $v157_knowledge_rls$
+DECLARE
+  t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['atlas_v157_knowledge_stores','atlas_v157_knowledge_documents','atlas_v157_knowledge_chunks','atlas_v157_knowledge_retrieval_policies']
+  LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t);
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY',t);
+    EXECUTE format('DROP POLICY IF EXISTS %I_tenant ON %I',t,t);
+    EXECUTE format('CREATE POLICY %I_tenant ON %I USING (tenant_id = nullif(current_setting(''app.tenant_id'',true),'''')::uuid) WITH CHECK (tenant_id = nullif(current_setting(''app.tenant_id'',true),'''')::uuid)',t,t);
+    EXECUTE format('REVOKE ALL ON %I FROM PUBLIC',t);
+  END LOOP;
+END;
+$v157_knowledge_rls$;
+
+
 COMMIT;
