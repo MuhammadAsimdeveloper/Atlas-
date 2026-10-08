@@ -30,3 +30,54 @@ test('dispatches bounded Jobber GraphQL without persisting provider data',async(
  assert.equal(calls,1);
  assert.equal(r.providerRef,context.idempotencyKey);
 });
+
+
+test('V157 P0 connector_action resolves a tenant-scoped operation, verified connection and external secret, then returns typed output',async()=>{
+ const {createConnectorDefinition,createConnectorSchemaRegistry}=await import('../../packages/atlas-integration-fabric/index.mjs');
+ const connector=createConnectorDefinition({
+  tenantId,
+  id:'crm',
+  name:'Custom CRM',
+  auth:'bearer',
+  baseUrl:'https://api.example.com',
+  operations:[{
+   id:'contacts.lookup',
+   method:'POST',
+   path:'/v1/contacts/lookup',
+   inputSchema:{type:'object',required:['contactRef'],additionalProperties:false,properties:{contactRef:{type:'string'}}},
+   outputSchema:{type:'object',required:['contact'],additionalProperties:false,properties:{contact:{type:'object',required:['id'],additionalProperties:false,properties:{id:{type:'string'}}}}},
+   idempotent:true
+  }]
+ });
+ const connectorRegistry=createConnectorSchemaRegistry({connectors:[connector]});
+ let seen=null;
+ const runtime=createProviderRuntime({
+  connectionStore:store({tenant_id:tenantId,connection_id:connectionId,provider_key:'crm',channel:null,status:'verified',credential_ref:'kms/crm',metadata:{}}),
+  connectorRegistry,
+  secretResolver:async()=>{seen='resolved-secret';return seen;},
+  fetchImpl:async(url,opts)=>{
+   assert.equal(url,'https://api.example.com/v1/contacts/lookup');
+   assert.equal(opts.method,'POST');
+   assert.equal(opts.headers.authorization,'Bearer resolved-secret');
+   assert.deepEqual(JSON.parse(opts.body),{contactRef:'c1'});
+   return {ok:true,status:200,text:async()=>JSON.stringify({contact:{id:'c1'}}),headers:new Headers({'content-type':'application/json'})};
+  }
+ });
+ const r=await runtime.execute({job,context,node:{type:'connector_action',config:{connectorRef:'crm',connectionRef:connectionId,operationRef:'contacts.lookup',input:{contactRef:'c1'}}}});
+ assert.equal(seen,'resolved-secret');
+ assert.deepEqual(r.output,{contact:{id:'c1'}});
+ assert.equal(r.resultRef.kind,'connector_operation');
+ assert.equal(r.resultRef.id,context.idempotencyKey);
+});
+
+test('V157 P0 connector_action fails closed when connection provider does not match connector identity',async()=>{
+ const {createConnectorDefinition,createConnectorSchemaRegistry}=await import('../../packages/atlas-integration-fabric/index.mjs');
+ const connector=createConnectorDefinition({tenantId,id:'crm',name:'Custom CRM',auth:'bearer',baseUrl:'https://api.example.com',operations:[{id:'contacts.lookup',method:'POST',path:'/contacts',inputSchema:{type:'object'},outputSchema:{type:'object'}}]});
+ const connectorRegistry=createConnectorSchemaRegistry({connectors:[connector]});
+ const runtime=createProviderRuntime({
+  connectionStore:store({tenant_id:tenantId,connection_id:connectionId,provider_key:'other-crm',channel:null,status:'verified',credential_ref:'kms/crm',metadata:{}}),
+  connectorRegistry,secretResolver:async()=> 'resolved-secret',
+  fetchImpl:async()=>{throw new Error('must not call provider')}
+ });
+ await assert.rejects(()=>runtime.execute({job,context,node:{type:'connector_action',config:{connectorRef:'crm',connectionRef:connectionId,operationRef:'contacts.lookup',input:{}}}}),/connector.*match|provider.*match|operation.*binding/i);
+});
