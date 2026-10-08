@@ -98,9 +98,9 @@ test('V157 P0 reconciliation resolution atomically resumes confirmed success and
   await db.query("SELECT set_config('app.tenant_id',$1,false)",[tenantA]);
   const jobs=await db.query("SELECT job_type,status,payload_ref->>'id' AS execution_id FROM atlas_runtime_jobs WHERE tenant_id=$1 AND job_id=$2",[tenantA,created.executionId]);
   assert.equal(jobs.rows[0].job_type,'workflow.execute');
-  assert.equal(jobs.rows[0].status,'succeeded');
+  assert.equal(jobs.rows[0].status,'queued');
   const resumed=await db.query("SELECT job_type,status,payload_ref->>'id' AS execution_id FROM atlas_runtime_jobs WHERE tenant_id=$1 AND payload_ref->>'id'=$2 ORDER BY created_at DESC",[tenantA,created.executionId]);
-  assert.ok(resumed.rows.some(row=>row.job_type==='workflow.execute'&&row.status==='queued'));
+  assert.equal(resumed.rows.filter(row=>row.job_type==='workflow.execute'&&row.status==='queued').length,1);
   const replayed=await store.reconcile({actorId:actorA,tenantId:tenantA,workflowId,executionId:created.executionId,expectedVersion:resolved.version,reconciliationId:pending.reconciliation.reconciliationId,resolution:'confirmed_success',now:'2026-10-05T10:00:03Z'});
   assert.equal(replayed.executionId,resolved.executionId);
   assert.equal(replayed.version,resolved.version);
