@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { normalizeActionSchemas, isGenericJsonSchema } from '../atlas-action-fabric/schema.mjs';
 
 const FREEZE = value => Object.freeze(value);
 const SHA256 = /^[a-f0-9]{64}$/i;
@@ -118,8 +119,8 @@ export function createConnectorDefinition({
       id: opId,
       method,
       path,
-      inputSchema: clone(operation.inputSchema || {}),
-      outputSchema: clone(operation.outputSchema || {}),
+      inputSchema: normalizeActionSchemas({inputSchema:operation.inputSchema || {}, outputSchema:operation.outputSchema || {}}).inputSchema,
+      outputSchema: normalizeActionSchemas({inputSchema:operation.inputSchema || {}, outputSchema:operation.outputSchema || {}}).outputSchema,
       idempotent: operation.idempotent !== false,
       requiresApproval: operation.requiresApproval === true
     });
@@ -140,14 +141,82 @@ export function createConnectorDefinition({
   });
 }
 
-export function validateConnectorOperation(connectorDefinition, operationId) {
-  if (!connectorDefinition || !SHA256.test(String(connectorDefinition.checksum || ''))) {
-    throw new Error('connector definition is invalid');
+export function verifyConnectorDefinition(connectorDefinition) {
+  if (!connectorDefinition || !SHA256.test(String(connectorDefinition.checksum || ''))) return false;
+  const { checksum, ...body } = connectorDefinition;
+  try {
+    return crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex') === checksum;
+  } catch {
+    return false;
   }
+}
+
+export function validateConnectorOperation(connectorDefinition, operationId) {
+  if (!verifyConnectorDefinition(connectorDefinition)) throw new Error('connector definition is invalid');
   const operation = connectorDefinition.operations?.find(item => item.id === operationId);
   if (!operation) throw Object.assign(new Error('connector operation is not granted'), { code:'operation_not_granted' });
   return FREEZE(clone(operation));
 }
+
+export function createConnectorSchemaRegistry({ connectors = [], tenantId = null } = {}) {
+  if (!Array.isArray(connectors) || connectors.length > 500) throw new TypeError('connectors must contain <= 500 definitions');
+  const rows = connectors.map(connectorDefinition => {
+    if (!verifyConnectorDefinition(connectorDefinition)) throw new TypeError('connector definition is invalid');
+    return FREEZE(clone(connectorDefinition));
+  });
+  const tenantBound = tenantId == null ? null : boundedText(tenantId, 'registry tenant id', 160);
+  const lookup = (safeTenantId, connectorRef) => {
+    const expectedTenant = tenantBound || boundedText(safeTenantId, 'tenantId', 160);
+    if (tenantBound && safeTenantId !== tenantBound) throw Object.assign(new Error('connector registry tenant scope mismatch'), { code:'tenant_scope_mismatch' });
+    const connector = rows.find(item => item.tenantId === expectedTenant && item.id === connectorRef);
+    if (!connector) throw Object.assign(new Error('connector is not registered for this tenant'), { code:'connector_not_registered' });
+    return connector;
+  };
+  return FREEZE({
+    getOperationSchema({ tenantId: safeTenantId, connectorRef, operationRef } = {}) {
+      const connector = lookup(safeTenantId, assertRef(connectorRef, 'connectorRef'));
+      const operation = validateConnectorOperation(connector, assertRef(operationRef, 'operationRef'));
+      const schemas = normalizeActionSchemas({ inputSchema:operation.inputSchema || {}, outputSchema:operation.outputSchema || {} });
+      return FREEZE({
+        tenantId: connector.tenantId,
+        connectorRef: connector.id,
+        operationRef: operation.id,
+        method: operation.method,
+        path: operation.path,
+        schemaVersion: 1,
+        schemaStatus: isGenericJsonSchema(schemas.inputSchema) && isGenericJsonSchema(schemas.outputSchema) ? 'generic' : 'typed',
+        inputSchema: schemas.inputSchema,
+        outputSchema: schemas.outputSchema,
+        idempotent: operation.idempotent === true,
+        requiresApproval: operation.requiresApproval === true
+      });
+    },
+    has({ tenantId:safeTenantId, connectorRef } = {}) {
+      try { lookup(safeTenantId, assertRef(connectorRef, 'connectorRef')); return true; } catch { return false; }
+    },
+    list({ tenantId:safeTenantId = tenantBound, schemaStatus = null } = {}) {
+      const expectedTenant = tenantBound || boundedText(safeTenantId, 'tenantId', 160);
+      if (tenantBound && safeTenantId !== tenantBound) throw Object.assign(new Error('connector registry tenant scope mismatch'), { code:'tenant_scope_mismatch' });
+      return rows
+        .filter(item => item.tenantId === expectedTenant)
+        .flatMap(item => item.operations || [])
+        .map(operation => {
+          const schemas = normalizeActionSchemas({ inputSchema:operation.inputSchema || {}, outputSchema:operation.outputSchema || {} });
+          return {
+            connectorRef: rows.find(item => item.operations?.some(op => op.id === operation.id && item.tenantId === expectedTenant))?.id,
+            operationRef: operation.id,
+            schemaVersion:1,
+            schemaStatus:isGenericJsonSchema(schemas.inputSchema) && isGenericJsonSchema(schemas.outputSchema) ? 'generic' : 'typed',
+            inputSchema:schemas.inputSchema,
+            outputSchema:schemas.outputSchema
+          };
+        })
+        .filter(item => schemaStatus === null || item.schemaStatus === schemaStatus)
+        .map(clone);
+    }
+  });
+}
+
 
 function keyBytes(masterKey) {
   const key = Buffer.isBuffer(masterKey) ? Buffer.from(masterKey) : Buffer.from(String(masterKey || ''), 'base64');
