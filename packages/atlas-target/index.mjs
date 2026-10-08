@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { WORKFLOW_NODE_CATALOG, WORKFLOW_NODE_TYPES, WORKFLOW_TRIGGER_CATALOG } from './workflow-catalog.mjs';
 import { createWorkflowNodeSchemaRegistry, WORKFLOW_NODE_SCHEMA_REGISTRY } from './workflow-node-schema-registry.mjs';
+import { validateJsonSchema } from '../atlas-action-fabric/schema.mjs';
 
 const sha = value => crypto.createHash('sha256').update(JSON.stringify(canon(value))).digest('hex');
 const canon = value => Array.isArray(value) ? value.map(canon) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canon(value[key])])) : value;
@@ -265,7 +266,7 @@ function validateWorkflowNodeConfig(type, config) {
   if (type === 'error_trigger' && config.errorCode !== undefined && (typeof config.errorCode !== 'string' || !/^[a-z][a-z0-9_.-]{0,79}$/.test(config.errorCode))) throw new Error('error_trigger errorCode is invalid');
 }
 
-function normalizeNode(node, index, schemaRegistry = WORKFLOW_NODE_SCHEMA_REGISTRY) {
+function normalizeNode(node, index, schemaRegistry = WORKFLOW_NODE_SCHEMA_REGISTRY, tenantId = null) {
   if (!node || typeof node !== 'object' || Array.isArray(node)) throw new Error('Node ' + (index + 1) + ' is invalid');
   const id = reference(node.id || ('node_' + (index + 1)), 'node id');
   const type = text(node.type, 'node type', 48);
@@ -274,7 +275,7 @@ function normalizeNode(node, index, schemaRegistry = WORKFLOW_NODE_SCHEMA_REGIST
   if (node.config != null && (!node.config || typeof node.config !== 'object' || Array.isArray(node.config))) throw new Error('Node config must be a plain object');
   const config = copyWorkflowConfig(node.config || {});
   validateWorkflowNodeConfig(type, config);
-  schemaRegistry.validateNodeConfig(type, config);
+  schemaRegistry.validateNodeConfig(type, config, { tenantId });
   const retry = node.retry == null ? {} : copyWorkflowConfig(node.retry, 'retry');
   if (!retry || typeof retry !== 'object' || Array.isArray(retry)) throw new Error('Node retry policy must be an object');
   const maxAttempts = retry.maxAttempts === undefined ? 3 : retry.maxAttempts;
@@ -315,7 +316,10 @@ export function createWorkflowGraph({ tenantId, id = crypto.randomUUID(), versio
   while (queue.length) for (const target of outgoing.get(queue.shift()) || []) if (!reachable.has(target)) { reachable.add(target); queue.push(target); }
   if (reachable.size !== normalized.length) throw new Error('Workflow graph contains unreachable nodes');
   if (!normalized.some(node => node.type === 'stop' || outgoing.get(node.id).length === 0)) throw new Error('Workflow requires a terminal node');
-  const body = { tenantId: reference(tenantId, 'tenantId'), id: reference(id, 'workflow id'), version, name: text(name || id, 'workflow name', 120), nodes: normalized.sort((a,b) => a.id.localeCompare(b.id)), edges: safeEdges.sort((a,b) => a.id.localeCompare(b.id)) };
+  const propagated = typeof nodeSchemaRegistry.propagateOutputSchemas === 'function'
+    ? nodeSchemaRegistry.propagateOutputSchemas({ nodes: normalized, edges: safeEdges }, { tenantId: reference(tenantId, 'tenantId') })
+    : normalized;
+  const body = { tenantId: reference(tenantId, 'tenantId'), id: reference(id, 'workflow id'), version, name: text(name || id, 'workflow name', 120), nodes: propagated.sort((a,b) => a.id.localeCompare(b.id)), edges: safeEdges.sort((a,b) => a.id.localeCompare(b.id)) };
   return freeze({ ...body, checksum: sha(body) });
 }
 
@@ -323,6 +327,15 @@ export function verifyWorkflowGraph(graph) {
   if (!graph || typeof graph.checksum !== 'string') return false;
   const { checksum, ...body } = graph;
   return /^[a-f0-9]{64}$/.test(checksum) && sha(body) === checksum;
+}
+
+export function validateWorkflowNodeInput({ graph, nodeId, input } = {}) {
+  if (!verifyWorkflowGraph(graph)) throw new Error('Workflow graph checksum is invalid');
+  const node = graph.nodes?.find(item => item.id === nodeId);
+  if (!node) throw Object.assign(new Error('Workflow node is unavailable'), { code:'workflow_node_missing' });
+  const schema = node.propagatedInputSchema || node.runtimeInputSchema || node.inputSchema || {};
+  validateJsonSchema(input, schema, 'workflow.node.input');
+  return true;
 }
 
 function copyWorkflowApprovalEvidence(evidence) {
