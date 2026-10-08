@@ -384,8 +384,13 @@ export function resolveWorkflowReconciliation({
   resolvedByActorId,
   now = Date.now()
 } = {}) {
+  if (execution.status !== 'reconciliation_required') {
+    const resolved=execution.reconciliation;
+    if (resolved?.status==='resolved' && resolved.reconciliationId===reconciliationId && resolved.resolution===resolution) return execution;
+    assertMutable(execution);
+    throw new Error('Workflow execution is not awaiting reconciliation');
+  }
   assertMutable(execution);
-  if (execution.status !== 'reconciliation_required') throw new Error('Workflow execution is not awaiting reconciliation');
   const pending = execution.reconciliation;
   if (!pending || pending.status !== 'required') throw new Error('No pending reconciliation exists');
   if (pending.reconciliationId !== reconciliationId) throw new Error('Workflow reconciliation ID mismatch');
