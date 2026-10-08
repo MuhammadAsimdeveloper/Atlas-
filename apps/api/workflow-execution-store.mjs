@@ -5,6 +5,7 @@ import {
   approveWorkflowExecution,
   cancelWorkflowExecution,
   replayWorkflowExecution,
+  resolveWorkflowReconciliation,
   verifyWorkflowExecution
 } from '../../packages/atlas-target/workflow-execution-engine.mjs';
 
@@ -149,6 +150,32 @@ export class PostgresWorkflowExecutionStore{
     return this.#mutate({actorId,tenantId,workflowId,executionId,expectedVersion,now,kind:'approve',apply:state=>approveWorkflowExecution({execution:state,approvalId,approvedByActorId:actorId,evidenceRef,now})});
   }
 
+  async reconcile({actorId,tenantId,workflowId,executionId,expectedVersion=null,reconciliationId,resolution,now=Date.now()}){
+    return this.#transaction(async client=>{
+      await this.#scope(client,{actorId,tenantId},{write:true});
+      const result=await client.query('SELECT * FROM atlas_workflow_executions WHERE tenant_id=$1 AND execution_id=$2 AND workflow_id=$3 FOR UPDATE',[tenantId,executionId,workflowId]);
+      if(!result.rows[0]) throw createAuthError(404,'workflow_execution_not_found');
+      const current=rowToState(result.rows[0]);
+      if(expectedVersion!==null && (!Number.isSafeInteger(expectedVersion) || expectedVersion!==current.version)) throw createAuthError(409,'workflow_execution_version_conflict','The execution changed. Refresh and try again.');
+      let next;
+      try {
+        next=resolveWorkflowReconciliation({execution:current,reconciliationId,resolution,resolvedByActorId:actorId,now});
+      } catch(error) {
+        throw createAuthError(409,'workflow_reconciliation_invalid',error?.message||'The reconciliation decision is invalid.');
+      }
+      if(next===current) return current;
+      if(next.version!==current.version+1) throw createAuthError(500,'workflow_execution_version_invalid');
+      const updated=await client.query('UPDATE atlas_workflow_executions SET status=$4,current_node_id=$5,state=$6::jsonb,state_checksum=$7,checksum=$7,last_error_code=$8,retry_at=$9,finished_at=$10,version=$11,updated_at=$12 WHERE tenant_id=$1 AND execution_id=$2 AND workflow_id=$3 AND version=$13',[tenantId,executionId,workflowId,next.status,next.currentNodeId,JSON.stringify(next),next.checksum,next.lastErrorCode,next.retryAt,next.endedAt,next.version,next.updatedAt,current.version]);
+      if(!updated.rowCount) throw createAuthError(409,'workflow_execution_version_conflict','The execution changed. Refresh and try again.');
+      if(next.status==='queued'){
+        const idempotencyKey=digest({tenantId,executionId:next.executionId,graphChecksum:next.graphChecksum,reconciliationId:next.reconciliation.reconciliationId,resolution:'confirmed_success'});
+        const resumedJobId='reconcile_'+next.executionId+'_'+next.version;
+        await client.query('SELECT atlas_v115_enqueue_job($1,$2,$3,$4::jsonb,$5,$6,$7)',[tenantId,resumedJobId,'workflow.execute',JSON.stringify({kind:'workflow_execution',id:next.executionId,version:next.version}),idempotencyKey,null,8]);
+      }
+      await this.#event(client,next,{actorId,eventType:'execution.reconciled',status:next.status,nodeId:next.currentNodeId,detailsRef:{kind:'workflow_reconciliation',id:next.reconciliation.reconciliationId,version:next.version}});
+      return next;
+    });
+  }
   async replay({actorId,tenantId,workflowId,executionId,replayExecutionId=null,expectedVersion=null,now=Date.now()}){
     return this.#transaction(async client=>{
       await this.#scope(client,{actorId,tenantId},{write:true});
