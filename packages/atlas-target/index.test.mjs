@@ -389,8 +389,9 @@ test('V157 P0 next frontier propagates connector output schemas into downstream 
     ]
   });
   const consume=graph.nodes.find(node=>node.id==='consume');
-  assert.equal(consume.schemaStatus,'propagated');
+  assert.equal(consume.schemaStatus,'typed-compatible');
   assert.equal(consume.propagatedInputSchema.properties.contact.properties.id.type,'string');
+  assert.equal(consume.upstreamNodes.includes('lookup'),true);
   assert.doesNotThrow(()=>validateWorkflowNodeInput({graph,nodeId:'consume',input:{contact:{id:'c1',name:'Ada'}}}));
   assert.throws(()=>validateWorkflowNodeInput({graph,nodeId:'consume',input:{contact:{id:'c1'}}}),/schema|name|required/i);
   assert.equal(graph.nodes.find(node=>node.id==='lookup').outputSchema.properties.contact.type,'object');
