@@ -2,7 +2,7 @@ import {createPostmarkAdapter,createTwilioMessagingAdapter,createTwilioVoiceAdap
 import {createZapierWebhookAdapter,createJobberAdapter} from './integration-runtime.mjs';
 import {executeProviderAction} from '../../packages/atlas-core/provider-adapters.mjs';
 import {validateJsonSchema} from '../../packages/atlas-action-fabric/schema.mjs';
-import {assertSafeConnectorUrl} from '../../packages/atlas-integration-fabric/index.mjs';
+import {assertSafeConnectorUrl, createHmacSignature} from '../../packages/atlas-integration-fabric/index.mjs';
 
 const KEY=/^[a-z][a-z0-9_.-]{1,79}$/;
 const REF=/^[A-Za-z0-9_.:/-]{8,240}$/;
@@ -17,12 +17,16 @@ function operationRef(v,label){const x=text(v,label,240);if(!SHORT_REF.test(x))t
 function object(v,label){if(!v||typeof v!=='object'||Array.isArray(v))throw Object.assign(new Error(label+' must be an object'),{code:'provider_request_invalid'});return v;}
 function boundedPayload(v){if(JSON.stringify(v).length>MAX_BODY)throw Object.assign(new Error('Provider payload exceeds the bounded execution size.'),{code:'provider_payload_too_large'});return v;}
 
-function connectorHeaders({auth,secret,requiredScopes=[]}={}) {
- const headers={'accept':'application/json'};
+function connectorHeaders({auth,secret,requiredScopes=[],requestHeaders={},hmac=null,body='',timestamp=Math.floor(Date.now()/1000)}={}) {
+ const headers={'accept':'application/json',...requestHeaders};
  if(auth==='bearer'||auth==='oauth2') headers.authorization='Bearer '+secret;
  else if(auth==='api_key') headers['x-api-key']=secret;
  else if(auth==='basic') headers.authorization='Basic '+secret;
- else if(auth==='none') {}
+ else if(auth==='hmac') {
+  if(!hmac) throw Object.assign(new Error('HMAC connector operation requires signing metadata.'),{code:'hmac_configuration_required'});
+  headers[hmac.timestampHeader]=String(timestamp);
+  headers[hmac.signatureHeader]=createHmacSignature({secret,timestamp,body});
+ } else if(auth==='none') {}
  else throw Object.assign(new Error('Connector authentication mode requires a dedicated adapter.'),{code:'connector_auth_unsupported'});
  return headers;
 }
@@ -62,8 +66,9 @@ async function executeConnectorAction({connectorRegistry,connectionStore,secretR
  assertSafeConnectorUrl(operation.baseUrl);
  const url=new URL(operation.path,operation.baseUrl);
  if(url.origin!==new URL(operation.baseUrl).origin) throw Object.assign(new Error('Connector operation escaped the registered base URL.'),{code:'connector_url_escape'});
- const headers=connectorHeaders({auth:operation.auth,secret,requiredScopes:operation.requiredScopes});
- let body;
+ let body='';
+ const timestamp=Math.floor(Date.now()/1000);
+ const headers=connectorHeaders({auth:operation.auth,secret,requiredScopes:operation.requiredScopes,requestHeaders:operation.requestHeaders||{},hmac:operation.hmac||null,body,timestamp});
  if(operation.method==='GET'||operation.method==='HEAD') {
   if(input&&typeof input==='object'&&!Array.isArray(input)) {
    for(const [key,value] of Object.entries(input)) {
@@ -76,6 +81,10 @@ async function executeConnectorAction({connectorRegistry,connectionStore,secretR
  } else {
   headers['content-type']='application/json';
   body=JSON.stringify(input);
+ }
+ if(operation.auth==='hmac') {
+  const signature=createHmacSignature({secret,timestamp,body});
+  headers[operation.hmac.signatureHeader]=signature;
  }
  if(operation.idempotent!==false) headers['idempotency-key']=context.idempotencyKey;
  const response=await fetchImpl(url.toString(),{method:operation.method,headers,body,signal:context.signal});
