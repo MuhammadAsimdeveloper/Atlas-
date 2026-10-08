@@ -152,6 +152,85 @@ function validate(value, schema, path) {
  }
 }
 
+
+export function isGenericJsonSchema(schema = {}) {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return true;
+  const keys = Object.keys(schema);
+  if (!keys.length) return true;
+  return schema.type === 'object'
+    && (schema.additionalProperties !== false)
+    && Object.keys(schema.properties || {}).length === 0
+    && !schema.required?.length
+    && !schema.enum?.length;
+}
+
+function schemaCompatible(source, target, path = '
+ return Object.freeze({
+  inputSchema:normalizeSchema(inputSchema, 'inputSchema'),
+  outputSchema:normalizeSchema(outputSchema, 'outputSchema')
+ });
+}
+
+export function validateJsonSchema(value, schema = {}, path = 'input') {
+ const normalized = normalizeSchema(schema, 'schema');
+ try {
+  validate(value, normalized, path);
+ } catch (error) {
+  if (error?.code === 'schema_validation_failed') throw error;
+  throw Object.assign(new TypeError(error?.message || 'schema validation failed'), { code:'schema_validation_failed', path });
+ }
+ return true;
+}
+
+export function schemaSupportsType(schema = {}, type) {
+ const normalized = normalizeSchema(schema);
+ return normalized.type === type || Object.keys(normalized).length === 0;
+}
+) {
+  if (isGenericJsonSchema(target) || isGenericJsonSchema(source)) {
+    return { compatible:true, indeterminate:isGenericJsonSchema(source) && !isGenericJsonSchema(target), path };
+  }
+  if (target.type && source.type && target.type !== source.type && !(target.type === 'number' && source.type === 'integer')) {
+    return { compatible:false, indeterminate:false, path, reason:'type_mismatch' };
+  }
+  if (target.enum) {
+    if (!source.enum || target.enum.some(value => !source.enum.some(candidate => JSON.stringify(candidate) === JSON.stringify(value)))) {
+      return { compatible:false, indeterminate:false, path, reason:'enum_mismatch' };
+    }
+  }
+  if (target.type === 'object' && source.type === 'object') {
+    const sourceProps = source.properties || {};
+    const targetProps = target.properties || {};
+    for (const key of target.required || []) {
+      if (!Object.hasOwn(sourceProps, key)) return { compatible:false, indeterminate:false, path:path+'.'+key, reason:'required_property_missing' };
+      const nested = schemaCompatible(sourceProps[key], targetProps[key] || {}, path+'.'+key);
+      if (!nested.compatible) return nested;
+    }
+    for (const key of Object.keys(targetProps)) {
+      if (Object.hasOwn(sourceProps, key)) {
+        const nested = schemaCompatible(sourceProps[key], targetProps[key], path+'.'+key);
+        if (!nested.compatible) return nested;
+      }
+    }
+  }
+  if (target.type === 'array' && source.type === 'array') {
+    return schemaCompatible(source.items || {}, target.items || {}, path+'[]');
+  }
+  if (target.type === 'string' && source.type === 'string') {
+    if (target.minLength !== undefined && source.minLength !== undefined && source.minLength < target.minLength) return { compatible:false, indeterminate:false, path, reason:'min_length' };
+    if (target.maxLength !== undefined && source.maxLength !== undefined && source.maxLength > target.maxLength) return { compatible:false, indeterminate:false, path, reason:'max_length' };
+  }
+  if ((target.type === 'number' || target.type === 'integer') && (source.type === 'number' || source.type === 'integer')) {
+    if (target.minimum !== undefined && source.minimum !== undefined && source.minimum < target.minimum) return { compatible:false, indeterminate:false, path, reason:'minimum' };
+    if (target.maximum !== undefined && source.maximum !== undefined && source.maximum > target.maximum) return { compatible:false, indeterminate:false, path, reason:'maximum' };
+  }
+  return { compatible:true, indeterminate:false, path };
+}
+
+export function compareJsonSchemas(sourceSchema = {}, targetSchema = {}) {
+  return Object.freeze(schemaCompatible(sourceSchema, targetSchema));
+}
+
 export function normalizeActionSchemas({ inputSchema = {}, outputSchema = {} } = {}) {
  return Object.freeze({
   inputSchema:normalizeSchema(inputSchema, 'inputSchema'),
