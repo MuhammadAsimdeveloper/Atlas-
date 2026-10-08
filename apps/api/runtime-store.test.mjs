@@ -273,7 +273,10 @@ test('V157 credential lifecycle stores only external secret references and suppo
   assert.equal(rotated.status,'active');
   const afterRotate=await api.listCredentials({actorId:actorA,tenantId:tenantA});
   assert.equal(afterRotate.items.find(item=>item.credential_id===credentialId).rotated_at!=null,true);
-  assert.equal(afterRotate.items.find(item=>item.credential_id===credentialId).secret_ref,'vault/crm-v2'); // raw ref is metadata, secret material is external
+  assert.equal('secret_ref' in afterRotate.items.find(item=>item.credential_id===credentialId),false);
+  await db.query("SELECT set_config('app.tenant_id',$1,false)",[tenantA]);
+  const stored=await db.query("SELECT secret_ref,status FROM atlas_v122_credentials WHERE tenant_id=$1 AND credential_id=$2",[tenantA,credentialId]);
+  assert.deepEqual(stored.rows[0],{secret_ref:'vault/crm-v2',status:'active'});
   const revoked=await api.revokeCredential({actorId:actorA,tenantId:tenantA,credentialId});
   assert.equal(revoked.status,'revoked');
   await assert.rejects(api.rotateCredential({actorId:actorA,tenantId:tenantA,credentialId,secretRef:'vault/crm-v3',expiresAt:new Date(Date.now()+172_800_000).toISOString()}),/revoked|rotate/i);
