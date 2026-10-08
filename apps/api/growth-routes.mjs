@@ -243,6 +243,33 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
         await requireMutation(req,who.session); const body=await readJson(req); exact(body,['routeId','workflowId','workflowVersion','eventType','priority','predicate','branchKey','dedupWindowSeconds']);
         return send(res,201,{routeId:await runtimeStore.createWorkflowEventRoute({...who,...body})},env);
       }
+      if (path === '/api/v1/growth/credentials' && req.method === 'GET') {
+        if (typeof runtimeStore?.listCredentials !== 'function') throw createAuthError(503,'credential_runtime_unavailable');
+        const status=url.searchParams.get('status');
+        const providerKey=url.searchParams.get('providerKey');
+        return send(res,200,await runtimeStore.listCredentials({...who,status:status||null,providerKey:providerKey||null,limit:Number(url.searchParams.get('limit')||100)}),env);
+      }
+      if (path === '/api/v1/growth/credentials' && req.method === 'POST') {
+        await requireMutation(req,who.session);
+        if (typeof runtimeStore?.createCredential !== 'function') throw createAuthError(503,'credential_runtime_unavailable');
+        const body=await readJson(req); exact(body,['credentialId','providerKey','label','secretRef','expiresAt']);
+        return send(res,201,{credential:await runtimeStore.createCredential({...who,...body})},env);
+      }
+      const credentialRotate=path.match(/^\/api\/v1\/growth\/credentials\/([0-9a-f-]{36})\/rotate$/i);
+      if(credentialRotate && req.method==='POST'){
+        await requireMutation(req,who.session);
+        if (typeof runtimeStore?.rotateCredential !== 'function') throw createAuthError(503,'credential_runtime_unavailable');
+        const body=await readJson(req); exact(body,['secretRef','expiresAt']);
+        return send(res,200,{credential:await runtimeStore.rotateCredential({...who,credentialId:credentialRotate[1],...body})},env);
+      }
+      const credentialRevoke=path.match(/^\/api\/v1\/growth\/credentials\/([0-9a-f-]{36})\/revoke$/i);
+      if(credentialRevoke && req.method==='POST'){
+        await requireMutation(req,who.session);
+        if (typeof runtimeStore?.revokeCredential !== 'function') throw createAuthError(503,'credential_runtime_unavailable');
+        const body=await readJson(req); exact(body,[]);
+        return send(res,200,{credential:await runtimeStore.revokeCredential({...who,credentialId:credentialRevoke[1]})},env);
+      }
+
       if (path === '/api/v1/growth/connectors' && req.method === 'GET') return send(res,200,{installations:await runtimeStore.listConnectorInstallations({...who,status:url.searchParams.get('status')||null,limit:Number(url.searchParams.get('limit')||100)})},env);
       if (path === '/api/v1/growth/connectors' && req.method === 'POST') {
         await requireMutation(req,who.session); const body=await readJson(req); exact(body,['installationId','connectorKey','externalAccountRef','credentialRef','scopesHash','tokenExpiresAt','status']);
