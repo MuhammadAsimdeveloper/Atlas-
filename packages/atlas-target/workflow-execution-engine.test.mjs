@@ -360,3 +360,43 @@ test('wait-until nodes reject unbounded or past resume times', () => {
   const before = resumeWorkflowExecution({ execution, now: now + 5 * 60_000 - 1 });
   assert.equal(before, execution);
 });
+
+
+test('V157 P0 execution completion validates real step outputs and stores only a deterministic output hash', async () => {
+  const { createActionRegistry, defineAction } = await import('../atlas-action-fabric/index.mjs');
+  const actionRegistry=createActionRegistry({actions:[defineAction({
+    id:'execution.typed.output',
+    name:'Execution Typed Output',
+    domain:'automation',
+    risk:'read',
+    inputSchema:{type:'object'},
+    outputSchema:{type:'object',required:['status'],additionalProperties:false,properties:{status:{type:'string',enum:['ok','failed']}}},
+    surfaces:['workflow']
+  })]});
+  const workflow=createWorkflowGraph({
+    tenantId,
+    id:'wf-runtime-output',
+    version:1,
+    name:'Runtime output validation',
+    actionRegistry,
+    nodes:[
+      {id:'start',type:'trigger',config:{eventType:'contact.created'}},
+      {id:'action',type:'action',config:{actionId:'execution.typed.output'}},
+      {id:'stop',type:'stop'}
+    ],
+    edges:[{id:'e1',from:'start',to:'action'},{id:'e2',from:'action',to:'stop'}]
+  });
+  const first=createWorkflowExecution({
+    tenantId,
+    executionId,
+    workflow,
+    triggerEventRef:'event_2026_output_1',
+    createdByActorId:'99999999-9999-4999-8999-999999999999'
+  });
+  const advanced=completeWorkflowStep({execution:first,nodeId:'start',attempt:1,now:'2026-10-05T10:00:00Z'});
+  const completed=completeWorkflowStep({execution:advanced,nodeId:'action',attempt:1,output:{status:'ok'},resultRef:{kind:'provider_action',id:'provider_1',version:1},now:'2026-10-05T10:00:01Z'});
+  assert.equal(completed.steps.at(-1).outputSchemaVersion,1);
+  assert.equal(completed.steps.at(-1).outputHash.length,64);
+  assert.equal('output' in completed.steps.at(-1),false);
+  assert.throws(()=>completeWorkflowStep({execution:advanced,nodeId:'action',attempt:1,output:{status:17},now:'2026-10-05T10:00:01Z'}),/schema|status/i);
+});
