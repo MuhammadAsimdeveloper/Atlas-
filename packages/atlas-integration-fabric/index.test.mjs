@@ -220,3 +220,14 @@ test('connector operation schemas are normalized and exposed through a tenant-sc
   assert.equal(schema.inputSchema.properties.page.type,'integer');
   assert.equal(schema.outputSchema.properties.items.items.properties.id.type,'string');
 });
+
+
+test('connector schema registry rejects tampered definitions before exposing operation schemas', async () => {
+  const { createConnectorSchemaRegistry } = await import('./index.mjs');
+  const connector=createConnectorDefinition({
+    tenantId:'tenant_123',id:'tamper.crm',name:'Tamper CRM',auth:'bearer',baseUrl:'https://api.example.com',
+    operations:[{id:'contacts.get',method:'GET',path:'/contacts',inputSchema:{type:'object'},outputSchema:{type:'object'}}]
+  });
+  const tampered={...connector,operations:[{...connector.operations[0],outputSchema:{type:'string'}}]};
+  assert.throws(()=>createConnectorSchemaRegistry({connectors:[tampered]}),/invalid|checksum/i);
+});
