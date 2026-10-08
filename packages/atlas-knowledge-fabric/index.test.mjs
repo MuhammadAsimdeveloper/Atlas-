@@ -90,11 +90,11 @@ test('V157 provider-neutral embeddings are bounded and tenant-scoped without sto
  assert.equal(request.storeId,storeId);
  assert.equal(request.rawTextStored,false);
  assert.match(request.textHash,/^[a-f0-9]{64}$/);
- const result=await runEmbeddingAdapter({request,adapter:{embed:async(input)=>{
+ const result=await runEmbeddingAdapter({request,text:'Approved booking policy.',adapter:{embed:async(input)=>{
    assert.equal(input.textHash,request.textHash);
-   assert.equal(input.text.length,0);
+   assert.equal(input.text,'Approved booking policy.');
    return {dimensions:3,vector:[0.1,0.2,0.3]};
- }},adapterInput:{textHash:request.textHash}});
+ }}});
  assert.deepEqual(result.vector,[0.1,0.2,0.3]);
  assert.equal(result.dimensions,3);
 });
