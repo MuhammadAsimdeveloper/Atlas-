@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createCrmRecord, defineCrmProperty, updateCrmRecord, createCrmAssociation, createCrmPipeline, transitionCrmDeal, searchCrm,
-  createWorkflowGraph, verifyWorkflowGraph, planWorkflowNode, summarizeWorkflowExecution, WORKFLOW_NODE_TYPES, WORKFLOW_NODE_CATALOG, WORKFLOW_TRIGGER_TYPES, WORKFLOW_TRIGGER_CATALOG,
+  createWorkflowGraph, verifyWorkflowGraph, validateWorkflowNodeInput, planWorkflowNode, summarizeWorkflowExecution, WORKFLOW_NODE_TYPES, WORKFLOW_NODE_CATALOG, WORKFLOW_TRIGGER_TYPES, WORKFLOW_TRIGGER_CATALOG,
   createBookingCalendar, verifyBookingCalendar, listAvailableSlots, holdBooking, bookAppointment, rescheduleAppointment, cancelAppointment,
   createAgentRuntimePolicy, defineAgentTool, authorizeAgentToolCall, createAgentSession, consumeAgentBudget, completeAgentSession, validateAgentOutput, summarizeAgentExecution
 } from './index.mjs';
