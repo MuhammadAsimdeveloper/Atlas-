@@ -81,7 +81,7 @@ async function resolveConnectorSecret({resolved,operation,connectorRef,job,conne
  return refreshed.accessToken;
 }
 
-async function executeConnectorAction({connectorRegistry,connectionStore,secretResolver,fetchImpl,node,job,context}) {
+async function executeConnectorAction({connectorRegistry,connectionStore,secretResolver,credentialWriter,fetchImpl,node,job,context}) {
  if(!connectorRegistry||typeof connectorRegistry.getOperationSchema!=='function') throw Object.assign(new Error('Connector schema registry is required.'),{code:'connector_registry_required'});
  const cfg=object(node.config||{},'node.config');
  const connectorRef=operationRef(cfg.connectorRef,'connectorRef');
@@ -177,7 +177,7 @@ export function createProviderRuntime({connectionStore,secretResolver,credential
  if(!connectionStore||typeof connectionStore.getProviderConnectionForWorker!=='function')throw new TypeError('A lease-bound provider connection store is required.');
  if(typeof secretResolver!=='function')throw new TypeError('A production secret resolver is required.');
  return Object.freeze({execute:async({node,job,context})=>{
-   if(node?.type==='connector_action') return await executeConnectorAction({connectorRegistry,connectionStore,secretResolver,fetchImpl,node,job,context});
+   if(node?.type==='connector_action') return await executeConnectorAction({connectorRegistry,connectionStore,secretResolver,credentialWriter,fetchImpl,node,job,context});
    const cfg=object(node.config||{},'node.config'),capabilityId=text(cfg.capabilityId,'capabilityId',120);
    if(cfg.consent!==true||cfg.approved!==true)throw Object.assign(new Error('Provider action requires explicit consent and approval.'),{code:'provider_consent_required'});
    if(context.attempt>1)throw Object.assign(new Error('Provider action retry requires reconciliation because the configured adapter cannot guarantee exactly-once delivery.'),{code:'provider_retry_unsafe'});
