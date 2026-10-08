@@ -20,7 +20,7 @@ async function database() {
   await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
   const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1])-Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
   for (const file of files) await db.exec(await readFile(path.join(migrationDirectory,file),'utf8'));
-  for (const grant of ['API-ROLE-GRANTS-V112.sql','API-ROLE-GRANTS-V114.sql','API-ROLE-GRANTS-V115.sql','API-ROLE-GRANTS-V119.sql','API-ROLE-GRANTS-V120.sql','API-ROLE-GRANTS-V136.sql','API-ROLE-GRANTS-V137.sql','API-ROLE-GRANTS-V138.sql','API-ROLE-GRANTS-V148.sql','API-ROLE-GRANTS-V149.sql']) await db.exec(await readFile(path.join(migrationDirectory,grant),'utf8'));
+  for (const grant of ['API-ROLE-GRANTS-V157.sql','API-ROLE-GRANTS-V112.sql','API-ROLE-GRANTS-V114.sql','API-ROLE-GRANTS-V115.sql','API-ROLE-GRANTS-V119.sql','API-ROLE-GRANTS-V120.sql','API-ROLE-GRANTS-V136.sql','API-ROLE-GRANTS-V137.sql','API-ROLE-GRANTS-V138.sql','API-ROLE-GRANTS-V148.sql','API-ROLE-GRANTS-V149.sql']) await db.exec(await readFile(path.join(migrationDirectory,grant),'utf8'));
   await db.exec(`INSERT INTO atlas_auth_users(user_id,email,display_name,password_hash,email_verified_at) VALUES
     ('${actorA}','owner-a@runtime.test','Owner A','scrypt$test',now()),
     ('${actorB}','owner-b@runtime.test','Owner B','scrypt$test',now()),
@@ -281,5 +281,29 @@ test('V157 credential lifecycle stores only external secret references and suppo
   assert.equal(revoked.status,'revoked');
   await assert.rejects(api.rotateCredential({actorId:actorA,tenantId:tenantA,credentialId,secretRef:'vault/crm-v3',expiresAt:new Date(Date.now()+172_800_000).toISOString()}),/revoked|rotate/i);
   await assert.rejects(api.getCredential({actorId:actorB,tenantId:tenantB,credentialId}),{code:'credential_not_found'});
+ }finally{await db.close();}
+});
+
+
+test('V157 durable knowledge store persists only references/hashes and retrieval policy metadata',async()=>{
+ const {db,pool,api}=await database();
+ const storeId=randomUUID(),documentId=randomUUID(),policyId=randomUUID();
+ try{
+  assert.equal(await api.createKnowledgeStore({actorId:actorA,tenantId:tenantA,storeId,name:'Support KB',version:1,status:'draft',checksum:digest('knowledge-store')}),storeId);
+  assert.equal(await api.createKnowledgeDocument({actorId:actorA,tenantId:tenantA,storeId,documentId,sourceType:'help_article',title:'Booking policy',contentRef:'s3://atlas-knowledge/article-1',contentHash:digest('article'),metadata:{locale:'en-US'},checksum:digest('document')}),documentId);
+  assert.equal(await api.createKnowledgeRetrievalPolicy({actorId:actorA,tenantId:tenantA,policyId,storeId,topK:6,minScore:.65,reranker:'weighted',allowedSourceTypes:['help_article'],requireCitations:true}),policyId);
+  const stores=await api.listKnowledgeStores({actorId:actorA,tenantId:tenantA});
+  assert.equal(stores.items[0].store_id,storeId);
+  const docs=await api.listKnowledgeDocuments({actorId:actorA,tenantId:tenantA,storeId});
+  assert.equal(docs.items[0].document_id,documentId);
+  assert.equal('content' in docs.items[0],false);
+  assert.equal('content_ref' in docs.items[0],false);
+  await db.query("SELECT set_config('app.tenant_id',$1,false)",[tenantA]);
+  const stored=await db.query("SELECT content_ref,content_hash FROM atlas_v157_knowledge_documents WHERE tenant_id=$1 AND document_id=$2",[tenantA,documentId]);
+  assert.equal(stored.rows[0].content_ref,'s3://atlas-knowledge/article-1');
+  assert.equal(stored.rows[0].content_hash,digest('article'));
+  const policy=await api.getKnowledgeRetrievalPolicy({actorId:actorA,tenantId:tenantA,policyId});
+  assert.equal(policy.require_citations,true);
+  await assert.rejects(api.getKnowledgeRetrievalPolicy({actorId:actorB,tenantId:tenantB,policyId}),{code:'knowledge_policy_not_found'});
  }finally{await db.close();}
 });
