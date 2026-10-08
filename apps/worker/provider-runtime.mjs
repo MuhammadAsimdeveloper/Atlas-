@@ -56,7 +56,7 @@ async function executeConnectorAction({connectorRegistry,connectionStore,secretR
  const scopes=Array.isArray(connection.scopes)?connection.scopes.map(String):[];
  const missing=(operation.requiredScopes||[]).filter(scope=>!scopes.includes(scope));
  if(missing.length) throw Object.assign(new Error('Connector operation scope is not granted.'),{code:'connector_scope_missing',scopes:missing});
- const credentialRef=ref(connection.credential_ref,'credential_ref');
+ const credentialRef=operationRef(connection.credential_ref,'credential_ref');
  const secret=await secretResolver({tenantId:job.tenant_id,connectionId:connection.connection_id,credentialRef});
  if(typeof secret!=='string'||secret.length<8||secret.length>4096) throw Object.assign(new Error('Provider credential could not be resolved.'),{code:'provider_secret_unavailable'});
  assertSafeConnectorUrl(operation.baseUrl);
