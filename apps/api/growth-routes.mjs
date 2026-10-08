@@ -220,6 +220,16 @@ export function createGrowthApi({ store, authStore, executionStore = null, runti
         if(typeof runtimeStore?.getExecutionInspector!=='function') throw createAuthError(503,'execution_inspector_unavailable');
         return send(res,200,await runtimeStore.getExecutionInspector({...who,executionId,limit:Number(url.searchParams.get('limit')||200)}),env);
       }
+      if (path === '/api/v1/growth/executions/reconcile' && req.method === 'POST') {
+        await requireMutation(req,who.session);
+        if (typeof executionStore?.reconcile !== 'function') throw createAuthError(503,'workflow_reconciliation_unavailable');
+        const body=await readJson(req);
+        exact(body,['executionId','reconciliationId','resolution','expectedVersion']);
+        if (!UUID.test(body.executionId||'') || typeof body.reconciliationId!=='string' || !/^reconcile_[A-Za-z0-9_-]{8,200}$/.test(body.reconciliationId)) throw createAuthError(400,'invalid_workflow_reconciliation');
+        if (!['confirmed_success','confirmed_failure'].includes(body.resolution)) throw createAuthError(400,'invalid_workflow_reconciliation_resolution');
+        if (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1) throw createAuthError(400,'invalid_workflow_execution_version');
+        return send(res,200,{execution:await executionStore.reconcile({...who,...body})},env);
+      }
       if (path === '/api/v1/growth/executions/replay' && req.method === 'POST') {
         await requireMutation(req,who.session); const body=await readJson(req); exact(body,['replayId','sourceExecutionId','sourceVersion','targetWorkflowVersion','reason']);
         return send(res,202,{replayId:await runtimeStore.requestExecutionReplay({...who,...body})},env);
