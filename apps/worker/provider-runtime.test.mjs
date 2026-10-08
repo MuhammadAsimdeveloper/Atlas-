@@ -117,3 +117,10 @@ test('V157 P0 connector operation headers reject secret-bearing and hop-by-hop n
  assert.throws(()=>createConnectorDefinition({tenantId,id:'headers',name:'Headers',auth:'bearer',baseUrl:'https://api.example.com',operations:[{id:'items.get',method:'GET',path:'/items',requestHeaders:{authorization:'nope'},inputSchema:{type:'object'},outputSchema:{type:'object'}}]}),/header|forbidden|secret/i);
  assert.throws(()=>createConnectorDefinition({tenantId,id:'headers2',name:'Headers2',auth:'bearer',baseUrl:'https://api.example.com',operations:[{id:'items.get',method:'GET',path:'/items',requestHeaders:{connection:'close'},inputSchema:{type:'object'},outputSchema:{type:'object'}}]}),/header|forbidden/i);
 });
+
+
+test('V157 P0 connector definitions cannot override Atlas-generated idempotency or HMAC headers',async()=>{
+ const {createConnectorDefinition}=await import('../../packages/atlas-integration-fabric/index.mjs');
+ assert.throws(()=>createConnectorDefinition({tenantId,id:'headers3',name:'Headers3',auth:'bearer',baseUrl:'https://api.example.com',operations:[{id:'items.get',method:'GET',path:'/items',requestHeaders:{'idempotency-key':'forged'},inputSchema:{type:'object'},outputSchema:{type:'object'}}]}),/header|forbidden/i);
+ assert.throws(()=>createConnectorDefinition({tenantId,id:'headers4',name:'Headers4',auth:'hmac',baseUrl:'https://api.example.com',operations:[{id:'items.get',method:'GET',path:'/items',requestHeaders:{'x-atlas-signature':'forged'},hmac:{timestampHeader:'x-atlas-timestamp',signatureHeader:'x-atlas-signature'},inputSchema:{type:'object'},outputSchema:{type:'object'}}]}),/collision|header|forbidden/i);
+});
