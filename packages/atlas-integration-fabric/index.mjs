@@ -102,6 +102,20 @@ function normalizeRequestHeaders(input) {
   return output;
 }
 
+function normalizeOAuthConfig(input){
+  if(input==null) return null;
+  assertPlain(input,'connector oauth');
+  const tokenUrl=boundedText(input.tokenUrl,'OAuth token URL',2048);
+  assertSafeConnectorUrl(tokenUrl);
+  const clientId=boundedText(input.clientId,'OAuth client ID',300);
+  if(/[\r\n\u0000]/.test(clientId)||/secret|token|password/i.test(clientId)) throw Object.assign(new Error('OAuth client ID is unsafe'),{code:'oauth_client_id_invalid'});
+  const scope=input.scope==null?null:boundedText(input.scope,'OAuth scope',2000);
+  for(const key of ['clientSecret','accessToken','refreshToken','token','secret']){
+    if(Object.hasOwn(input,key)) throw Object.assign(new Error('OAuth connector definition cannot contain secret material'),{code:'oauth_secret_in_definition'});
+  }
+  return {tokenUrl,clientId,...(scope?{scope}:{})};
+}
+
 function normalizeHmacConfig(input){
   if(input==null) return null;
   assertPlain(input,'operation hmac');
@@ -183,7 +197,7 @@ export function createConnectorDefinition({
     version, scopes: [...new Set((Array.isArray(scopes) ? scopes : []).map(value => boundedText(value,'scope',240)))].sort(),
     rateLimit: rateLimit ? clone(rateLimit) : null,
     pagination: pagination ? clone(pagination) : null,
-    oauth: oauth ? clone(oauth) : null,
+    oauth: normalizeOAuthConfig(oauth),
     metadata: clone(metadata || {}),
     operations: normalized
   };
@@ -236,6 +250,7 @@ export function createConnectorSchemaRegistry({ connectors = [], tenantId = null
         protocol: connector.protocol,
         auth: connector.auth,
         baseUrl: connector.baseUrl,
+        oauth: connector.oauth ? clone(connector.oauth) : null,
         method: operation.method,
         path: operation.path,
         schemaVersion: 1,
