@@ -1,6 +1,6 @@
 ## V157 — Deep n8n parity + optional Operator Copilot
 
-V157 establishes the next major roadmap direction: Atlas must deliver deep functional parity with n8n's workflow automation surface while making the platform usable without technical automation knowledge. The chatbot/Copilot is optional and operates through the same governed application services as the visual UI, API and workers.
+V157 remains the deep n8n parity + optional Operator Copilot phase. Its verified foundation now includes typed workflow/action schemas, output propagation, connector-operation execution, OAuth2 refresh, credential lifecycle metadata, durable reconciliation, strict legacy-node schemas, tenant-safe knowledge/RAG contracts, embedding/reranker adapter contracts, and general agent citation/injection gates. Live provider adapters, production secret stores/KMS, vector indexes, model/reranker services and external infrastructure remain deployment gates.
 
 See [Deep n8n Parity + Optional Operator Copilot Plan](ATLAS-N8N-DEEP-PARITY-AND-COPILOT-PLAN-2026-10.md) for the authoritative capability map, command/navigation model, safety contract, delivery phases and definition of done.
 
@@ -20,6 +20,7 @@ This status describes verified repository behavior at V148. `DONE` means the lis
 
 | Phase | Status | Verified scope and outstanding work |
 |---|---|---|
+| V157. Deep n8n parity + optional Operator Copilot | **IMPLEMENTED FOUNDATION / EXTERNALLY GATED** | Typed schema enforcement, connector execution/credentials, durable reconciliation, strict legacy-node schemas, governed knowledge/RAG contracts and agent citation/injection gates are implemented; vector indexes, provider certification, full preview/test parity and production infrastructure remain external gates. |
 | V148. Agent model runtime + governed authoring | **IMPLEMENTED / EXTERNALLY GATED** | Adds provider-neutral model adapters, timeout/cancellation, structured-output validation, governed tool execution, redacted execution timelines, durable turn executions, worker RPCs, authenticated execute/get/list routes, and plan-first AI workflow authoring with clarifying questions. Live model/input/output providers remain deployment gates. |
 | V147. Agent journey runtime + durable handoff fabric | **IMPLEMENTED / EXTERNALLY GATED** | Adds release-pinned turn planning, reference-only CRM/appointment/conversation/voice context, workflow invocation authorization, human handoff, durable RLS-backed evidence and authenticated API/runtime-store wiring. Live model providers remain external activation gates. |
 | V146. Hardened n8n-inspired automation fabric | **IMPLEMENTED / EXTERNALLY GATED** | Adds n8n-style loop/data/error/webhook execution concepts, governed retries/filters, protected environments, reusable templates, approval contracts, MCP authorization, AI workflow proposal mode and security audit. No arbitrary shell execution or direct URL actions; live provider/runtime/managed infrastructure evidence remains gated. |
