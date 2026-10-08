@@ -7,6 +7,7 @@ const ID = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_AUTH = new Set(['oauth2', 'api_key', 'basic', 'bearer', 'hmac', 'none']);
 const METHODS = new Set(['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS']);
+const FORBIDDEN_HEADERS = new Set(['authorization','cookie','set-cookie','proxy-authorization','host','content-length','connection','transfer-encoding','upgrade']);
 const PRIVATE_HOSTS = new Set(['localhost','localhost.localdomain','ip6-localhost','ip6-loopback']);
 const PRIVATE_IPV4 = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(?:1[6-9]|2[0-9]|3[0-1])\.|0\.)/;
 const PRIVATE_IPV6 = /^(::1|fc|fd|fe80:)/i;
@@ -82,6 +83,40 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function normalizeRequestHeaders(input) {
+  if (input == null) return {};
+  assertPlain(input,'operation requestHeaders');
+  const entries=Object.entries(input);
+  if(entries.length>30) throw new TypeError('operation requestHeaders exceed 30 entries');
+  const output={};
+  for(const [rawName,rawValue] of entries){
+    const name=boundedText(rawName,'request header name',80);
+    const lower=name.toLowerCase();
+    if(!/^[a-z0-9-]+$/i.test(name)||FORBIDDEN_HEADERS.has(lower)||/authorization|cookie|token|secret|password|signature/i.test(lower)){
+      throw Object.assign(new Error('request header is forbidden'),{code:'request_header_forbidden'});
+    }
+    const value=boundedText(String(rawValue),'request header value',1000);
+    if(/[\\r\\n]/.test(value)) throw Object.assign(new Error('request header contains unsafe line breaks'),{code:'request_header_invalid'});
+    output[name]=value;
+  }
+  return output;
+}
+
+function normalizeHmacConfig(input){
+  if(input==null) return null;
+  assertPlain(input,'operation hmac');
+  const timestampHeader=boundedText(input.timestampHeader||'x-atlas-timestamp','HMAC timestamp header',80);
+  const signatureHeader=boundedText(input.signatureHeader||'x-atlas-signature','HMAC signature header',80);
+  for(const name of [timestampHeader,signatureHeader]){
+    const lower=name.toLowerCase();
+    if(!/^[a-z0-9-]+$/i.test(name)||FORBIDDEN_HEADERS.has(lower)||/authorization|cookie|token|secret|password/i.test(lower)) throw Object.assign(new Error('HMAC header is forbidden'),{code:'hmac_header_forbidden'});
+  }
+  const algorithm=String(input.algorithm||'sha256').toLowerCase();
+  if(algorithm!=='sha256') throw Object.assign(new Error('HMAC algorithm is unsupported'),{code:'hmac_algorithm_unsupported'});
+  return {algorithm,timestampHeader,signatureHeader};
+}
+
+
 export function assertSafeConnectorUrl(rawUrl) {
   if (typeof rawUrl !== 'string' || rawUrl.length > 2048) throw new TypeError('connector URL is invalid');
   let parsed;
@@ -123,12 +158,16 @@ export function createConnectorDefinition({
       throw Object.assign(new Error('connector operation path must be relative'), { code:'operation_path_invalid' });
     }
     const schemas=normalizeActionSchemas({inputSchema:operation.inputSchema || {}, outputSchema:operation.outputSchema || {}});
+    const requestHeaders=normalizeRequestHeaders(operation.requestHeaders);
+    const hmac=normalizeHmacConfig(operation.hmac);
     return FREEZE({
       id: opId,
       method,
       path,
       inputSchema: schemas.inputSchema,
       outputSchema: schemas.outputSchema,
+      requestHeaders,
+      hmac,
       requiredScopes: [...new Set((Array.isArray(operation.requiredScopes) ? operation.requiredScopes : []).map(value => boundedText(value,'operation scope',240)))].sort(),
       idempotent: operation.idempotent !== false,
       requiresApproval: operation.requiresApproval === true
@@ -199,6 +238,8 @@ export function createConnectorSchemaRegistry({ connectors = [], tenantId = null
         schemaStatus: isGenericJsonSchema(schemas.inputSchema) && isGenericJsonSchema(schemas.outputSchema) ? 'generic' : 'typed',
         inputSchema: schemas.inputSchema,
         outputSchema: schemas.outputSchema,
+        requestHeaders: clone(operation.requestHeaders || {}),
+        hmac: operation.hmac ? clone(operation.hmac) : null,
         requiredScopes: Object.freeze([...(operation.requiredScopes || [])].map(String)),
         idempotent: operation.idempotent === true,
         requiresApproval: operation.requiresApproval === true
