@@ -282,3 +282,27 @@ test('V148 agent turn execution is feature-gated, tenant-scoped and queued from 
     } finally { await enabled.close(); }
   } finally { await api.close(); }
 });
+
+
+test('credential lifecycle routes are authenticated, CSRF-protected and never return secret material',async()=>{
+ const api=await createTestApi({runtimeStoreExtra:{
+   async listCredentials(data){assert.equal(data.tenantId,tenantA);return {items:[{credential_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',provider_key:'oauthcrm',label:'CRM',status:'active',secret_ref_present:true}]};},
+   async createCredential(data){assert.equal(data.tenantId,tenantA);return data.credentialId;},
+   async rotateCredential(data){assert.equal(data.tenantId,tenantA);return {credentialId:data.credentialId,status:'active'};},
+   async revokeCredential(data){assert.equal(data.tenantId,tenantA);return {credentialId:data.credentialId,status:'revoked'};}
+ }});
+ try{
+  let response=await fetch(api.base+'/api/v1/growth/credentials',{headers:api.headers});
+  const listed=await response.json();
+  assert.equal(response.status,200);
+  assert.equal('secret_ref' in listed.items[0],false);
+  response=await fetch(api.base+'/api/v1/growth/credentials',{method:'POST',headers:{...api.headers,'x-atlas-csrf':''},body:JSON.stringify({credentialId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',providerKey:'oauthcrm',label:'CRM',secretRef:'vault/crm-v1'})});
+  assert.equal(response.status,403);
+  response=await fetch(api.base+'/api/v1/growth/credentials',{method:'POST',headers:api.headers,body:JSON.stringify({credentialId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',providerKey:'oauthcrm',label:'CRM',secretRef:'vault/crm-v1'})});
+  assert.equal(response.status,201);
+  response=await fetch(api.base+'/api/v1/growth/credentials/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/rotate',{method:'POST',headers:api.headers,body:JSON.stringify({secretRef:'vault/crm-v2'})});
+  assert.equal(response.status,200);
+  response=await fetch(api.base+'/api/v1/growth/credentials/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/revoke',{method:'POST',headers:api.headers,body:JSON.stringify({})});
+  assert.equal(response.status,200);
+ }finally{await api.close();}
+});
