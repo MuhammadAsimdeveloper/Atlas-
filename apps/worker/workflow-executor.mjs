@@ -47,7 +47,7 @@ export async function executeWorkflowJob({store,job,workerId,resolveAction=async
    if(node.requiresAdapter&&(!effectiveCapabilityId||!externalSideEffectAllowed({capabilityId:effectiveCapabilityId,providerStatus:verifiedByDeployment?'verified':providerStatus,consent:node.config?.consent===true,approved:node.config?.approved===true})))
      throw Object.assign(new Error('External side effect is not verified for this node.'),{code:'provider_not_verified'});
    const result=await resolveAction(Object.freeze({node,execution,tenantId:job.tenant_id,jobId:job.job_id,workerId,attempt,signal}));
-   next=completeWorkflowStep({execution,nodeId,attempt,resultRef:result?.resultRef||null,output:result?.output,selectedPort:result?.selectedPort||'next',now});
+   next=completeWorkflowStep({execution,nodeId,attempt,resultRef:result?.resultRef||null,selectedPort:result?.selectedPort||'next',now});
  }catch(error){
    next=failWorkflowStep({execution,nodeId,attempt,errorCode:/^[a-z][a-z0-9_.-]{0,79}$/.test(error?.code||'')?error.code:'handler_failed',now});
  }
