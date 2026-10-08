@@ -133,7 +133,6 @@ export function redactKnowledgeText(value){
  output=output.replace(EMAIL,'[redacted email]');
  output=output.replace(PHONE,'[redacted phone]');
  output=output.replace(SECRET_VALUE,'[redacted secret]');
- output=output.replace(PRIVATE_KEY,'[redacted sensitive field]');
  return output;
 }
 
