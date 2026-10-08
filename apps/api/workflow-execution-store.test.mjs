@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 import { createWorkflowGraph } from '../../packages/atlas-target/index.mjs';
+import { createWorkflowExecution, failWorkflowStep } from '../../packages/atlas-target/workflow-execution-engine.mjs';
 import { PostgresWorkflowExecutionStore } from './workflow-execution-store.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
@@ -76,4 +77,42 @@ test('V119 execution control actions are optimistic and cross-tenant lookups fai
     const audit=await db.query("SELECT event_type,status FROM atlas_workflow_execution_events WHERE tenant_id=$1 AND execution_id=$2 ORDER BY created_at,event_id",[tenantA,execution.executionId]);
     assert.deepEqual(audit.rows.map(row=>row.event_type),['execution.created','execution.cancel']);
   }finally{await db.close();}
+});
+
+
+test('V157 P0 reconciliation resolution atomically resumes confirmed success and leaves confirmed failure terminal',async()=>{
+ const {db,pool}=await setup();
+ try{
+  const store=new PostgresWorkflowExecutionStore(pool);
+  const workflow={id:workflowId,tenantId:tenantA,module:'workflows',state:'published',payload:{graph:createWorkflowGraph({tenantId:tenantA,id:workflowId,version:5,name:'Lead journey',nodes:[{id:'start',type:'trigger',config:{eventType:'contact.created'}},{id:'task',type:'create_task',config:{taskTemplateRef:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}},{id:'stop',type:'stop'}],edges:[{id:'e1',from:'start',to:'task'},{id:'e2',from:'task',to:'stop'}]})}};
+  const created=await store.create({actorId:actorA,tenantId:tenantA,workflow,triggerEventRef:'evt_reconcile_success',executionId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',now:'2026-10-05T10:00:00Z'});
+  let state=createWorkflowExecution({tenantId:tenantA,executionId:created.executionId,workflow:workflow.payload.graph,triggerEventRef:'evt_reconcile_success',createdByActorId:actorA,now:'2026-10-05T10:00:00Z'});
+  state=failWorkflowStep({execution:state,nodeId:'start',attempt:1,errorCode:'provider_500',now:'2026-10-05T10:00:01Z'});
+  await db.query("UPDATE atlas_workflow_executions SET status=$3,current_node_id=$4,state=$5::jsonb,state_checksum=$6,checksum=$6,last_error_code=$7,version=$8,updated_at=$9 WHERE tenant_id=$1 AND execution_id=$2",[tenantA,created.executionId,state.status,state.currentNodeId,JSON.stringify(state),state.checksum,state.lastErrorCode,state.version,state.updatedAt]);
+  const pending=await store.get({actorId:actorA,tenantId:tenantA,workflowId,executionId:created.executionId});
+  assert.equal(pending.status,'reconciliation_required');
+  const resolved=await store.reconcile({actorId:actorA,tenantId:tenantA,workflowId,executionId:created.executionId,expectedVersion:pending.version,reconciliationId:pending.reconciliation.reconciliationId,resolution:'confirmed_success',now:'2026-10-05T10:00:02Z'});
+  assert.equal(resolved.status,'queued');
+  assert.equal(resolved.currentNodeId,'start');
+  assert.equal(resolved.reconciliation.resolution,'confirmed_success');
+  await db.query("SELECT set_config('app.tenant_id',$1,false)",[tenantA]);
+  const jobs=await db.query("SELECT job_type,status,payload_ref->>'id' AS execution_id FROM atlas_runtime_jobs WHERE tenant_id=$1 AND job_id=$2",[tenantA,created.executionId]);
+  assert.equal(jobs.rows[0].job_type,'workflow.execute');
+  assert.equal(jobs.rows[0].status,'succeeded');
+  const resumed=await db.query("SELECT job_type,status,payload_ref->>'id' AS execution_id FROM atlas_runtime_jobs WHERE tenant_id=$1 AND payload_ref->>'id'=$2 ORDER BY created_at DESC",[tenantA,created.executionId]);
+  assert.ok(resumed.rows.some(row=>row.job_type==='workflow.execute'&&row.status==='queued'));
+  const replayed=await store.reconcile({actorId:actorA,tenantId:tenantA,workflowId,executionId:created.executionId,expectedVersion:resolved.version,reconciliationId:pending.reconciliation.reconciliationId,resolution:'confirmed_success',now:'2026-10-05T10:00:03Z'});
+  assert.equal(replayed.executionId,resolved.executionId);
+  assert.equal(replayed.version,resolved.version);
+
+  const failedCreate=await store.create({actorId:actorA,tenantId:tenantA,workflow,triggerEventRef:'evt_reconcile_failure',executionId:'ffffffff-ffff-4fff-8fff-ffffffffffff',now:'2026-10-05T11:00:00Z'});
+  let failedState=createWorkflowExecution({tenantId:tenantA,executionId:failedCreate.executionId,workflow:workflow.payload.graph,triggerEventRef:'evt_reconcile_failure',createdByActorId:actorA,now:'2026-10-05T11:00:00Z'});
+  failedState=failWorkflowStep({execution:failedState,nodeId:'start',attempt:1,errorCode:'provider_500',now:'2026-10-05T11:00:01Z'});
+  await db.query("UPDATE atlas_workflow_executions SET status=$3,current_node_id=$4,state=$5::jsonb,state_checksum=$6,checksum=$6,last_error_code=$7,version=$8,updated_at=$9 WHERE tenant_id=$1 AND execution_id=$2",[tenantA,failedCreate.executionId,failedState.status,failedState.currentNodeId,JSON.stringify(failedState),failedState.checksum,failedState.lastErrorCode,failedState.version,failedState.updatedAt]);
+  const pendingFailure=await store.get({actorId:actorA,tenantId:tenantA,workflowId,executionId:failedCreate.executionId});
+  const dead=await store.reconcile({actorId:actorA,tenantId:tenantA,workflowId,executionId:failedCreate.executionId,expectedVersion:pendingFailure.version,reconciliationId:pendingFailure.reconciliation.reconciliationId,resolution:'confirmed_failure',now:'2026-10-05T11:00:02Z'});
+  assert.equal(dead.status,'dead_letter');
+  const failureJobs=await db.query("SELECT count(*)::int AS count FROM atlas_runtime_jobs WHERE tenant_id=$1 AND payload_ref->>'id'=$2",[tenantA,failedCreate.executionId]);
+  assert.equal(failureJobs.rows[0].count,1);
+ }finally{await db.close();}
 });
