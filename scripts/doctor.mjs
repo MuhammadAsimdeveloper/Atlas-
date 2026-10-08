@@ -335,6 +335,54 @@ try {
   check('V148 governed agent model runtime', v148Model.includes('createModelAdapter') && v148Model.includes('invokeModelTurn') && v148Model.includes('rawPromptStored: false') && v148Turn.includes('authorizeAgentToolCall') && v148Turn.includes('consumeAgentBudget'), (agentFabricTests.includes('V148') || agentTurnTests.includes('V148')) && agentWorker.includes('createAgentTurnJobHandler') && agentWorkerTests.includes('V148') && v148Migration.includes('atlas_agent_turn_executions') && v148Migration.includes('atlas_v148_get_agent_turn_for_job') && v148Grants.includes('atlas_worker'), 'Agent model inference, bounded streaming, tool approval, tenant isolation and durable worker state are connected with explicit secret/content redaction.');
   check('V148 agent observability and authoring', v148Timeline.includes('exportAgentTimeline') && v148Turn.includes('appendAgentTimelineEvent') && v148Automation.includes('createAiWorkflowAuthoringPlan') && await read('apps/api/growth-routes.mjs').then(x => x.includes('/api/v1/growth/agents/turns/execute') && x.includes('/api/v1/growth/agents/turns') && x.includes('/api/v1/growth/automation/ai-plan')), v148Gap.includes('V148 delivered') && await read('scripts/mirofish-check.mjs').then(x => x.includes('agent model schema safety') && x.includes('agent durable evidence is redacted')), 'Operator-visible agent debugging and plan-first workflow authoring exist as bounded, draft/feature-gated capabilities without autonomous production mutation.');
   check('V148 n8n-safe data mapping', v148Mapping.includes('validateDataMapping') && v148Mapping.includes('applyDataMapping') && v148Automation.includes("node.type === 'edit_fields'") && v148Automation.includes('validateDataMapping'), 'Workflow edit-fields mapping is allowlisted, declarative and rejects reserved/code/network paths.');
+  const v157Knowledge=await read('packages/atlas-knowledge-fabric/index.mjs');
+  const v157KnowledgeTests=await read('packages/atlas-knowledge-fabric/index.test.mjs');
+  const v157Support=await read('packages/atlas-copilot/support-runtime.mjs');
+  const v157SupportTests=await read('packages/atlas-copilot/support-runtime.test.mjs');
+  const v157Integration=await read('packages/atlas-integration-fabric/index.mjs');
+  const v157ProviderRuntime=await read('apps/worker/provider-runtime.mjs');
+  const v157ProviderTests=await read('apps/worker/provider-runtime.test.mjs');
+  const v157SchemaRegistry=await read('packages/atlas-target/workflow-node-schema-registry.mjs');
+  const v157SchemaTests=await read('packages/atlas-target/index.test.mjs');
+  const v157Migration=await read('infra/postgres/FINAL-MIGRATION-V157.sql');
+  const v157Grants=await read('infra/postgres/API-ROLE-GRANTS-V157.sql');
+  const v157Routes=await read('apps/api/growth-routes.mjs');
+  const v157RuntimeStore=await read('apps/api/runtime-store.mjs');
+  check('V157 connector and credential hardening',
+    v157Integration.includes('normalizeOAuthConfig') &&
+    v157Integration.includes('normalizeRequestHeaders') &&
+    v157Integration.includes('normalizeHmacConfig') &&
+    v157ProviderRuntime.includes('resolveConnectorSecret') &&
+    v157ProviderRuntime.includes('credentialWriter') &&
+    v157ProviderRuntime.includes('createHmacSignature') &&
+    v157ProviderTests.includes('oauth2 connector refreshes') &&
+    v157ProviderTests.includes('HMAC connector operations sign'),
+    'Connector execution is tenant-bound, auth-aware, HMAC-capable, OAuth2-refreshable and external-vault backed.');
+  check('V157 workflow schema and reconciliation hardening',
+    v157SchemaRegistry.includes('legacySchemaFor') &&
+    v157SchemaTests.includes('strict legacy workflow node schemas') &&
+    v157Migration.includes('reconciliation_required') &&
+    v157RuntimeStore.includes('async reconcile(') &&
+    v157Routes.includes('/api/v1/growth/executions/reconcile'),
+    'Typed legacy-node schemas, durable unknown-outcome reconciliation and authenticated operator resolution are wired.');
+  check('V157 knowledge and RAG safety',
+    v157Knowledge.includes('retrieveKnowledge') &&
+    v157Knowledge.includes('enforceKnowledgeCitations') &&
+    v157Knowledge.includes('detectPromptInjection') &&
+    v157KnowledgeTests.includes('prompt-injection and exfiltration') &&
+    v157Support.includes('detectPromptInjection') &&
+    v157Support.includes('enforceKnowledgeCitations') &&
+    v157SupportTests.includes('requires citations'),
+    'Tenant-safe retrieval, citation enforcement, injection filtering, redaction and memory lifecycle contracts are implemented and integrated with support.');
+  check('V157 durable knowledge administration',
+    v157Migration.includes('atlas_v157_knowledge_stores') &&
+    v157Migration.includes('atlas_v157_knowledge_documents') &&
+    v157Migration.includes('atlas_v157_knowledge_retrieval_policies') &&
+    v157Grants.includes('atlas_app') &&
+    v157RuntimeStore.includes('createKnowledgeStore') &&
+    v157Routes.includes('/api/v1/growth/knowledge/stores'),
+    'Knowledge store, document and retrieval-policy metadata are tenant-RLS protected and exposed through authenticated reference-only APIs.');
+
 } catch (error) {
   checks.push({ name: 'doctor setup', passed: false, detail: error.message });
 }
