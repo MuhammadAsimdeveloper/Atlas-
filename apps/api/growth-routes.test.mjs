@@ -306,3 +306,24 @@ test('credential lifecycle routes are authenticated, CSRF-protected and never re
   assert.equal(response.status,200);
  }finally{await api.close();}
 });
+
+
+test('knowledge routes are authenticated, tenant-scoped and reference-only',async()=>{
+ const api=await createTestApi({runtimeStoreExtra:{
+   async listKnowledgeStores(data){assert.equal(data.tenantId,tenantA);return {items:[{store_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'KB',version:1,status:'published'}]};},
+   async createKnowledgeStore(data){assert.equal(data.tenantId,tenantA);return data.storeId;},
+   async createKnowledgeDocument(data){assert.equal(data.tenantId,tenantA);return data.documentId;},
+   async createKnowledgeRetrievalPolicy(data){assert.equal(data.tenantId,tenantA);return data.policyId;}
+ }});
+ try{
+  let response=await fetch(api.base+'/api/v1/growth/knowledge/stores',{headers:api.headers});
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).items.length,1);
+  response=await fetch(api.base+'/api/v1/growth/knowledge/stores',{method:'POST',headers:api.headers,body:JSON.stringify({storeId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',name:'KB',version:1,status:'draft'})});
+  assert.equal(response.status,201);
+  response=await fetch(api.base+'/api/v1/growth/knowledge/documents',{method:'POST',headers:api.headers,body:JSON.stringify({storeId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',documentId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',sourceType:'help_article',title:'Booking',contentRef:'s3://kb/article',contentHash:'d'.repeat(64),metadata:{}})});
+  assert.equal(response.status,201);
+  response=await fetch(api.base+'/api/v1/growth/knowledge/policies',{method:'POST',headers:api.headers,body:JSON.stringify({policyId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',storeId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',topK:8,minScore:.6,reranker:'weighted',allowedSourceTypes:['help_article'],requireCitations:true})});
+  assert.equal(response.status,201);
+ }finally{await api.close();}
+});
