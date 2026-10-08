@@ -46,6 +46,12 @@ Coverage now verifies:
 
 The earlier V157 P0 typed-action and expression tests remain covered by the same CI test suite.
 
+## Output propagation extension
+
+The same registry now resolves action and connector-operation runtime input/output schemas and propagates them across the existing DAG edges. createWorkflowGraph() persists runtimeInputSchema, outputSchema, propagatedInputSchema, upstream references and a schema fingerprint on each normalized node. Strict downstream runtime inputs are checked against each upstream output shape; generic downstream inputs inherit the upstream shape without inventing a stricter guarantee. validateWorkflowNodeInput() validates an actual runtime payload against the propagated contract.
+
+Connector-backed nodes use the tenant-scoped connector schema registry. connector_action requires an opaque connector reference, connection reference and operation reference; the selected operation contributes its normalized input/output schemas and cannot cross tenant scope.
+
 ## Explicit non-goals
 
 This slice does not claim full P0 completion.
@@ -53,9 +59,9 @@ This slice does not claim full P0 completion.
 Still unfinished:
 
 - strict field schemas for every catalogued legacy node
-- connector-specific schemas generated from the connector registry
-- output schema propagation between adjacent nodes
-- complete graph-to-action mapping for connector_action/provider adapters
+- execution-time worker propagation of actual step payloads and durable output storage
+- complete connector_action/provider-operation authorization beyond schema binding
+- connector event trigger schema binding
 - execution-state/error/credential/test-preview parity still tracked in V-series work
 
 ## Next implementation frontier
