@@ -299,7 +299,7 @@ export function createWorkflowGraph({ tenantId, id = crypto.randomUUID(), versio
   if (!Array.isArray(nodes) || nodes.length < 2 || nodes.length > 150) throw new Error('Workflow nodes out of bounds');
   if (!Array.isArray(edges) || edges.length < 1 || edges.length > 300) throw new Error('Workflow edges out of bounds');
   const nodeSchemaRegistry = schemaRegistry || (actionRegistry ? createWorkflowNodeSchemaRegistry({ actionRegistry }) : WORKFLOW_NODE_SCHEMA_REGISTRY);
-  const normalized = nodes.map((node,index) => normalizeNode(node,index,nodeSchemaRegistry));
+  const normalized = nodes.map((node,index) => normalizeNode(node,index,nodeSchemaRegistry,tenantId));
   const ids = new Set(normalized.map(node => node.id));
   if (ids.size !== normalized.length) throw new Error('Workflow node IDs must be unique');
   const safeEdges = edges.map((edge, index) => {
