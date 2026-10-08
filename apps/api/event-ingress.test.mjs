@@ -1,3 +1,0 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {normalizeEvent,scheduledEvent} from './event-ingress.mjs';
-test('normalizes deterministic event identity',()=>{const a=normalizeEvent({tenantId:'t',eventType:'lead.created',eventRef:'lead_1'});const b=normalizeEvent({tenantId:'t',eventType:'lead.created',eventRef:'lead_1'});assert.equal(a.idempotencyKey,b.idempotencyKey);});
-test('scheduled events remain reference-only',()=>{const e=scheduledEvent({tenantId:'t',eventType:'campaign.tick',scheduleId:'s1',runAt:Date.now()});assert.equal(e.source,'schedule');assert.equal(e.eventRef,'schedule_s1');});

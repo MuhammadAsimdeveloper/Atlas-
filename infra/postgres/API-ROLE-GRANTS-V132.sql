@@ -1,1 +1,0 @@
-GRANT SELECT,INSERT,UPDATE ON atlas_connector_installations,atlas_connector_health_events TO atlas_app;

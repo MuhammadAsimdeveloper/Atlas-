@@ -1,4 +1,0 @@
-.workspace-dialog{width:min(92vw,440px);padding:25px;border:1px solid var(--line);border-radius:17px;background:var(--panel);color:var(--ink);box-shadow:var(--shadow)}
-.workspace-dialog::backdrop{background:rgba(19,25,38,.48);backdrop-filter:blur(3px)}
-.workspace-dialog h2{margin:0;font-size:19px;letter-spacing:-.4px}
-.dialog-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:5px}

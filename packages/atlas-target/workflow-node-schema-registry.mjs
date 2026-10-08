@@ -76,7 +76,26 @@ function legacySchemaFor(type){
   if(['find_availability','book_appointment','reschedule_appointment','cancel_appointment'].includes(type)) add('calendarRef',REF_SCHEMA);
   if(['invoke_agent','workflow_as_agent_tool'].includes(type)) add('agentReleaseRef',REF_SCHEMA);
   if(type==='respond_to_webhook') add('statusCode',{type:'integer',minimum:100,maximum:599});
-  if(type==='stop_and_error') { add('errorCode',{type:'string',pattern:'^[a-z][a-z0-9_.-]{0,79}
+  if(type==='stop_and_error') { add('errorCode',{type:'string',pattern:'^[a-z][a-z0-9_.-]{0,79}$'}); add('message',{type:'string',minLength:1,maxLength:500}); }
+  if(type==='execution_data') { add('key',{type:'string',pattern:'^[a-z][a-z0-9_.-]{0,79}$'}); add('value',{}); }
+  if(type==='error_trigger') add('errorCode',{type:'string',pattern:'^[a-z][a-z0-9_.-]{0,79}$'});
+  if(['graphql_request','soap_request','oauth2','basic_auth','bearer_auth','hmac_auth','custom_headers','pagination','retry','circuit_breaker'].includes(type)) {
+    add('connectionRef',REF_SCHEMA); add('operationRef',REF_SCHEMA); add('credentialRef',REF_SCHEMA);
+    add('requestHeaders',objectSchema({},[])); add('body',{}); add('variables',{type:'object',additionalProperties:true});
+  }
+  if(type==='knowledge_search') { add('query',STRING); add('knowledgeVersionRef',REF_SCHEMA); add('topK',{type:'integer',minimum:1,maximum:20}); }
+  if(type==='ai_classify') { add('promptRef',REF_SCHEMA); add('labels',{type:'array',minItems:1,maxItems:100,items:STRING}); add('outputSchema',{type:'object',additionalProperties:true}); }
+  if(type==='ai_summarize') { add('promptRef',REF_SCHEMA); add('maxChars',{type:'integer',minimum:100,maximum:12000}); }
+  if(type==='ai_intent_detect') { add('promptRef',REF_SCHEMA); add('labels',{type:'array',minItems:1,maxItems:100,items:STRING}); }
+  if(type==='ai_generate') { add('modelPolicyRef',REF_SCHEMA); add('outputSchema',{type:'object',additionalProperties:true}); }
+  if(type==='invoke_agent') { add('agentReleaseRef',REF_SCHEMA); add('input',objectSchema({},[])); }
+  if(type==='mcp_client') { add('serverRef',REF_SCHEMA); add('operationRef',REF_SCHEMA); add('input',objectSchema({},[])); }
+  if(type==='sub_workflow'||type==='execute_subworkflow') add('input',objectSchema({},[]));
+  if(type==='webhook'||type==='http_request') { add('method',{type:'string',enum:['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS']}); add('input',objectSchema({},[])); }
+  if(type==='spreadsheet_upsert') { add('mapping',objectSchema({},[])); add('values',objectSchema({},[])); }
+  return objectSchema(properties,required);
+}
+
 const CONTRACT_SCHEMAS={
  trigger:Object.freeze({
   inputSchema:{type:'object',required:['eventType'],additionalProperties:true,properties:{eventType:{type:'string',minLength:3,maxLength:180}}},

@@ -1,5 +1,0 @@
-Atlas V80 source manifest
-
-The complete local V80 workspace is packaged in atlas-v80-final-build.zip. This manifest records the SHA-256 and size of each source file in that artifact. The GitHub connector used here does not expose a bulk local-directory upload operation, so the repository is being initialized with the V80 source-of-truth documentation and delta files first.
-
-Full source artifact SHA-256: 2996556766bd68b8e36d3b296ff64eaa355b75e36d0330305ea2c07787aff311

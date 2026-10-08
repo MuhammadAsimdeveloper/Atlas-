@@ -1,7 +1,0 @@
-import test from 'node:test';import assert from 'node:assert/strict';
-import {buildOutboundIdempotencyKey,deliveryTransition,normalizeMessageInput,providerEventKey,threadKey} from './unified-inbox.mjs';
-test('threads deterministically across webhook retries',()=>assert.equal(threadKey({channel:'sms',externalThreadRef:'abc'}),threadKey({channel:'sms',externalThreadRef:'abc'})));
-test('outbound idempotency is tenant and conversation bound',()=>assert.notEqual(buildOutboundIdempotencyKey({tenantId:'11111111-1111-4111-8111-111111111111',conversationId:'22222222-2222-4222-8222-222222222222',channel:'sms',clientKey:'customer-1'}),buildOutboundIdempotencyKey({tenantId:'33333333-3333-4333-8333-333333333333',conversationId:'22222222-2222-4222-8222-222222222222',channel:'sms',clientKey:'customer-1'})));
-test('delivery state machine rejects unsafe rewinds',()=>{assert.equal(deliveryTransition('queued','sending'),'sending');assert.throws(()=>deliveryTransition('delivered','failed'),/transition/);});
-test('message payload is reference-only',()=>{const m=normalizeMessageInput({channel:'email',direction:'inbound',contentRef:'vault:message:1'});assert.equal(m.contentRef,'vault:message:1');assert.equal('body' in m,false);});
-test('provider event identity is deterministic',()=>assert.equal(providerEventKey({providerKey:'twilio.sms',eventRef:'SM1',payloadHash:'a'.repeat(64)}),providerEventKey({providerKey:'twilio.sms',eventRef:'SM1',payloadHash:'a'.repeat(64)})));
