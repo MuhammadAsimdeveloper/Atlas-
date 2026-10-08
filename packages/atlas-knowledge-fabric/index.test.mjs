@@ -34,7 +34,7 @@ test('V157 knowledge store is tenant-bound, versioned and content-reference base
   assert.equal(doc.rawContentStored,false);
   assert.equal(doc.chunks[0].trust,'untrusted_knowledge');
   assert.equal(doc.tenantId,tenantId);
-  assert.throws(()=>createKnowledgeDocument({...doc,tenantId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'}),/tenant/i);
+  assert.throws(()=>createKnowledgeDocument({...doc,tenantId:'tenant-b'}),/tenant/i);
 });
 
 test('V157 retrieval is deterministic, bounded, policy-filtered and reranker-aware',()=>{
@@ -43,12 +43,12 @@ test('V157 retrieval is deterministic, bounded, policy-filtered and reranker-awa
     tenantId,storeId,policy,
     query:'What is the booking policy?',
     candidates:[
-      {tenantId,storeId,ref:'r1',sourceType:'help_article',score:0.9,rerankScore:0.8,excerpt:'Booking is available weekdays.'},
-      {tenantId,storeId,ref:'r2',sourceType:'internal_note',score:0.99,rerankScore:0.2,excerpt:'Low-trust note.'},
-      {tenantId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',storeId,ref:'r3',sourceType:'help_article',score:0.99,rerankScore:0.99,excerpt:'Cross tenant.'}
+      {tenantId,storeId,ref:'ref1',sourceType:'help_article',score:0.9,rerankScore:0.8,excerpt:'Booking is available weekdays.'},
+      {tenantId,storeId,ref:'ref2',sourceType:'internal_note',score:0.99,rerankScore:0.2,excerpt:'Low-trust note.'},
+      {tenantId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',storeId,ref:'ref3',sourceType:'help_article',score:0.99,rerankScore:0.99,excerpt:'Cross tenant.'}
     ]
   });
-  assert.deepEqual(hits.map(hit=>hit.ref),['r1']);
+  assert.deepEqual(hits.map(hit=>hit.ref),['ref1']);
   assert.equal(hits[0].trust,'untrusted_knowledge');
 });
 
@@ -76,7 +76,7 @@ test('V157 prompt-injection and exfiltration defenses classify hostile knowledge
 test('V157 memory lifecycle enforces consent, retention and bounded writes',()=>{
   const policy=createMemoryLifecyclePolicy({scope:'conversation',retentionDays:30,requireConsent:true,maxFacts:20});
   const now=Date.parse('2026-10-08T00:00:00Z');
-  const fresh=evaluateMemoryLifecycle({policy,tenantId,scopeRef:'conversation_1',consent:{tenantId,scopeRef:'conversation_1',status:'granted',checkedAt:'2026-10-07T23:00:00Z',expiresAt:'2026-10-09T00:00:00Z'},facts:[{id:'m1',key:'preferred_day',value:'Monday',createdAt:'2026-10-07T12:00:00Z'}],now});
+  const fresh=evaluateMemoryLifecycle({policy,tenantId,scopeRef:'conversation_1',consent:{tenantId,scopeRef:'conversation_1',status:'granted',checkedAt:'2026-10-07T23:00:00Z',expiresAt:'2026-10-08T12:00:00Z'},facts:[{id:'m1',key:'preferred_day',value:'Monday',createdAt:'2026-10-07T12:00:00Z'}],now});
   assert.equal(fresh.status,'usable');
   assert.equal(fresh.items[0].trust,'untrusted_memory_data');
   assert.throws(()=>evaluateMemoryLifecycle({policy,tenantId,scopeRef:'conversation_1',consent:null,facts:[],now}),/consent/i);
@@ -103,17 +103,17 @@ test('V157 reranker preserves tenant scope, bounded hit count and stable evidenc
  const ranked=await rerankKnowledge({
    tenantId,storeId,queryHash:'a'.repeat(64),
    hits:[
-     {tenantId,storeId,ref:'r1',score:.7,excerpt:'first'},
-     {tenantId,storeId,ref:'r2',score:.9,excerpt:'second'},
-     {tenantId:'ffffffff-ffff-4fff-8fff-ffffffffffff',storeId,ref:'r3',score:1,excerpt:'cross tenant'}
+     {tenantId,storeId,ref:'ref1',score:.7,excerpt:'first'},
+     {tenantId,storeId,ref:'ref2',score:.9,excerpt:'second'},
+     {tenantId:'ffffffff-ffff-4fff-8fff-ffffffffffff',storeId,ref:'ref3',score:1,excerpt:'cross tenant'}
    ],
    adapter:{rerank:async(input)=>{
      assert.equal(input.tenantId,tenantId);
-     assert.deepEqual(input.refs,['r1','r2']);
-     return [{ref:'r1',score:.95},{ref:'r2',score:.55}];
+     assert.deepEqual(input.refs,['ref1','ref2']);
+     return [{ref:'ref1',score:.95},{ref:'ref2',score:.55}];
    }}
  });
- assert.deepEqual(ranked.map(hit=>hit.ref),['r1','r2']);
+ assert.deepEqual(ranked.map(hit=>hit.ref),['ref1','ref2']);
  assert.equal(ranked[0].rerankScore,.95);
  assert.equal(ranked[0].trust,'untrusted_knowledge');
 });
