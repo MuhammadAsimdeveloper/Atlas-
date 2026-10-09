@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
-const ID=/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
-const REF=/^[A-Za-z0-9][A-Za-z0-9_.:-]{2,180}$/;
+const ID=/^[a-z][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*$/;
+const REF=/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,180}$/;
 const CURRENCIES=new Set(['USD']);
 const PRODUCT_TYPES=new Set(['physical','digital','service']);
 const PRODUCT_STATUS=new Set(['draft','active','archived']);
@@ -23,7 +23,7 @@ function canonical(v){
 }
 function assertId(v,l='id'){if(typeof v!=='string'||!ID.test(v))throw Object.assign(new TypeError(l+' invalid'),{code:'invalid_id'});return v;}
 function assertRef(v,l='reference'){if(typeof v!=='string'||!REF.test(v))throw Object.assign(new TypeError(l+' invalid'),{code:'invalid_reference'});return v;}
-function text(v,l,max=500){if(typeof v!=='string'||!v.trim()||v.length>max)throw new TypeError(l+' invalid');return v.trim();}
+function text(v,l,max=500,{allowEmpty=false}={}){if(typeof v!=='string'||(!allowEmpty&&!v.trim())||v.length>max)throw new TypeError(l+' invalid');return v.trim();}
 function money(v,l='amountMinor'){if(!Number.isSafeInteger(v)||v<0)throw new RangeError(l+' must be a non-negative safe integer');return v;}
 function positiveMoney(v,l){money(v,l);if(v<1)throw new RangeError(l+' must be positive');return v;}
 function currency(v='USD'){if(!CURRENCIES.has(v))throw new TypeError('unsupported currency');return v;}
@@ -33,7 +33,7 @@ function safeArray(v,l,max){if(!Array.isArray(v)||v.length>max)throw new RangeEr
 
 export function defineProduct({tenantId,productId,name,type='service',status='active',description='',variants=[]}={}){
   assertRef(tenantId,'tenantId');assertId(productId,'productId');text(name,'name',160);if(!PRODUCT_TYPES.has(type)||!PRODUCT_STATUS.has(status))throw new TypeError('product type/status invalid');
-  text(description||'','description',2000);safeArray(variants,'variants',500);
+  text(description||'','description',2000,{allowEmpty:true});safeArray(variants,'variants',500);
   const seen=new Set();
   const normalized=variants.map((variant)=>{
     assertId(variant.id,'variantId');if(seen.has(variant.id))throw new TypeError('duplicate variant');seen.add(variant.id);
