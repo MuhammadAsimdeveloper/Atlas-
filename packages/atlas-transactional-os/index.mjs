@@ -176,7 +176,7 @@ export function transitionCheckout({checkout,to}={}){
 
 export function createPaymentEvent({tenantId,paymentId,provider,eventId,status,amountMinor,currencyCode='USD',orderId=null,occurredAt=new Date().toISOString(),payloadHash}={}){
   assertRef(tenantId,'tenantId');assertRef(paymentId,'paymentId');assertId(provider,'provider');assertRef(eventId,'eventId');money(amountMinor);currency(currencyCode);
-  if(!PAYMENT_STATUS.includes(status))throw new TypeError('payment status invalid');if(orderId)assertRef(orderId,'orderId');if(!payloadHash&&!/^[a-f0-9]{64}$/.test(payloadHash||''))throw new TypeError('payloadHash required');
+  if(!PAYMENT_STATUS.includes(status))throw new TypeError('payment status invalid');if(orderId)assertRef(orderId,'orderId');if(!/^[a-f0-9]{64}$/.test(payloadHash||''))throw new TypeError('payloadHash required');
   const dedupeKey=hash({tenantId,provider,eventId});
   const body={tenantId,paymentId,provider,eventId,status,amountMinor,currency:currencyCode,orderId,occurredAt:new Date(occurredAt).toISOString(),payloadHash,dedupeKey};
   return freeze({...body,checksum:hash(body)});
