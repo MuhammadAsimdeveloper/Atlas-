@@ -14,7 +14,9 @@ This register records the remaining product and production gaps after the V147 b
 | Inbox | Social DMs and web-chat channel parity | Partial | V148/V156 |
 | Workflow UX | Full visual canvas, rich expression/data-mapping editor, side-by-side diff | Partial | V146/V155 |
 | Workflow runtime | Live reviewed handler fleet for every catalog action | Partial | V125/V154 |
-| Workflow runtime | Redis-backed distributed wake/queue, autoscaler actuator, measured failover/load evidence | Externally gated | V154 |
+| Workflow runtime | Redis worker wakeup queue-key mismatch | Fixed in source; regression test added; CI/live Redis unverified | V154 |
+| Workflow execution | Duplicate completion callback after terminal success | Fixed in source; regression test added; CI unverified | V119 |
+| Workflow runtime | Redis-backed distributed queue, autoscaler actuator, measured failover/load evidence | Externally gated | V154 |
 | Execution ops | Full human-readable execution inspector UI, redacted step timeline export, run-from-version/replay controls | Partial | V148/V155 |
 | CRM | CSV import/export dry-run, dedupe/merge, custom fields/objects/associations, saved views/bulk operations, full activity timeline | Partial | V151 |
 | Sales | Assignment queues, weighted forecast, richer revenue/sales dashboards | Partial | V151/V158 |
