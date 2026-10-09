@@ -50,7 +50,7 @@ if (redisWakeup) {
   const queues = [...new Set(Object.keys(jobHandlers))];
   wakeLoop = (async () => {
     while (!stopping && queues.length) {
-      try { await redisWakeup.receive(queues.map(q => `${env.ATLAS_REDIS_NAMESPACE || 'atlas'}:wake:${q}`), 5); worker.wakeNow(); }
+      try { await redisWakeup.receive(queues, 5); worker.wakeNow(); }
       catch (error) { process.stderr.write(`Atlas Redis wakeup degraded: ${error?.message || 'unknown'}\n`); await new Promise(r => setTimeout(r, 2000)); }
     }
   })();
