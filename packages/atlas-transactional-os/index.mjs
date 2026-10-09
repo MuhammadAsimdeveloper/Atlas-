@@ -143,7 +143,7 @@ export function releaseInventoryReservation({state,reservation}={}){
 }
 
 export function createQuote({tenantId,quoteId,customerRef,pricing,validUntil,notes='',status='draft'}={}){
-  assertRef(tenantId,'tenantId');assertRef(quoteId,'quoteId');assertRef(customerRef,'customerRef');text(notes||'','notes',3000);
+  assertRef(tenantId,'tenantId');assertRef(quoteId,'quoteId');assertRef(customerRef,'customerRef');text(notes||'','notes',3000,{allowEmpty:true});
   if(!pricing||pricing.tenantId!==tenantId)throw new Error('pricing mismatch');
   if(!Number.isFinite(Date.parse(validUntil)))throw new TypeError('validUntil invalid');
   if(!QUOTE_STATUS.includes(status))throw new TypeError('quote status invalid');
