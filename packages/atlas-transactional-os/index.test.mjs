@@ -88,3 +88,12 @@ test('idempotency/reconciliation are durable-record contracts, not process memor
 });
 
 test('transactional capability catalog covers the next-stage product surface',()=>assert.ok(TRANSACTIONAL_CAPABILITIES.length>=45));
+
+test('inventory reservations reject stale state and bind commits to the reserved snapshot',()=>{
+ const state=createInventoryState({tenantId,items:[{variantId:'basic',onHand:5}]});
+ const reservation=reserveInventory({state,lines:[{variantId:'basic',quantity:3}],reservationId:'res-guard'});
+ assert.throws(()=>commitInventoryReservation({state:createInventoryState({tenantId,items:[{variantId:'basic',onHand:6}]}),reservation}),/state changed/i);
+ const committed=commitInventoryReservation({state:reservation.nextState,reservation});
+ assert.equal(committed.committedState.items[0].onHand,2);
+ assert.equal(committed.committedState.items[0].reserved,0);
+});
