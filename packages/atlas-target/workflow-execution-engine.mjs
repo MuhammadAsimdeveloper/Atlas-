@@ -172,12 +172,13 @@ export function completeWorkflowStep({
   selectedPort = 'next',
   now = Date.now()
 } = {}) {
-  assertMutable(execution);
+  if (!verifyExecution(execution)) throw new Error('Workflow execution checksum is invalid');
   if (!Number.isSafeInteger(attempt) || attempt < 1 || attempt > 10) throw new Error('Workflow step attempt is invalid');
 
   const prior = execution.steps.find(step => step.nodeId === nodeId && step.attempt === attempt && step.status === 'completed');
   if (prior) return execution;
 
+  assertMutable(execution);
   if (execution.currentNodeId !== nodeId) throw new Error('Workflow step is not the current step');
 
   const node = nodeFor(execution, nodeId);
