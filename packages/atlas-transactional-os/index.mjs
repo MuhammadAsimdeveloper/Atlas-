@@ -123,7 +123,7 @@ export function reserveInventory({state,lines,reservationId,ttlSeconds=900}={}){
   const qty=new Map();for(const line of lines){assertId(line.variantId,'variantId');boundedInt(line.quantity,'quantity',1,100000);qty.set(line.variantId,(qty.get(line.variantId)||0)+line.quantity);}
   const next=state.items.map(item=>{const q=qty.get(item.variantId)||0;const available=item.onHand-item.reserved;if(q>available)throw new Error('insufficient inventory');return {...item,reserved:item.reserved+q};});
   const expiresAt=new Date(Date.now()+ttlSeconds*1000).toISOString();
-  return freeze({tenantId:state.tenantId,reservationId,expiresAt,lines:[...qty.entries()].map(([variantId,quantity])=>({variantId,quantity})),nextState:freeze({tenantId:state.tenantId,items:next,stateHash:hash(next)}),reservationHash:hash({tenantId:state.tenantId,reservationId,expiresAt,lines:[...qty.entries()]})});
+  const nextState=freeze({tenantId:state.tenantId,items:next,stateHash:hash(next)});\n  return freeze({tenantId:state.tenantId,reservationId,expiresAt,lines:[...qty.entries()].map(([variantId,quantity])=>({variantId,quantity})),baseStateHash:state.stateHash,reservedStateHash:nextState.stateHash,nextState,reservationHash:hash({tenantId:state.tenantId,reservationId,expiresAt,lines:[...qty.entries()],baseStateHash:state.stateHash,reservedStateHash:nextState.stateHash})});
 }
 
 export function commitInventoryReservation({state,reservation}={}){
