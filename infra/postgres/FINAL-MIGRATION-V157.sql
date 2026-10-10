@@ -73,14 +73,40 @@ CREATE TABLE IF NOT EXISTS atlas_platform_notification_attempts (
 CREATE INDEX IF NOT EXISTS atlas_platform_notification_attempts_idx ON atlas_platform_notification_attempts(notification_id, started_at DESC);
 
 ALTER TABLE atlas_platform_content_reports ENABLE ROW LEVEL SECURITY;
-ALTER TABLE atlas_platform_content_reports FORCE ROW LEVEL SECURITY;
 ALTER TABLE atlas_platform_content_moderation_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE atlas_platform_content_moderation_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE atlas_platform_notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE atlas_platform_notifications FORCE ROW LEVEL SECURITY;
 ALTER TABLE atlas_platform_notification_attempts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE atlas_platform_notification_attempts FORCE ROW LEVEL SECURITY;
 
--- No tenant-facing policies are created. The dedicated platform-admin API must use
--- an explicitly privileged service role and audited queries before these tables are enabled.
+-- Platform tables have no direct table grants. Owner-executed SECURITY DEFINER functions
+-- provide a narrow API surface; do not grant direct SELECT/INSERT/UPDATE to atlas_app.
+CREATE OR REPLACE FUNCTION atlas_v157_admin_list_content_reports(p_status TEXT DEFAULT NULL, p_limit INTEGER DEFAULT 25)
+RETURNS SETOF atlas_platform_content_reports
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $
+  SELECT r.* FROM public.atlas_platform_content_reports r
+  WHERE p_status IS NULL OR r.status = p_status
+  ORDER BY r.created_at DESC LIMIT LEAST(GREATEST(COALESCE(p_limit,25),1),100)
+$;
+
+CREATE OR REPLACE FUNCTION atlas_v157_admin_list_notifications(p_status TEXT DEFAULT NULL, p_limit INTEGER DEFAULT 25)
+RETURNS SETOF atlas_platform_notifications
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $
+  SELECT n.* FROM public.atlas_platform_notifications n
+  WHERE p_status IS NULL OR n.status = p_status
+  ORDER BY n.created_at DESC LIMIT LEAST(GREATEST(COALESCE(p_limit,25),1),100)
+$;
+
+CREATE OR REPLACE FUNCTION atlas_v157_admin_notification_attempts(p_notification_id UUID)
+RETURNS SETOF atlas_platform_notification_attempts
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $
+  SELECT a.* FROM public.atlas_platform_notification_attempts a
+  WHERE a.notification_id = p_notification_id ORDER BY a.started_at DESC LIMIT 50
+$;
+
+REVOKE ALL ON FUNCTION atlas_v157_admin_list_content_reports(TEXT,INTEGER) FROM PUBLIC;
+REVOKE ALL ON FUNCTION atlas_v157_admin_list_notifications(TEXT,INTEGER) FROM PUBLIC;
+REVOKE ALL ON FUNCTION atlas_v157_admin_notification_attempts(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION atlas_v157_admin_list_content_reports(TEXT,INTEGER) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v157_admin_list_notifications(TEXT,INTEGER) TO atlas_app;
+GRANT EXECUTE ON FUNCTION atlas_v157_admin_notification_attempts(UUID) TO atlas_app;
+
 COMMIT;
