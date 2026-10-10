@@ -18,6 +18,7 @@ AS $func$
 DECLARE
   current_report public.atlas_platform_content_reports%ROWTYPE;
   next_status TEXT;
+  previous_status TEXT;
 BEGIN
   IF p_action NOT IN ('assigned','marked_in_review') THEN
     RAISE EXCEPTION 'unsupported_moderation_transition' USING ERRCODE='22023';
