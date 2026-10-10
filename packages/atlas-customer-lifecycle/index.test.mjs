@@ -82,7 +82,7 @@ test('CSV export is schema-bound, deterministic, and resists spreadsheet formula
    {id:'v4',name:'	=SUM(1,1)',vin:'VIN-4'}
   ]
  });
- assert.equal(exportPlan.rowCount,2);
+ assert.equal(exportPlan.rowCount,4);
  assert.equal(exportPlan.contentType,'text/csv; charset=utf-8');
  assert.match(exportPlan.csv,/'=HYPERLINK/);
  assert.match(exportPlan.csv,/"'  =SUM\(1,1\)"/);
