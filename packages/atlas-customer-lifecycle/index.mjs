@@ -198,3 +198,117 @@ export const CUSTOMER_LIFECYCLE_CAPABILITIES=Object.freeze([
  'marketing.campaigns','marketing.sequences','marketing.segmentation','marketing.attribution','marketing.utm','marketing.conversion_tracking',
  'marketing.social_publishing','marketing.reputation','marketing.ads','marketing.forms_surveys','learning.courses_memberships_community'
 ]);
+
+
+function csvCell(value) {
+  let text = value === null || value === undefined ? '' :
+    typeof value === 'object' ? JSON.stringify(value) : String(value);
+  // Spreadsheet formula injection protection applies to text values only.
+  if (typeof value === 'string' && /^(?:\s*[=+@-]|[\t\r])/.test(text)) text = "'" + text;
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+
+/**
+ * Build a deterministic, tenant-labelled CSV export artifact from already-authorized
+ * records. Authorization and tenant-scoped record retrieval must happen before calling
+ * this pure formatter; the caller's tenant ID is never treated as proof of access.
+ */
+export function createCsvExportPlan({ tenantId, exportId, schema, records = [], fields = null } = {}) {
+  assertTenant(tenantId);
+  assertRef(exportId, 'exportId');
+  if (!schema || typeof schema !== 'object' || schema.tenantId !== tenantId) {
+    throw Object.assign(new Error('schema tenant mismatch'), { code: 'tenant_mismatch' });
+  }
+  boundedArray(records, 'records', 100000);
+  const allowed = new Set(schema.properties.map(p => p.key));
+  const selected = fields === null ? schema.properties.map(p => p.key) : fields;
+  boundedArray(selected, 'fields', 200);
+  if (selected.length === 0 || new Set(selected).size !== selected.length ||
+      selected.some(field => typeof field !== 'string' || !allowed.has(field))) {
+    throw Object.assign(new Error('export fields invalid'), { code: 'export_fields_invalid' });
+  }
+  const rows = records.map((record, index) => {
+    const validation = validateRecord({ schema, record });
+    if (!validation.valid) {
+      throw Object.assign(new Error('export record validation failed'), {
+        code: 'export_record_invalid', row: index + 1, errors: validation.errors
+      });
+    }
+    return selected.map(field => csvCell(record[field])).join(',');
+  });
+  const csv = [selected.map(csvCell).join(','), ...rows].join('\r\n') + '\r\n';
+  return Object.freeze({
+    tenantId, exportId, rowCount: records.length, fields: [...selected],
+    contentType: 'text/csv; charset=utf-8', csv,
+    artifactHash: hash({ tenantId, exportId, fields: selected, csv })
+  });
+}
+
+
+/** Parse a bounded RFC-4180-style CSV document without evaluating cell contents. */
+export function parseCsvImport({tenantId,importId,schema,csv,maxBytes=5_000_000,maxRows=100_000}={}){
+  assertTenant(tenantId);assertRef(importId,'importId');
+  if(!schema||schema.tenantId!==tenantId)throw Object.assign(new Error('schema tenant mismatch'),{code:'tenant_mismatch'});
+  if(typeof csv!=='string')throw new TypeError('csv must be a string');
+  if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>25_000_000)throw new RangeError('maxBytes invalid');
+  if(!Number.isSafeInteger(maxRows)||maxRows<1||maxRows>100_000)throw new RangeError('maxRows invalid');
+  if(Buffer.byteLength(csv,'utf8')>maxBytes)throw Object.assign(new RangeError('CSV exceeds byte limit'),{code:'csv_too_large'});
+  const source=csv.charCodeAt(0)===0xFEFF?csv.slice(1):csv;
+  const rows=[];let row=[],cell='',quoted=false,closedQuote=false;
+  for(let i=0;i<source.length;i++){
+    const ch=source[i];
+    if(quoted){
+      if(ch==='"'&&source[i+1]==='"'){cell+='"';i++;}
+      else if(ch==='"'){quoted=false;closedQuote=true;}
+      else cell+=ch;
+      continue;
+    }
+    if(closedQuote&&ch!==','&&ch!=='\r'&&ch!=='\n')throw Object.assign(new Error('unexpected character after quoted CSV cell'),{code:'csv_malformed',offset:i});
+    if(ch==='"'){
+      if(cell.length!==0)throw Object.assign(new Error('quote inside unquoted CSV cell'),{code:'csv_malformed',offset:i});
+      quoted=true;
+    }else if(ch===','){
+      row.push(cell);cell='';closedQuote=false;
+    }else if(ch==='\r'||ch==='\n'){
+      if(ch==='\r'&&source[i+1]==='\n')i++;
+      row.push(cell);rows.push(row);row=[];cell='';closedQuote=false;
+      if(rows.length>maxRows+1)throw Object.assign(new RangeError('CSV row limit exceeded'),{code:'csv_too_many_rows'});
+    }else cell+=ch;
+  }
+  if(quoted)throw Object.assign(new Error('unterminated quoted CSV cell'),{code:'csv_malformed'});
+  if(cell.length||row.length||closedQuote){row.push(cell);rows.push(row);}
+  while(rows.length&&rows.at(-1).length===1&&rows.at(-1)[0]==='')rows.pop();
+  if(rows.length<1)throw Object.assign(new Error('CSV header required'),{code:'csv_header_required'});
+  if(rows.length-1>maxRows)throw Object.assign(new RangeError('CSV row limit exceeded'),{code:'csv_too_many_rows'});
+  const headers=rows.shift().map(h=>h.trim());
+  const allowed=new Set(schema.properties.map(p=>p.key));
+  if(!headers.length||headers.some(h=>!h)||new Set(headers).size!==headers.length||
+     headers.some(h=>!allowed.has(h))){
+    throw Object.assign(new Error('CSV headers must be unique schema fields'),{code:'csv_headers_invalid'});
+  }
+  const propertyByKey=new Map(schema.properties.map(p=>[p.key,p]));
+  const records=rows.map((values,index)=>{
+    if(values.length!==headers.length)throw Object.assign(new Error('CSV column count mismatch'),{code:'csv_column_count',row:index+2,expected:headers.length,actual:values.length});
+    const record={};
+    headers.forEach((header,i)=>{
+      const raw=values[i];if(raw==='')return;
+      const property=propertyByKey.get(header);let value=raw;
+      if(property.type==='number'&&raw.trim()!==''&&Number.isFinite(Number(raw)))value=Number(raw);
+      else if(property.type==='boolean'&&/^(true|false)$/i.test(raw))value=raw.toLowerCase()==='true';
+      else if(property.type==='json'){try{value=JSON.parse(raw);}catch{/* invalid JSON remains invalid for the domain validator */}}
+      record[header]=value;
+    });
+    return record;
+  });
+  return Object.freeze({tenantId,importId,headers,records,rowCount:records.length,
+    schemaHash:schema.schemaHash,contentHash:hash({tenantId,importId,headers,records})});
+}
+
+/** Parse CSV and return a dry-run validation report; persistence is deliberately separate. */
+export function createCsvImportPlan({tenantId,importId,schema,csv,mode='upsert',maxBytes=5_000_000,maxRows=100_000}={}){
+  const parsed=parseCsvImport({tenantId,importId,schema,csv,maxBytes,maxRows});
+  const validation=createImportPlan({tenantId,importId,schema,rows:parsed.records,mode,dryRun:true});
+  return Object.freeze({...parsed,mode,dryRun:true,invalidRows:validation.invalidRows,
+    validRows:validation.validRows,planHash:hash({contentHash:parsed.contentHash,mode,dryRun:true,
+      invalidRows:validation.invalidRows,validRows:validation.validRows})});
+}

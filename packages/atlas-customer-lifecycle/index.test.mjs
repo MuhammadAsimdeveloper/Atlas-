@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
  defineObjectSchema,validateRecord,upsertRecord,dedupeKey,findDedupeCandidates,createMergePlan,
  createSegmentDefinition,evaluateSegment,createActivityEvent,createAttributionTouch,attributeJourney,
- createScoreModel,scoreRecord,createCampaignDefinition,createImportPlan,createDataQualityReport,CUSTOMER_LIFECYCLE_CAPABILITIES
+ createScoreModel,scoreRecord,createCampaignDefinition,createImportPlan,createDataQualityReport,createCsvExportPlan,parseCsvImport,createCsvImportPlan,CUSTOMER_LIFECYCLE_CAPABILITIES
 } from './index.mjs';
 
 const schema=defineObjectSchema({
@@ -70,3 +70,46 @@ test('import plans are dry-run first and data quality detects duplicates',()=>{
 });
 
 test('requested Phase 2 capability surface is represented',()=>assert.ok(CUSTOMER_LIFECYCLE_CAPABILITIES.length>=20));
+
+
+test('CSV export is schema-bound, deterministic, and resists spreadsheet formula injection',()=>{
+ const exportPlan=createCsvExportPlan({
+  tenantId:'tenant_1',exportId:'export_1',schema,
+  fields:['id','name','vin'],records:[
+   {id:'v1',name:'=HYPERLINK("https://evil.example")',vin:'VIN-1'},
+   {id:'v2',name:'Truck, "Blue"',vin:'VIN-2'},
+   {id:'v3',name:'  =SUM(1,1)',vin:'VIN-3'},
+   {id:'v4',name:'	=SUM(1,1)',vin:'VIN-4'}
+  ]
+ });
+ assert.equal(exportPlan.rowCount,4);
+ assert.equal(exportPlan.contentType,'text/csv; charset=utf-8');
+ assert.match(exportPlan.csv,/'=HYPERLINK/);
+ assert.match(exportPlan.csv,/"'  =SUM\(1,1\)"/);
+ assert.match(exportPlan.csv,/"'	=SUM\(1,1\)"/);
+ assert.ok(exportPlan.csv.endsWith('\r\n'));
+ assert.equal((exportPlan.csv.match(/\r\n/g)||[]).length,5);
+ assert.match(exportPlan.csv,/"Truck, ""Blue"""/);
+ assert.match(exportPlan.artifactHash,/^[a-f0-9]{64}$/);
+ assert.throws(()=>createCsvExportPlan({tenantId:'tenant_2',exportId:'export_1',schema,records:[]}),{code:'tenant_mismatch'});
+ assert.throws(()=>createCsvExportPlan({tenantId:'tenant_1',exportId:'export_1',schema,fields:['secret'],records:[]}),{code:'export_fields_invalid'});
+ assert.throws(()=>createCsvExportPlan({tenantId:'tenant_1',exportId:'export_1',schema,records:[{id:'v1',name:'bad'}]}),{code:'export_record_invalid'});
+});
+
+
+test('CSV import parser handles quoting, CRLF, BOM, schema allowlists and bounded dry-run validation',()=>{
+ const csv='\uFEFFid,name,vin,price,active\r\nv1,"Truck, ""Blue""",VIN-1,12,true\r\nv2,Van,VIN-2,not-a-number,false\r\n';
+ const parsed=parseCsvImport({tenantId:'tenant_1',importId:'import_1',schema,csv});
+ assert.equal(parsed.rowCount,2);
+ assert.equal(parsed.records[0].name,'Truck, "Blue"');
+ assert.equal(parsed.records[0].price,12);
+ assert.equal(parsed.records[0].active,true);
+ const plan=createCsvImportPlan({tenantId:'tenant_1',importId:'import_1',schema,csv});
+ assert.equal(plan.dryRun,true);
+ assert.equal(plan.invalidRows,1);
+ assert.throws(()=>parseCsvImport({tenantId:'tenant_2',importId:'import_1',schema,csv}),{code:'tenant_mismatch'});
+ assert.throws(()=>parseCsvImport({tenantId:'tenant_1',importId:'import_1',schema,csv:'id,id\\r\\nv1,v1'}),{code:'csv_headers_invalid'});
+ assert.throws(()=>parseCsvImport({tenantId:'tenant_1',importId:'import_1',schema,csv:'id,unknown\\r\\nv1,x'}),{code:'csv_headers_invalid'});
+ assert.throws(()=>parseCsvImport({tenantId:'tenant_1',importId:'import_1',schema,csv:'id,name\\r\\n"v1,broken'}),{code:'csv_malformed'});
+ assert.throws(()=>parseCsvImport({tenantId:'tenant_1',importId:'import_1',schema,csv,maxBytes:4}),{code:'csv_too_large'});
+});
