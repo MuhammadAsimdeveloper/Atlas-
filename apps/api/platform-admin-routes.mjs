@@ -41,13 +41,12 @@ export function createPlatformAdminApi({ pool, authStore, env = process.env } = 
       await identity(req);
       const path = url.pathname.slice('/api/v1/platform-admin/'.length);
       if (path === 'overview') {
-        const [users, workspaces, audit, payments] = await Promise.all([
+        const [users, workspaces, audit] = await Promise.all([
           pool.query('SELECT count(*)::int AS total, count(*) FILTER (WHERE email_verified_at IS NOT NULL)::int AS verified, count(*) FILTER (WHERE disabled_at IS NOT NULL)::int AS disabled FROM atlas_auth_users'),
           pool.query('SELECT count(*)::int AS total FROM atlas_organizations'),
-          pool.query('SELECT count(*)::int AS total FROM atlas_auth_audit_events WHERE created_at >= now() - interval \'24 hours\''),
-          pool.query("SELECT count(*)::int AS total, count(*) FILTER (WHERE status='failed')::int AS failed, count(*) FILTER (WHERE status='captured')::int AS captured, coalesce(sum(amount_minor) FILTER (WHERE status='captured'),0)::text AS captured_minor FROM atlas_v156_payment_events")
+          pool.query('SELECT count(*)::int AS total FROM atlas_auth_audit_events WHERE created_at >= now() - interval \'24 hours\'')
         ]);
-        return send(res, 200, { data: { users: users.rows[0], workspaces: workspaces.rows[0], audit24h: audit.rows[0].total, payments: payments.rows[0], sections: { content: 'not_configured', notifications: 'not_configured' } } }, env);
+        return send(res, 200, { data: { users: users.rows[0], workspaces: workspaces.rows[0], audit24h: audit.rows[0].total, payments: { status: 'unavailable', reason: 'tenant_rls_read_model_required' }, sections: { content: 'not_configured', notifications: 'not_configured' } } }, env);
       }
       if (path === 'users') {
         const q = (url.searchParams.get('q') || '').trim().slice(0, 100);
@@ -55,11 +54,7 @@ export function createPlatformAdminApi({ pool, authStore, env = process.env } = 
         const { rows } = await pool.query(`SELECT user_id AS id, email, display_name AS "displayName", (email_verified_at IS NOT NULL) AS "emailVerified", (disabled_at IS NOT NULL) AS disabled, created_at AS "createdAt" FROM atlas_auth_users WHERE ($1 = '' OR email ILIKE '%' || $1 || '%' OR display_name ILIKE '%' || $1 || '%') ORDER BY created_at DESC LIMIT $2`, [q, limit]);
         return send(res, 200, { data: rows, limit }, env);
       }
-      if (path === 'payments') {
-        const limit = boundedLimit(url.searchParams.get('limit'));
-        const { rows } = await pool.query(`SELECT tenant_id AS "workspaceId", provider, provider_event_id AS "providerEventId", payment_id AS "paymentId", order_id AS "orderId", status, amount_minor::text AS "amountMinor", currency, occurred_at AS "occurredAt", received_at AS "receivedAt" FROM atlas_v156_payment_events ORDER BY occurred_at DESC LIMIT $1`, [limit]);
-        return send(res, 200, { data: rows, limit }, env);
-      }
+      if (path === 'payments') return send(res, 503, { error: 'platform_finance_read_model_required', message: 'Cross-tenant finance views are disabled until a tenant-isolated, audited platform reporting read model is installed.' }, env);
       if (path === 'audit') {
         const limit = boundedLimit(url.searchParams.get('limit'));
         const { rows } = await pool.query(`SELECT event_id AS id, tenant_id AS "workspaceId", actor_id AS "actorId", action, subject_ref AS "subjectRef", metadata, created_at AS "createdAt" FROM atlas_auth_audit_events ORDER BY created_at DESC LIMIT $1`, [limit]);
