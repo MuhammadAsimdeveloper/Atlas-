@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
  defineObjectSchema,validateRecord,upsertRecord,dedupeKey,findDedupeCandidates,createMergePlan,
  createSegmentDefinition,evaluateSegment,createActivityEvent,createAttributionTouch,attributeJourney,
- createScoreModel,scoreRecord,createCampaignDefinition,createImportPlan,createDataQualityReport,CUSTOMER_LIFECYCLE_CAPABILITIES
+ createScoreModel,scoreRecord,createCampaignDefinition,createImportPlan,createDataQualityReport,createCsvExportPlan,CUSTOMER_LIFECYCLE_CAPABILITIES
 } from './index.mjs';
 
 const schema=defineObjectSchema({
@@ -70,3 +70,22 @@ test('import plans are dry-run first and data quality detects duplicates',()=>{
 });
 
 test('requested Phase 2 capability surface is represented',()=>assert.ok(CUSTOMER_LIFECYCLE_CAPABILITIES.length>=20));
+
+
+test('CSV export is schema-bound, deterministic, and resists spreadsheet formula injection',()=>{
+ const exportPlan=createCsvExportPlan({
+  tenantId:'tenant_1',exportId:'export_1',schema,
+  fields:['id','name','vin'],records:[
+   {id:'v1',name:'=HYPERLINK("https://evil.example")',vin:'VIN-1'},
+   {id:'v2',name:'Truck, "Blue"',vin:'VIN-2'}
+  ]
+ });
+ assert.equal(exportPlan.rowCount,2);
+ assert.equal(exportPlan.contentType,'text/csv; charset=utf-8');
+ assert.match(exportPlan.csv,/'=HYPERLINK/);
+ assert.match(exportPlan.csv,/"Truck, ""Blue"""/);
+ assert.match(exportPlan.artifactHash,/^[a-f0-9]{64}$/);
+ assert.throws(()=>createCsvExportPlan({tenantId:'tenant_2',exportId:'export_1',schema,records:[]}),{code:'tenant_mismatch'});
+ assert.throws(()=>createCsvExportPlan({tenantId:'tenant_1',exportId:'export_1',schema,fields:['secret'],records:[]}),{code:'export_fields_invalid'});
+ assert.throws(()=>createCsvExportPlan({tenantId:'tenant_1',exportId:'export_1',schema,records:[{id:'v1',name:'bad'}]}),{code:'export_record_invalid'});
+});
