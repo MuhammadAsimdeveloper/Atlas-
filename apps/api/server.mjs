@@ -14,6 +14,7 @@ import { PostgresRuntimeStore } from './runtime-store.mjs';
 import { createRedisWakeupTransport } from '../../packages/atlas-runtime/redis-client.mjs';
 import { createCapabilityApi } from './capability-routes.mjs';
 import { createCopilotApi } from './copilot-routes.mjs';
+import { createPlatformAdminApi } from './platform-admin-routes.mjs';
 import { loadInboxContentStore } from './inbox-content.mjs';
 import { loadWebhookSecretResolver } from './webhook-secrets.mjs';
 import { runWorkflowScheduler } from './workflow-scheduler.mjs';
@@ -39,7 +40,11 @@ const webAssets = new Map([
   ['/copilot.html', ['../command-center/copilot.html', 'text/html; charset=utf-8']],
   ['/copilot.mjs', ['../command-center/copilot.mjs', 'text/javascript; charset=utf-8']],
   ['/copilot.css', ['../command-center/copilot.css', 'text/css; charset=utf-8']],
-  ['/copilot-widget.mjs', ['../marketing-site/copilot-widget.mjs', 'text/javascript; charset=utf-8']]
+  ['/copilot-widget.mjs', ['../marketing-site/copilot-widget.mjs', 'text/javascript; charset=utf-8']],
+  ['/platform-admin', ['../command-center/platform-admin.html', 'text/html; charset=utf-8']],
+  ['/platform-admin.html', ['../command-center/platform-admin.html', 'text/html; charset=utf-8']],
+  ['/platform-admin.mjs', ['../command-center/platform-admin.mjs', 'text/javascript; charset=utf-8']],
+  ['/platform-admin.css', ['../command-center/platform-admin.css', 'text/css; charset=utf-8']]
 ]);
 
 function json(res, status, body, headers = {}) {
@@ -91,6 +96,7 @@ let webhookSecretResolver = null;
 let schedulerTimer = null;
 let redisWakeup = null;
 let copilotApi = null;
+let platformAdminApi = null;
 if (env.ATLAS_DATABASE_URL) {
   const { Pool } = await import('pg');
   pool = new Pool(await createPostgresPoolConfig(env, { application_name: `atlas-api-${release.toLowerCase()}` }));
@@ -108,6 +114,7 @@ if (env.ATLAS_DATABASE_URL) {
   webhookSecretResolver = await loadWebhookSecretResolver(env);
   capabilityApi = createCapabilityApi({ store: capabilityStore, authStore, env, inboxContentStore, webhookSecretResolver });
   copilotApi = createCopilotApi({ pool, authStore, runtimeStore, inboxContentStore, env });
+  platformAdminApi = createPlatformAdminApi({ pool, authStore, env });
   if (env.ATLAS_WORKFLOW_SCHEDULER_ENABLED === 'true') {
     const intervalMs=Math.max(1000,Math.min(60000,Number(env.ATLAS_WORKFLOW_SCHEDULER_INTERVAL_MS||5000)));
     const tick=()=>void runWorkflowScheduler({runtimeStore,growthStore,executionStore:workflowExecutionStore,limit:100}).catch(error=>process.stderr.write(`Atlas workflow scheduler failed: ${error?.message||'unknown'}\\n`));
@@ -143,6 +150,10 @@ const server = createServer(async (req, res) => {
   }
   if (copilotApi) {
     const handled = await copilotApi.handle(req, res);
+    if (handled) return;
+  }
+  if (platformAdminApi) {
+    const handled = await platformAdminApi.handle(req, res);
     if (handled) return;
   }
   if (url.pathname.startsWith('/api/')) return json(res, authApi ? 404 : 503, { error: authApi ? 'not_found' : 'database_required' });

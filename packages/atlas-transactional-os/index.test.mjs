@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
- defineProduct,definePriceBook,defineTaxPolicy,defineCoupon,createCart,priceCart,
+ defineProduct,definePriceBook,defineTaxPolicy,defineCoupon,createCart,priceCart,createOrder,
  createInventoryState,reserveInventory,commitInventoryReservation,releaseInventoryReservation,
  createQuote,transitionQuote,createCheckoutIntent,transitionCheckout,createPaymentEvent,applyPaymentEvent,
  createSubscription,transitionSubscription,createRefundRequest,createCredit,consumeCredit,
@@ -44,7 +44,7 @@ test('quote and checkout state machines reject invalid transitions',()=>{
  assert.throws(()=>transitionCheckout({checkout,to:'completed'}),/transition/);
 });
 
-test('payment events are provider-idempotent and state transitions are bounded',()=>{
+test('payments are provider-event idempotent and state transitions are bounded',()=>{
  const state={tenantId,paymentId:'pay-1',currency:'USD',amountMinor:10000,status:'authorized',version:1};
  const event=createPaymentEvent({tenantId,paymentId:'pay-1',provider:'stripe',eventId:'evt-1',status:'captured',amountMinor:10000,payloadHash:'a'.repeat(64)});
  assert.equal(applyPaymentEvent({paymentState:state,event}).status,'captured');
@@ -88,3 +88,23 @@ test('idempotency/reconciliation are durable-record contracts, not process memor
 });
 
 test('transactional capability catalog covers the next-stage product surface',()=>assert.ok(TRANSACTIONAL_CAPABILITIES.length>=45));
+
+test('inventory reservations reject stale state and bind commits to the reserved snapshot',()=>{
+ const state=createInventoryState({tenantId,items:[{variantId:'basic',onHand:5}]});
+ const reservation=reserveInventory({state,lines:[{variantId:'basic',quantity:3}],reservationId:'res-guard'});
+ assert.throws(()=>commitInventoryReservation({state:createInventoryState({tenantId,items:[{variantId:'basic',onHand:6}]}),reservation}),/state changed/i);
+ const committed=commitInventoryReservation({state:reservation.nextState,reservation});
+ assert.equal(committed.committedState.items[0].onHand,2);
+ assert.equal(committed.committedState.items[0].reserved,0);
+});
+
+test('orders bind tenant, customer, immutable pricing hash and bounded status',()=>{
+ const pricing={currency:'USD',totalMinor:2500,pricingHash:'a'.repeat(64)};
+ const order=createOrder({tenantId,orderId:'order_1',customerRef:'customer_1',pricing,inventoryReservationId:'reserve_1'});
+ assert.equal(order.totalMinor,2500);
+ assert.equal(order.pricingHash,pricing.pricingHash);
+ assert.equal(order.status,'draft');
+ assert.equal(order.checksum.length,64);
+ assert.throws(()=>createOrder({tenantId,orderId:'order_2',customerRef:'customer_1',pricing,status:'captured'}),/status/i);
+ assert.throws(()=>createOrder({tenantId,orderId:'order_3',customerRef:'customer_1',pricing:{currency:'EUR',totalMinor:2}}),/currency/i);
+});

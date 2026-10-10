@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
-const ID=/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
-const REF=/^[A-Za-z0-9][A-Za-z0-9_.:-]{2,180}$/;
+const ID=/^[A-Za-z][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*$/;
+const REF=/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,180}$/;
 const CURRENCIES=new Set(['USD']);
 const PRODUCT_TYPES=new Set(['physical','digital','service']);
 const PRODUCT_STATUS=new Set(['draft','active','archived']);
@@ -23,7 +23,7 @@ function canonical(v){
 }
 function assertId(v,l='id'){if(typeof v!=='string'||!ID.test(v))throw Object.assign(new TypeError(l+' invalid'),{code:'invalid_id'});return v;}
 function assertRef(v,l='reference'){if(typeof v!=='string'||!REF.test(v))throw Object.assign(new TypeError(l+' invalid'),{code:'invalid_reference'});return v;}
-function text(v,l,max=500){if(typeof v!=='string'||!v.trim()||v.length>max)throw new TypeError(l+' invalid');return v.trim();}
+function text(v,l,max=500,{allowEmpty=false}={}){if(typeof v!=='string'||(!allowEmpty&&!v.trim())||v.length>max)throw new TypeError(l+' invalid');return v.trim();}
 function money(v,l='amountMinor'){if(!Number.isSafeInteger(v)||v<0)throw new RangeError(l+' must be a non-negative safe integer');return v;}
 function positiveMoney(v,l){money(v,l);if(v<1)throw new RangeError(l+' must be positive');return v;}
 function currency(v='USD'){if(!CURRENCIES.has(v))throw new TypeError('unsupported currency');return v;}
@@ -33,7 +33,7 @@ function safeArray(v,l,max){if(!Array.isArray(v)||v.length>max)throw new RangeEr
 
 export function defineProduct({tenantId,productId,name,type='service',status='active',description='',variants=[]}={}){
   assertRef(tenantId,'tenantId');assertId(productId,'productId');text(name,'name',160);if(!PRODUCT_TYPES.has(type)||!PRODUCT_STATUS.has(status))throw new TypeError('product type/status invalid');
-  text(description||'','description',2000);safeArray(variants,'variants',500);
+  text(description||'','description',2000,{allowEmpty:true});safeArray(variants,'variants',500);
   const seen=new Set();
   const normalized=variants.map((variant)=>{
     assertId(variant.id,'variantId');if(seen.has(variant.id))throw new TypeError('duplicate variant');seen.add(variant.id);
@@ -123,27 +123,45 @@ export function reserveInventory({state,lines,reservationId,ttlSeconds=900}={}){
   const qty=new Map();for(const line of lines){assertId(line.variantId,'variantId');boundedInt(line.quantity,'quantity',1,100000);qty.set(line.variantId,(qty.get(line.variantId)||0)+line.quantity);}
   const next=state.items.map(item=>{const q=qty.get(item.variantId)||0;const available=item.onHand-item.reserved;if(q>available)throw new Error('insufficient inventory');return {...item,reserved:item.reserved+q};});
   const expiresAt=new Date(Date.now()+ttlSeconds*1000).toISOString();
-  return freeze({tenantId:state.tenantId,reservationId,expiresAt,lines:[...qty.entries()].map(([variantId,quantity])=>({variantId,quantity})),nextState:freeze({tenantId:state.tenantId,items:next,stateHash:hash(next)}),reservationHash:hash({tenantId:state.tenantId,reservationId,expiresAt,lines:[...qty.entries()]})});
+  const nextState=freeze({tenantId:state.tenantId,items:next,stateHash:hash(next)});
+  return freeze({tenantId:state.tenantId,reservationId,expiresAt,lines:[...qty.entries()].map(([variantId,quantity])=>({variantId,quantity})),baseStateHash:state.stateHash,reservedStateHash:nextState.stateHash,nextState,reservationHash:hash({tenantId:state.tenantId,reservationId,expiresAt,lines:[...qty.entries()],baseStateHash:state.stateHash,reservedStateHash:nextState.stateHash})});
 }
 
 export function commitInventoryReservation({state,reservation}={}){
-  if(!reservation||reservation.nextState?.tenantId!==state?.tenantId)throw new Error('reservation mismatch');
+  if(!state||!Array.isArray(state.items)||!reservation||reservation.nextState?.tenantId!==state.tenantId)throw new Error('reservation mismatch');
   if(Date.parse(reservation.expiresAt)<=Date.now())throw new Error('reservation expired');
+  const currentHash=hash(state.items);
+  const fromReserved=currentHash===reservation.reservedStateHash;
+  if(!fromReserved&&currentHash!==reservation.baseStateHash)throw new Error('inventory state changed since reservation');
   const qty=new Map(reservation.lines.map(x=>[x.variantId,x.quantity]));
-  const items=state.items.map(item=>{const q=qty.get(item.variantId)||0;return q?{...item,onHand:item.onHand-q,reserved:item.reserved-q}:item;});
+  for(const variantId of qty.keys())if(!state.items.some(item=>item.variantId===variantId))throw new Error('reservation inventory item missing');
+  const items=state.items.map(item=>{const q=qty.get(item.variantId)||0;if(!q)return item;return fromReserved?{...item,onHand:item.onHand-q,reserved:item.reserved-q}:{...item,onHand:item.onHand-q};});
   if(items.some(i=>i.onHand<0||i.reserved<0||i.reserved>i.onHand))throw new Error('inventory invariant violated');
   return freeze({tenantId:state.tenantId,reservationId:reservation.reservationId,committedState:freeze({tenantId:state.tenantId,items,stateHash:hash(items)})});
 }
 
 export function releaseInventoryReservation({state,reservation}={}){
-  if(!reservation||reservation.nextState?.tenantId!==state?.tenantId)throw new Error('reservation mismatch');
+  if(!state||!reservation||reservation.nextState?.tenantId!==state.tenantId)throw new Error('reservation mismatch');
+  if(hash(state.items)!==reservation.reservedStateHash)throw new Error('inventory state changed since reservation');
   const qty=new Map(reservation.lines.map(x=>[x.variantId,x.quantity]));
   const items=state.items.map(item=>{const q=qty.get(item.variantId)||0;const next=item.reserved-q;if(next<0)throw new Error('release exceeds reserved');return q?{...item,reserved:next}:item;});
   return freeze({tenantId:state.tenantId,reservationId:reservation.reservationId,releasedState:freeze({tenantId:state.tenantId,items,stateHash:hash(items)})});
 }
 
+export function createOrder({tenantId,orderId,customerRef,pricing,inventoryReservationId=null,status='draft',reason=''}={}) {
+  assertRef(tenantId,'tenantId');assertRef(orderId,'orderId');assertRef(customerRef,'customerRef');
+  if(!pricing||!Number.isSafeInteger(pricing.totalMinor)||pricing.totalMinor<0)throw new TypeError('order pricing invalid');
+  const currencyCode=currency(pricing.currency||'USD');
+  const pricingHash=typeof pricing.pricingHash==='string'&&/^[a-f0-9]{64}$/.test(pricing.pricingHash)?pricing.pricingHash:hash(pricing);
+  if(inventoryReservationId!==null)assertRef(inventoryReservationId,'inventoryReservationId');
+  if(!ORDER_STATUS.includes(status))throw new TypeError('order status invalid');
+  text(reason,'reason',300,{allowEmpty:true});
+  const body={tenantId,orderId,customerRef,currency:currencyCode,totalMinor:pricing.totalMinor,pricingHash,inventoryReservationId,status,version:1,reason:reason.trim()};
+  return freeze({...body,checksum:hash(body)});
+}
+
 export function createQuote({tenantId,quoteId,customerRef,pricing,validUntil,notes='',status='draft'}={}){
-  assertRef(tenantId,'tenantId');assertRef(quoteId,'quoteId');assertRef(customerRef,'customerRef');text(notes||'','notes',3000);
+  assertRef(tenantId,'tenantId');assertRef(quoteId,'quoteId');assertRef(customerRef,'customerRef');text(notes||'','notes',3000,{allowEmpty:true});
   if(!pricing||pricing.tenantId!==tenantId)throw new Error('pricing mismatch');
   if(!Number.isFinite(Date.parse(validUntil)))throw new TypeError('validUntil invalid');
   if(!QUOTE_STATUS.includes(status))throw new TypeError('quote status invalid');
@@ -176,7 +194,7 @@ export function transitionCheckout({checkout,to}={}){
 
 export function createPaymentEvent({tenantId,paymentId,provider,eventId,status,amountMinor,currencyCode='USD',orderId=null,occurredAt=new Date().toISOString(),payloadHash}={}){
   assertRef(tenantId,'tenantId');assertRef(paymentId,'paymentId');assertId(provider,'provider');assertRef(eventId,'eventId');money(amountMinor);currency(currencyCode);
-  if(!PAYMENT_STATUS.includes(status))throw new TypeError('payment status invalid');if(orderId)assertRef(orderId,'orderId');if(!payloadHash&&!/^[a-f0-9]{64}$/.test(payloadHash||''))throw new TypeError('payloadHash required');
+  if(!PAYMENT_STATUS.includes(status))throw new TypeError('payment status invalid');if(orderId)assertRef(orderId,'orderId');if(!/^[a-f0-9]{64}$/.test(payloadHash||''))throw new TypeError('payloadHash required');
   const dedupeKey=hash({tenantId,provider,eventId});
   const body={tenantId,paymentId,provider,eventId,status,amountMinor,currency:currencyCode,orderId,occurredAt:new Date(occurredAt).toISOString(),payloadHash,dedupeKey};
   return freeze({...body,checksum:hash(body)});
@@ -190,8 +208,8 @@ export function applyPaymentEvent({paymentState,event}={}){
     authorized:['captured','failed'],captured:['partially_refunded','refunded'],partially_refunded:['partially_refunded','refunded'],
     failed:[],refunded:[]
   };
-  if(!legal[paymentState.status]?.includes(event.status))throw Object.assign(new Error('payment transition invalid'),{code:'invalid_transition'});
   if((event.status==='captured'||event.status==='refunded'||event.status==='partially_refunded')&&event.amountMinor>paymentState.amountMinor)throw new Error('payment amount exceeds original');
+  if(!legal[paymentState.status]?.includes(event.status))throw Object.assign(new Error('payment transition invalid'),{code:'invalid_transition'});
   return freeze({...clone(paymentState),status:event.status,lastEventId:event.eventId,lastEventHash:event.payloadHash,version:(paymentState.version||1)+1});
 }
 
@@ -213,6 +231,7 @@ export function transitionSubscription({subscription,to,expectedVersion=subscrip
 
 export function createRefundRequest({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,capturedMinor=null,alreadyRefundedMinor=0,requiresApprovalAboveMinor=100000,approval=null}={}){
   assertRef(tenantId,'tenantId');assertRef(refundId,'refundId');assertRef(paymentId,'paymentId');positiveMoney(amountMinor,'amountMinor');text(reason,'reason',500);idem(idempotencyKey);money(requiresApprovalAboveMinor,'requiresApprovalAboveMinor');
+  if(capturedMinor!==null){money(capturedMinor,'capturedMinor');money(alreadyRefundedMinor,'alreadyRefundedMinor');if(amountMinor+alreadyRefundedMinor>capturedMinor)throw new Error('refund exceeds refundable balance');}
   const approvalRequired=amountMinor>requiresApprovalAboveMinor;if(approvalRequired&&approval?.status!=='approved')return freeze({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,status:'needs_approval',approvalRequired:true});
   return freeze({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,status:'approved',approvalRequired:false,refundHash:hash({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey})});
 }

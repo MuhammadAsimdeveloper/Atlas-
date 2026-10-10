@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
-const ID=/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
-const REF=/^[A-Za-z0-9][A-Za-z0-9_.:-]{2,180}$/;
+const ID=/^[a-z][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*$/;
+const REF=/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,180}$/;
 const PROPERTY=/^[a-z][a-z0-9_]{1,63}$/;
 const TYPES=new Set(['string','number','boolean','date','datetime','email','phone','url','enum','json','reference']);
 const OPS=new Set(['equals','not_equals','contains','starts_with','ends_with','gt','gte','lt','lte','exists','in','not_in','between']);

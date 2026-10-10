@@ -305,3 +305,25 @@ test('wait-until nodes reject unbounded or past resume times', () => {
   const before = resumeWorkflowExecution({ execution, now: now + 5 * 60_000 - 1 });
   assert.equal(before, execution);
 });
+
+test('duplicate completion after terminal success is idempotent', () => {
+  const initial = createWorkflowExecution({
+    tenantId,
+    executionId,
+    workflow: graph(),
+    triggerEventRef: 'event_terminal_duplicate',
+    createdByActorId: '99999999-9999-4999-8999-999999999999'
+  });
+  const afterTrigger = completeWorkflowStep({ execution: initial, nodeId: 'start', now: '2026-10-05T10:00:00Z' });
+  const afterTask = completeWorkflowStep({ execution: afterTrigger, nodeId: 'task', now: '2026-10-05T10:00:01Z' });
+  const completed = completeWorkflowStep({ execution: afterTask, nodeId: 'stop', now: '2026-10-05T10:00:02Z' });
+
+  assert.equal(completed.status, 'completed');
+  const duplicate = completeWorkflowStep({
+    execution: completed,
+    nodeId: 'stop',
+    attempt: 1,
+    now: '2026-10-05T10:00:03Z'
+  });
+  assert.strictEqual(duplicate, completed);
+});

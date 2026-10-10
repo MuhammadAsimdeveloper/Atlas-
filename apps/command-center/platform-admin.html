@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Atlas Platform Admin</title>
+  <link rel="stylesheet" href="/platform-admin.css">
+  <script type="module" src="/platform-admin.mjs"></script>
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/platform-admin" aria-label="Atlas Platform Admin home"><span class="brand-mark">A</span><span>atlas<span class="brand-sub">PLATFORM CONTROL</span></span></a>
+      <div class="nav-label">OPERATIONS</div>
+      <nav aria-label="Platform administration">
+        <button class="nav-item active" data-view="overview"><span>◫</span> Overview</button>
+        <button class="nav-item" data-view="users"><span>♙</span> Users & workspaces</button>
+        <button class="nav-item" data-view="content"><span>▤</span> Content control</button>
+        <button class="nav-item" data-view="payments"><span>＄</span> Payments & transactions</button>
+        <button class="nav-item" data-view="notifications"><span>♧</span> Notifications</button>
+        <button class="nav-item" data-view="reports"><span>▥</span> Reports</button>
+        <button class="nav-item" data-view="audit"><span>◷</span> Audit & security</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="status-dot"></div><div><strong>Control plane</strong><small id="connection-state">Checking secure session…</small></div></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div class="breadcrumbs">Atlas <span>/</span> Platform administration</div><div class="top-actions"><span class="environment"><i></i> LIVE DATA</span><button id="refresh" class="icon-button" aria-label="Refresh data" title="Refresh data">↻</button><div class="avatar" aria-label="Platform administrator">PA</div></div></header>
+      <section class="page-head"><div><div class="eyebrow" id="eyebrow">PLATFORM OVERVIEW</div><h1 id="page-title">Good operations start with visibility.</h1><p id="page-description">A secure, cross-workspace view of Atlas health and activity.</p></div><div class="head-date" id="today-label"></div></section>
+      <div id="alert" class="alert" role="status" hidden></div>
+      <section id="content" aria-live="polite"><div class="loading"><span class="spinner"></span> Loading platform data securely…</div></section>
+      <footer><span>Atlas Platform Admin</span><span>Owner-only access · Changes must be audited</span></footer>
+    </main>
+  </div>
+</body>
+</html>

@@ -29,7 +29,7 @@ HubSpot's current platform uses a shared object/data model, custom objects, asso
 **Atlas change:** V155 becomes the reusable typed data/relationship layer underlying CRM, marketing, commerce, support and reporting—not a thin contacts feature.
 
 ### Salesforce
-Salesforce is pushing API-first, composable revenue processes and a unified data + agent + business-logic architecture. Revenue Cloud exposes quoting, pricing, ordering and billing as modular APIs; Agentforce can act against governed business processes. Salesforce's 2026 Headless 360 direction exposes platform business logic and agents to MCP/external surfaces. 
+Salesforce is pushing API-first, composable revenue processes and a unified data + agent + business-logic architecture. Revenue Cloud exposes quoting, pricing, ordering and billing as modular APIs; Agentforce can act against governed business processes. Salesforce's 2026 Headless 360 direction exposes platform business logic and agents to MCP/external surfaces.
 
 **Atlas change:** every important Atlas business capability must have a callable service/API contract, not only a UI workflow. Business actions become agent tools, API endpoints and workflow nodes from the same source definition.
 

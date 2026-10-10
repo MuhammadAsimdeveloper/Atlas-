@@ -201,3 +201,4 @@ Use n8n as a moving benchmark and re-check public n8n docs before each major par
 ## Success metric
 
 Atlas wins when a non-technical business owner can describe a business outcome in one sentence, receive a reviewable automation plan, optionally let Copilot build or navigate it, test safely, publish it, and later diagnose or repair it — while an advanced user still gets n8n-class depth, control and extensibility.
+
