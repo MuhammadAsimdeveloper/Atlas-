@@ -95,3 +95,16 @@ test('moderation and notification filters reject unknown states before querying'
   assert.equal(h.calls.length,0);
  }
 });
+
+test('notification attempt history requires a UUID and uses the bounded database function', async()=>{
+ const h=harness();
+ h.req.url='/api/v1/platform-admin/notifications/00000000-0000-4000-8000-000000000001/attempts';
+ await h.api.handle(h.req,h.res);
+ assert.equal(h.res.status,200);
+ assert.ok(h.calls.some(call=>call.sql.includes('atlas_v157_admin_notification_attempts') && call.params[0]==='00000000-0000-4000-8000-000000000001'));
+ const bad=harness();
+ bad.req.url='/api/v1/platform-admin/notifications/not-a-uuid/attempts';
+ await bad.api.handle(bad.req,bad.res);
+ assert.equal(bad.res.status,400);
+ assert.equal(bad.calls.length,0);
+});
