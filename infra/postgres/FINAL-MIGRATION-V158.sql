@@ -49,6 +49,7 @@ BEGIN
     RAISE EXCEPTION 'content_report_not_transitionable' USING ERRCODE='22023';
   END IF;
 
+  previous_status := current_report.status;
   next_status := CASE WHEN p_action = 'marked_in_review' THEN 'in_review' ELSE current_report.status END;
   UPDATE public.atlas_platform_content_reports
     SET assigned_to = CASE WHEN p_action = 'assigned' THEN trim(p_assigned_to) ELSE assigned_to END,
@@ -63,7 +64,7 @@ BEGIN
     (report_id, actor_user_id, action, reason, from_status, to_status, request_id)
   VALUES
     (p_report_id, p_actor_user_id, p_action, trim(p_reason),
-     (SELECT CASE WHEN p_action='marked_in_review' THEN 'open' ELSE current_report.status END),
+     previous_status,
      current_report.status, p_request_id);
 
   RETURN NEXT current_report;
