@@ -30,7 +30,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     const moderationTransition = await db.query("SELECT proname, prosecdef FROM pg_proc WHERE proname='atlas_v158_admin_transition_content_report'");
     assert.equal(moderationTransition.rowCount,1,'V158 installs the audited moderation transition function');
     assert.equal(moderationTransition.rows[0].prosecdef,true,'V158 moderation transition uses SECURITY DEFINER');
-    const transitionGrants = await db.query("SELECT has_function_privilege('atlas_app','atlas_v158_admin_transition_content_report(uuid,uuid,text,text,text,integer,text)','EXECUTE') AS app_can_transition,has_function_privilege('public','atlas_v158_admin_transition_content_report(uuid,uuid,text,text,text,integer,text)','EXECUTE') AS public_can_transition");
+    const transitionGrants = await db.query("SELECT has_function_privilege('atlas_app','atlas_v158_admin_transition_content_report(uuid,uuid,text,text,text,integer,text)','EXECUTE') AS app_can_transition,NOT EXISTS (SELECT 1 FROM aclexplode(proacl) acl WHERE acl.grantee=0 AND acl.privilege_type='EXECUTE') AS public_can_transition FROM pg_proc WHERE proname='atlas_v158_admin_transition_content_report'");
     assert.equal(transitionGrants.rows[0].app_can_transition,true);
     assert.equal(transitionGrants.rows[0].public_can_transition,false,'V158 transition function is not executable by PUBLIC');
     const automationTable = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_v127_automation_events'::regclass");
