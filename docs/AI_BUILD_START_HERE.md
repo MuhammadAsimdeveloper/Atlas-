@@ -27,3 +27,8 @@ Inspect current V-series architecture and production truth boundary first. Use T
 Business agents → event/automation engine → connector lifecycle → unified inbox/communications → approvals → knowledge → analytics/SLOs → shared SEO/API/audit utilities → production deployment evidence.
 
 Implement the next unfinished capability from the roadmap and update its V-series documentation.
+
+## Platform admin portal priority
+Read `docs/PLATFORM-ADMIN-PORTAL-PLAN-2026-10-10.md` and `docs/PLATFORM-ADMIN-COMPETITOR-REVIEW-2026-10-10.md` before admin-console changes. The owner-only console must include user/workspace management, content moderation, payments/transactions, notifications, reports, audit/security, and platform settings. The current first pass provides the shell and read-only overview/users/payment/audit/report endpoints. Content moderation, notification delivery, audited write operations, and production-role/RLS qualification are still gates—not completed features. Do not expose destructive controls until their persistence, approval, idempotency, audit and tests exist.
+
+The linked private `MuhammadAsimdeveloper/Vibe-coding-` repository is an MIT-licensed engineering workflow toolkit. Reuse its QA/review/security/release discipline where appropriate; do not assume it contains an admin product or copy unrelated developer CLI modules into Atlas.
