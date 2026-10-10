@@ -32,3 +32,8 @@ Implement the next unfinished capability from the roadmap and update its V-serie
 Read `docs/PLATFORM-ADMIN-PORTAL-PLAN-2026-10-10.md` and `docs/PLATFORM-ADMIN-COMPETITOR-REVIEW-2026-10-10.md` before admin-console changes. The owner-only console must include user/workspace management, content moderation, payments/transactions, notifications, reports, audit/security, and platform settings. The current first pass provides the shell and read-only overview/users/payment/audit/report endpoints. Content moderation, notification delivery, audited write operations, and production-role/RLS qualification are still gates—not completed features. Do not expose destructive controls until their persistence, approval, idempotency, audit and tests exist.
 
 The linked private `MuhammadAsimdeveloper/Vibe-coding-` repository is an MIT-licensed engineering workflow toolkit. Reuse its QA/review/security/release discipline where appropriate; do not assume it contains an admin product or copy unrelated developer CLI modules into Atlas.
+
+
+## Platform admin phase 2 (2026-10-10)
+
+See `docs/PLATFORM-ADMIN-PHASE-2-2026-10-10.md`. The V157 migration and owner-only moderation/notification read surfaces are implemented on the current admin branch. Keep all write actions disabled until the content adapter and append-only event log can commit atomically, and notification delivery has a real provider-backed worker, consent/suppression handling and idempotent attempts. CI and production migration validation remain required.
