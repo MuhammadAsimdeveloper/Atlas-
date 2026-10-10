@@ -37,3 +37,8 @@ The linked private `MuhammadAsimdeveloper/Vibe-coding-` repository is an MIT-lic
 ## Platform admin phase 2 (2026-10-10)
 
 See `docs/PLATFORM-ADMIN-PHASE-2-2026-10-10.md`. The V157 migration and owner-only moderation/notification read surfaces are implemented on the current admin branch. Keep all write actions disabled until the content adapter and append-only event log can commit atomically, and notification delivery has a real provider-backed worker, consent/suppression handling and idempotent attempts. CI and production migration validation remain required.
+
+
+## Platform admin phase 3 (2026-10-10)
+
+See `docs/PLATFORM-ADMIN-PHASE-3-2026-10-10.md`. V158 adds audited, version-checked moderation triage for assignment and review status only. Enforcement decisions remain disabled until the actual content/account adapter and event log commit atomically. Re-run CI against the current branch head and validate production migration/role privileges before rollout.
