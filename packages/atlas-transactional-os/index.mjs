@@ -148,6 +148,18 @@ export function releaseInventoryReservation({state,reservation}={}){
   return freeze({tenantId:state.tenantId,reservationId:reservation.reservationId,releasedState:freeze({tenantId:state.tenantId,items,stateHash:hash(items)})});
 }
 
+export function createOrder({tenantId,orderId,customerRef,pricing,inventoryReservationId=null,status='draft',reason=''}={}) {
+  assertRef(tenantId,'tenantId');assertRef(orderId,'orderId');assertRef(customerRef,'customerRef');
+  if(!pricing||!Number.isSafeInteger(pricing.totalMinor)||pricing.totalMinor<0)throw new TypeError('order pricing invalid');
+  const currencyCode=currency(pricing.currency||'USD');
+  const pricingHash=typeof pricing.pricingHash==='string'&&/^[a-f0-9]{64}$/.test(pricing.pricingHash)?pricing.pricingHash:hash(pricing);
+  if(inventoryReservationId!==null)assertRef(inventoryReservationId,'inventoryReservationId');
+  if(!ORDER_STATUS.includes(status))throw new TypeError('order status invalid');
+  text(reason,'reason',300,{allowEmpty:true});
+  const body={tenantId,orderId,customerRef,currency:currencyCode,totalMinor:pricing.totalMinor,pricingHash,inventoryReservationId,status,version:1,reason:reason.trim()};
+  return freeze({...body,checksum:hash(body)});
+}
+
 export function createQuote({tenantId,quoteId,customerRef,pricing,validUntil,notes='',status='draft'}={}){
   assertRef(tenantId,'tenantId');assertRef(quoteId,'quoteId');assertRef(customerRef,'customerRef');text(notes||'','notes',3000,{allowEmpty:true});
   if(!pricing||pricing.tenantId!==tenantId)throw new Error('pricing mismatch');
