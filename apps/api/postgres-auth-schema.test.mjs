@@ -18,7 +18,7 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     await db.exec('CREATE ROLE atlas_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;');
     await db.exec('CREATE ROLE atlas_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOBYPASSRLS;');
   const files = (await readdir(migrationDirectory)).filter(name => /^FINAL-MIGRATION-V[0-9]+(?:-V[0-9]+)?\.sql$/.test(name)).sort((a,b) => Number(a.match(/V([0-9]+)/)[1]) - Number(b.match(/V([0-9]+)/)[1]) || a.localeCompare(b));
-    assert.equal(files.at(-1), 'FINAL-MIGRATION-V157.sql');
+    assert.equal(files.at(-1), 'FINAL-MIGRATION-V158.sql');
     for (const file of files) { try { await db.exec(await readFile(path.join(migrationDirectory,file),'utf8')); } catch (error) { throw new Error(`${file}: ${error.message}`); } }
     const moderationTable = await db.query("SELECT relrowsecurity FROM pg_class WHERE oid='atlas_platform_content_reports'::regclass");
     assert.equal(moderationTable.rows[0].relrowsecurity,true,'V157 platform moderation reports enable RLS');
@@ -27,6 +27,12 @@ test('all PostgreSQL migrations apply in order and V115 keeps tenant data and wo
     const moderationRead = await db.query("SELECT proname, prosecdef FROM pg_proc WHERE proname='atlas_v157_admin_list_content_reports'");
     assert.equal(moderationRead.rowCount,1,'V157 installs the bounded moderation read function');
     assert.equal(moderationRead.rows[0].prosecdef,true,'V157 moderation read uses SECURITY DEFINER');
+    const moderationTransition = await db.query("SELECT proname, prosecdef FROM pg_proc WHERE proname='atlas_v158_admin_transition_content_report'");
+    assert.equal(moderationTransition.rowCount,1,'V158 installs the audited moderation transition function');
+    assert.equal(moderationTransition.rows[0].prosecdef,true,'V158 moderation transition uses SECURITY DEFINER');
+    const transitionGrants = await db.query("SELECT has_function_privilege('atlas_app','atlas_v158_admin_transition_content_report(uuid,uuid,text,text,text,integer,text)','EXECUTE') AS app_can_transition,has_function_privilege('public','atlas_v158_admin_transition_content_report(uuid,uuid,text,text,text,integer,text)','EXECUTE') AS public_can_transition");
+    assert.equal(transitionGrants.rows[0].app_can_transition,true);
+    assert.equal(transitionGrants.rows[0].public_can_transition,false,'V158 transition function is not executable by PUBLIC');
     const automationTable = await db.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='atlas_v127_automation_events'::regclass");
     assert.equal(automationTable.rows[0].relrowsecurity,true);
     assert.equal(automationTable.rows[0].relforcerowsecurity,true);
