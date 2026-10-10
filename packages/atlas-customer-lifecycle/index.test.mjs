@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
  defineObjectSchema,validateRecord,upsertRecord,dedupeKey,findDedupeCandidates,createMergePlan,
  createSegmentDefinition,evaluateSegment,createActivityEvent,createAttributionTouch,attributeJourney,
- createScoreModel,scoreRecord,createCampaignDefinition,createImportPlan,createDataQualityReport,createCsvExportPlan,CUSTOMER_LIFECYCLE_CAPABILITIES
+ createScoreModel,scoreRecord,createCampaignDefinition,createImportPlan,createDataQualityReport,createCsvExportPlan,parseCsvImport,createCsvImportPlan,CUSTOMER_LIFECYCLE_CAPABILITIES
 } from './index.mjs';
 
 const schema=defineObjectSchema({
@@ -94,4 +94,22 @@ test('CSV export is schema-bound, deterministic, and resists spreadsheet formula
  assert.throws(()=>createCsvExportPlan({tenantId:'tenant_2',exportId:'export_1',schema,records:[]}),{code:'tenant_mismatch'});
  assert.throws(()=>createCsvExportPlan({tenantId:'tenant_1',exportId:'export_1',schema,fields:['secret'],records:[]}),{code:'export_fields_invalid'});
  assert.throws(()=>createCsvExportPlan({tenantId:'tenant_1',exportId:'export_1',schema,records:[{id:'v1',name:'bad'}]}),{code:'export_record_invalid'});
+});
+
+
+test('CSV import parser handles quoting, CRLF, BOM, schema allowlists and bounded dry-run validation',()=>{
+ const csv='\uFEFFid,name,vin,price,active\r\nv1,"Truck, ""Blue""",VIN-1,12,true\r\nv2,Van,VIN-2,not-a-number,false\r\n';
+ const parsed=parseCsvImport({tenantId:'tenant_1',importId:'import_1',schema,csv});
+ assert.equal(parsed.rowCount,2);
+ assert.equal(parsed.records[0].name,'Truck, "Blue"');
+ assert.equal(parsed.records[0].price,12);
+ assert.equal(parsed.records[0].active,true);
+ const plan=createCsvImportPlan({tenantId:'tenant_1',importId:'import_1',schema,csv});
+ assert.equal(plan.dryRun,true);
+ assert.equal(plan.invalidRows,1);
+ assert.throws(()=>parseCsvImport({tenantId:'tenant_2',importId:'import_1',schema,csv}),{code:'tenant_mismatch'});
+ assert.throws(()=>parseCsvImport({tenantId:'tenant_1',importId:'import_1',schema,csv:'id,id\\r\\nv1,v1'}),{code:'csv_headers_invalid'});
+ assert.throws(()=>parseCsvImport({tenantId:'tenant_1',importId:'import_1',schema,csv:'id,unknown\\r\\nv1,x'}),{code:'csv_headers_invalid'});
+ assert.throws(()=>parseCsvImport({tenantId:'tenant_1',importId:'import_1',schema,csv:'id,name\\r\\n"v1,broken'}),{code:'csv_malformed'});
+ assert.throws(()=>parseCsvImport({tenantId:'tenant_1',importId:'import_1',schema,csv,maxBytes:4}),{code:'csv_too_large'});
 });
