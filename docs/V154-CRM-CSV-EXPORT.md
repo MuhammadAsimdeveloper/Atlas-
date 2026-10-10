@@ -1,23 +1,21 @@
-# V154 — CRM CSV Export Safety Slice
+# V154 — CRM CSV Import/Export Safety Slice
 
 ## Scope delivered
 
-This slice adds `createCsvExportPlan` to the existing customer-lifecycle domain module.
+The customer-lifecycle module now exposes bounded CSV import and export primitives.
 
-- Requires the export tenant to match the schema tenant.
-- Allows only schema-declared fields and rejects duplicate/empty field selections.
-- Validates every row against the schema before generating output.
-- Uses RFC-style quoted CSV cells, doubles embedded quotes, and emits CRLF row endings.
-- Prefixes potentially executable spreadsheet formula text with an apostrophe.
-- Produces a deterministic SHA-256 artifact hash and explicit CSV content type.
-- Adds regression tests for formula injection, escaping, invalid rows, invalid fields, and tenant mismatch.
+- `createCsvExportPlan` requires tenant/schema consistency, allows only schema-declared fields, validates every record, escapes CSV quotes, emits CRLF rows, protects formula-leading text (including leading whitespace and tab), and returns a deterministic artifact hash.
+- `parseCsvImport` handles a UTF-8 BOM, quoted cells, escaped quotes, commas inside quotes, CRLF/LF rows, and embedded newlines inside quoted cells.
+- CSV import has configurable byte and row limits, unique schema-field header allowlisting, strict column counts, tenant/schema checks, and field-type coercion for numbers and booleans.
+- `createCsvImportPlan` is dry-run only and returns validated/invalid row counts and a deterministic plan hash. It does not persist or mutate CRM records.
+- Regression tests cover quoting, formula injection, CRLF, invalid headers, malformed quotes, tenant mismatch, limits, and dry-run validation.
 
 ## Trust boundary
 
-This is a pure formatting/validation primitive, not an authenticated export endpoint. The API must authorize the actor, query records with tenant-scoped persistence/RLS, apply export permissions and PII policy, and audit the export before invoking it. A caller-supplied tenant ID is not authorization evidence. Large exports should later move to bounded streaming/object storage rather than returning a large in-memory string.
+These are pure domain primitives, not authenticated endpoints. API callers must authorize the actor, query records with tenant-scoped persistence/RLS, enforce export/import permissions and PII policy, and append an audit event. A caller-supplied tenant ID is not authorization evidence. Import commit must be a separate idempotent command with duplicate policy, optimistic concurrency, audit history and rollback/recovery behavior. Large exports should use bounded streaming/object storage.
 
 ## Verification status
 
-- Regression tests added in `packages/atlas-customer-lifecycle/index.test.mjs`.
-- CI and local Node test execution have not been run from this GitHub editing session; merge only after repository CI passes.
-- This does not complete GHL CRM parity: CSV import/API wiring, saved views, bulk operations, merge approval, custom-object API integration, and the full activity timeline remain open.
+- Regression tests have been added, but the full suite has not yet passed on this branch.
+- The initial PR CI run failed 20 tests. Eight PostgreSQL-related tests were blocked by a syntax error in the existing `infra/postgres/FINAL-MIGRATION-V156.sql`; other failures included pre-existing customer-lifecycle and transactional tests. The log must be reviewed against a fresh CI run before merge.
+- This is not full GHL CRM parity: authenticated API/UI wiring, persistent import commit, saved views, bulk operations, merge approval, custom-object API integration, and the full activity timeline remain open.
