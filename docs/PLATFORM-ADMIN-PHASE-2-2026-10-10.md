@@ -8,7 +8,8 @@ Date: 2026-10-10
 - Added narrow SECURITY DEFINER read functions with fixed search paths. Direct table grants are not given to the API role; the functions clamp list sizes and return only the queue data.
 - Added owner-authorized API reads for `/api/v1/platform-admin/content` and `/api/v1/platform-admin/notifications`, with allow-listed status filters and bounded limits.
 - Replaced placeholder admin screens with queue tables showing status, timestamps, workspace association, reasons, attempts and error state.
-- Added API tests for function-based reads and invalid status rejection.
+- Added API tests for function-based reads, invalid status rejection, and UUID-validated notification attempt history.
+- Extended the PostgreSQL migration test to include V157 and assert the new RLS tables and SECURITY DEFINER read function. CI exposed and fixed invalid dollar-quote delimiters and the stale V156-only migration assertion.
 - Financial views remain fail-closed. User account mutations, content decisions, notification sending/retries and bulk actions remain disabled.
 
 ## Safety decisions
@@ -20,4 +21,4 @@ Date: 2026-10-10
 
 ## Verification
 
-The API tests were extended. GitHub Actions must pass for the current branch head before treating this phase as CI-verified. The next phase is audited transactional moderation decisions, then the provider-backed notification queue and delivery worker, followed by launch/security gates.
+The API and PostgreSQL migration tests were extended. The first CI run failed because the test suite hard-coded V156 as the final migration and V157 function dollar-quoting was malformed; both were fixed in subsequent commits. GitHub Actions must pass for the current branch head before treating this phase as CI-verified. The next phase is audited transactional moderation decisions, then the provider-backed notification queue and delivery worker, followed by launch/security gates.
