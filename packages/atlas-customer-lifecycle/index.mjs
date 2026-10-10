@@ -204,7 +204,7 @@ function csvCell(value) {
   let text = value === null || value === undefined ? '' :
     typeof value === 'object' ? JSON.stringify(value) : String(value);
   // Spreadsheet formula injection protection applies to text values only.
-  if (typeof value === 'string' && /^[=+@\\t\\r-]/.test(text)) text = "'" + text;
+  if (typeof value === 'string' && /^(?:\\s*[=+@-]|[\\t\\r])/.test(text)) text = "'" + text;
   return '"' + text.replace(/"/g, '""') + '"';
 }
 
