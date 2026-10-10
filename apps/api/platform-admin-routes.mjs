@@ -3,6 +3,16 @@ import { resolveAtlasAuthority, requireAtlasPlatformOwner } from '../../packages
 import { securityHeaders, enforceRateLimit } from './security.mjs';
 
 const LIMIT = 100;
+async function readJsonBody(req, maxBytes = 8192) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  let raw = '';
+  for await (const chunk of req) {
+    raw += chunk.toString('utf8');
+    if (Buffer.byteLength(raw) > maxBytes) throw createAuthError(413, 'request_body_too_large');
+  }
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch { throw createAuthError(400, 'invalid_json'); }
+}
 function send(res, status, body, env) {
   res.writeHead(status, { ...securityHeaders(env), 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(body));
@@ -35,6 +45,31 @@ export function createPlatformAdminApi({ pool, authStore, env = process.env } = 
         if (!isAllowedOrigin(req, env)) throw createAuthError(403, 'origin_not_allowed');
         const { session } = await identity(req);
         if (!(await verifyCsrf(req, session, env))) throw createAuthError(403, 'csrf_check_failed');
+        const transitionMatch = req.method === 'POST' && url.pathname.match(/^\\/api\\/v1\\/platform-admin\\/content\\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\/transition$/i);
+        if (transitionMatch) {
+          const body = await readJsonBody(req);
+          const action = body.action;
+          const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+          const assignedTo = typeof body.assignedTo === 'string' ? body.assignedTo.trim() : null;
+          const expectedVersion = Number(body.expectedVersion);
+          if (!['assigned','marked_in_review'].includes(action)) return send(res, 400, { error: 'unsupported_moderation_transition' }, env);
+          if (reason.length < 8 || Buffer.byteLength(reason) > 2000) return send(res, 400, { error: 'invalid_moderation_reason' }, env);
+          if (!Number.isInteger(expectedVersion) || expectedVersion < 1) return send(res, 400, { error: 'expected_version_required' }, env);
+          if (action === 'assigned' && (!assignedTo || assignedTo.length > 254)) return send(res, 400, { error: 'assignee_required' }, env);
+          const requestId = typeof req.headers['x-request-id'] === 'string' && req.headers['x-request-id'].length <= 128 ? req.headers['x-request-id'] : null;
+          try {
+            const { rows } = await pool.query(
+              'SELECT * FROM atlas_v158_admin_transition_content_report($1,$2,$3,$4,$5,$6,$7)',
+              [transitionMatch[1], session.user.id, action, reason, assignedTo, expectedVersion, requestId]
+            );
+            return send(res, 200, { data: rows[0], status: 'updated', enforcement: 'disabled_until_content_adapter_exists' }, env);
+          } catch (error) {
+            if (error.code === 'P0002') return send(res, 404, { error: 'content_report_not_found' }, env);
+            if (error.code === '40001') return send(res, 409, { error: 'content_report_version_conflict' }, env);
+            if (error.code === '22023') return send(res, 400, { error: error.message }, env);
+            throw error;
+          }
+        }
         return send(res, 405, { error: 'admin_mutations_not_enabled' }, env);
       }
       await enforceRateLimit({ req, store: authStore, secret: env.ATLAS_SESSION_SECRET, env, route: 'platform-admin.read', limit: 90, windowSeconds: 60 });
