@@ -45,7 +45,7 @@ export function createPlatformAdminApi({ pool, authStore, env = process.env } = 
         if (!isAllowedOrigin(req, env)) throw createAuthError(403, 'origin_not_allowed');
         const { session } = await identity(req);
         if (!(await verifyCsrf(req, session, env))) throw createAuthError(403, 'csrf_check_failed');
-        const transitionMatch = req.method === 'POST' && url.pathname.match(/^\\/api\\/v1\\/platform-admin\\/content\\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\/transition$/i);
+        const transitionMatch = req.method === 'POST' && url.pathname.match(/^\/api\/v1\/platform-admin\/content\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/transition$/i);
         if (transitionMatch) {
           const body = await readJsonBody(req);
           const action = body.action;
