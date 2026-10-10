@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-const ID=/^[a-z][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*$/;
+const ID=/^[A-Za-z][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*$/;
 const REF=/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,180}$/;
 const CURRENCIES=new Set(['USD']);
 const PRODUCT_TYPES=new Set(['physical','digital','service']);
@@ -128,16 +128,21 @@ export function reserveInventory({state,lines,reservationId,ttlSeconds=900}={}){
 }
 
 export function commitInventoryReservation({state,reservation}={}){
-  if(!reservation||reservation.nextState?.tenantId!==state?.tenantId)throw new Error('reservation mismatch');
+  if(!state||!Array.isArray(state.items)||!reservation||reservation.nextState?.tenantId!==state.tenantId)throw new Error('reservation mismatch');
   if(Date.parse(reservation.expiresAt)<=Date.now())throw new Error('reservation expired');
+  const currentHash=hash(state.items);
+  const fromReserved=currentHash===reservation.reservedStateHash;
+  if(!fromReserved&&currentHash!==reservation.baseStateHash)throw new Error('inventory state changed since reservation');
   const qty=new Map(reservation.lines.map(x=>[x.variantId,x.quantity]));
-  const items=state.items.map(item=>{const q=qty.get(item.variantId)||0;return q?{...item,onHand:item.onHand-q,reserved:item.reserved-q}:item;});
+  for(const variantId of qty.keys())if(!state.items.some(item=>item.variantId===variantId))throw new Error('reservation inventory item missing');
+  const items=state.items.map(item=>{const q=qty.get(item.variantId)||0;if(!q)return item;return fromReserved?{...item,onHand:item.onHand-q,reserved:item.reserved-q}:{...item,onHand:item.onHand-q};});
   if(items.some(i=>i.onHand<0||i.reserved<0||i.reserved>i.onHand))throw new Error('inventory invariant violated');
   return freeze({tenantId:state.tenantId,reservationId:reservation.reservationId,committedState:freeze({tenantId:state.tenantId,items,stateHash:hash(items)})});
 }
 
 export function releaseInventoryReservation({state,reservation}={}){
-  if(!reservation||reservation.nextState?.tenantId!==state?.tenantId)throw new Error('reservation mismatch');
+  if(!state||!reservation||reservation.nextState?.tenantId!==state.tenantId)throw new Error('reservation mismatch');
+  if(hash(state.items)!==reservation.reservedStateHash)throw new Error('inventory state changed since reservation');
   const qty=new Map(reservation.lines.map(x=>[x.variantId,x.quantity]));
   const items=state.items.map(item=>{const q=qty.get(item.variantId)||0;const next=item.reserved-q;if(next<0)throw new Error('release exceeds reserved');return q?{...item,reserved:next}:item;});
   return freeze({tenantId:state.tenantId,reservationId:reservation.reservationId,releasedState:freeze({tenantId:state.tenantId,items,stateHash:hash(items)})});
@@ -191,8 +196,8 @@ export function applyPaymentEvent({paymentState,event}={}){
     authorized:['captured','failed'],captured:['partially_refunded','refunded'],partially_refunded:['partially_refunded','refunded'],
     failed:[],refunded:[]
   };
-  if(!legal[paymentState.status]?.includes(event.status))throw Object.assign(new Error('payment transition invalid'),{code:'invalid_transition'});
   if((event.status==='captured'||event.status==='refunded'||event.status==='partially_refunded')&&event.amountMinor>paymentState.amountMinor)throw new Error('payment amount exceeds original');
+  if(!legal[paymentState.status]?.includes(event.status))throw Object.assign(new Error('payment transition invalid'),{code:'invalid_transition'});
   return freeze({...clone(paymentState),status:event.status,lastEventId:event.eventId,lastEventHash:event.payloadHash,version:(paymentState.version||1)+1});
 }
 
@@ -214,6 +219,7 @@ export function transitionSubscription({subscription,to,expectedVersion=subscrip
 
 export function createRefundRequest({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,capturedMinor=null,alreadyRefundedMinor=0,requiresApprovalAboveMinor=100000,approval=null}={}){
   assertRef(tenantId,'tenantId');assertRef(refundId,'refundId');assertRef(paymentId,'paymentId');positiveMoney(amountMinor,'amountMinor');text(reason,'reason',500);idem(idempotencyKey);money(requiresApprovalAboveMinor,'requiresApprovalAboveMinor');
+  if(capturedMinor!==null){money(capturedMinor,'capturedMinor');money(alreadyRefundedMinor,'alreadyRefundedMinor');if(amountMinor+alreadyRefundedMinor>capturedMinor)throw new Error('refund exceeds refundable balance');}
   const approvalRequired=amountMinor>requiresApprovalAboveMinor;if(approvalRequired&&approval?.status!=='approved')return freeze({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,status:'needs_approval',approvalRequired:true});
   return freeze({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey,status:'approved',approvalRequired:false,refundHash:hash({tenantId,refundId,paymentId,amountMinor,reason,idempotencyKey})});
 }
