@@ -64,7 +64,20 @@ export function createPlatformAdminApi({ pool, authStore, env = process.env } = 
         const { rows } = await pool.query(`SELECT date_trunc('day', created_at)::date AS day, count(*)::int AS events FROM atlas_auth_audit_events WHERE created_at >= now() - interval '30 days' GROUP BY 1 ORDER BY 1`);
         return send(res, 200, { data: rows }, env);
       }
-      if (path === 'content' || path === 'notifications') return send(res, 200, { data: [], status: 'not_configured', message: 'This module requires its versioned persistence schema and audited mutation workflow before it can be enabled.' }, env);
+      if (path === 'content') {
+        const status = url.searchParams.get('status');
+        if (status && !['open','in_review','actioned','dismissed','appealed'].includes(status)) return send(res, 400, { error: 'invalid_content_status' }, env);
+        const limit = boundedLimit(url.searchParams.get('limit'));
+        const { rows } = await pool.query('SELECT * FROM atlas_v157_admin_list_content_reports($1,$2)', [status || null, limit]);
+        return send(res, 200, { data: rows, limit, status: 'available', mutations: 'disabled_pending_audited_workflow' }, env);
+      }
+      if (path === 'notifications') {
+        const status = url.searchParams.get('status');
+        if (status && !['draft','queued','sending','sent','partial','failed','cancelled'].includes(status)) return send(res, 400, { error: 'invalid_notification_status' }, env);
+        const limit = boundedLimit(url.searchParams.get('limit'));
+        const { rows } = await pool.query('SELECT * FROM atlas_v157_admin_list_notifications($1,$2)', [status || null, limit]);
+        return send(res, 200, { data: rows, limit, status: 'available', delivery: 'provider_worker_not_connected' }, env);
+      }
       return send(res, 404, { error: 'not_found' }, env);
     } catch (error) {
       const status = Number.isInteger(error?.status) ? error.status : 500;
