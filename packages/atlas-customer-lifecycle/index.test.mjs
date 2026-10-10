@@ -77,12 +77,18 @@ test('CSV export is schema-bound, deterministic, and resists spreadsheet formula
   tenantId:'tenant_1',exportId:'export_1',schema,
   fields:['id','name','vin'],records:[
    {id:'v1',name:'=HYPERLINK("https://evil.example")',vin:'VIN-1'},
-   {id:'v2',name:'Truck, "Blue"',vin:'VIN-2'}
+   {id:'v2',name:'Truck, "Blue"',vin:'VIN-2'},
+   {id:'v3',name:'  =SUM(1,1)',vin:'VIN-3'},
+   {id:'v4',name:'	=SUM(1,1)',vin:'VIN-4'}
   ]
  });
  assert.equal(exportPlan.rowCount,2);
  assert.equal(exportPlan.contentType,'text/csv; charset=utf-8');
  assert.match(exportPlan.csv,/'=HYPERLINK/);
+ assert.match(exportPlan.csv,/"'  =SUM\(1,1\)"/);
+ assert.match(exportPlan.csv,/"'	=SUM\(1,1\)"/);
+ assert.ok(exportPlan.csv.endsWith('\r\n'));
+ assert.equal((exportPlan.csv.match(/\r\n/g)||[]).length,5);
  assert.match(exportPlan.csv,/"Truck, ""Blue"""/);
  assert.match(exportPlan.artifactHash,/^[a-f0-9]{64}$/);
  assert.throws(()=>createCsvExportPlan({tenantId:'tenant_2',exportId:'export_1',schema,records:[]}),{code:'tenant_mismatch'});
