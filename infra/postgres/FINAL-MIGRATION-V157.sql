@@ -81,26 +81,26 @@ ALTER TABLE atlas_platform_notification_attempts ENABLE ROW LEVEL SECURITY;
 -- provide a narrow API surface; do not grant direct SELECT/INSERT/UPDATE to atlas_app.
 CREATE OR REPLACE FUNCTION atlas_v157_admin_list_content_reports(p_status TEXT DEFAULT NULL, p_limit INTEGER DEFAULT 25)
 RETURNS SETOF atlas_platform_content_reports
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $func$
   SELECT r.* FROM public.atlas_platform_content_reports r
   WHERE p_status IS NULL OR r.status = p_status
   ORDER BY r.created_at DESC LIMIT LEAST(GREATEST(COALESCE(p_limit,25),1),100)
-$;
+$func$;
 
 CREATE OR REPLACE FUNCTION atlas_v157_admin_list_notifications(p_status TEXT DEFAULT NULL, p_limit INTEGER DEFAULT 25)
 RETURNS SETOF atlas_platform_notifications
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $func$
   SELECT n.* FROM public.atlas_platform_notifications n
   WHERE p_status IS NULL OR n.status = p_status
   ORDER BY n.created_at DESC LIMIT LEAST(GREATEST(COALESCE(p_limit,25),1),100)
-$;
+$func$;
 
 CREATE OR REPLACE FUNCTION atlas_v157_admin_notification_attempts(p_notification_id UUID)
 RETURNS SETOF atlas_platform_notification_attempts
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $func$
   SELECT a.* FROM public.atlas_platform_notification_attempts a
   WHERE a.notification_id = p_notification_id ORDER BY a.started_at DESC LIMIT 50
-$;
+$func$;
 
 REVOKE ALL ON FUNCTION atlas_v157_admin_list_content_reports(TEXT,INTEGER) FROM PUBLIC;
 REVOKE ALL ON FUNCTION atlas_v157_admin_list_notifications(TEXT,INTEGER) FROM PUBLIC;
