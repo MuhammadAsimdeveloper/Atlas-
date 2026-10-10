@@ -198,3 +198,48 @@ export const CUSTOMER_LIFECYCLE_CAPABILITIES=Object.freeze([
  'marketing.campaigns','marketing.sequences','marketing.segmentation','marketing.attribution','marketing.utm','marketing.conversion_tracking',
  'marketing.social_publishing','marketing.reputation','marketing.ads','marketing.forms_surveys','learning.courses_memberships_community'
 ]);
+
+
+function csvCell(value) {
+  let text = value === null || value === undefined ? '' :
+    typeof value === 'object' ? JSON.stringify(value) : String(value);
+  // Spreadsheet formula injection protection applies to text values only.
+  if (typeof value === 'string' && /^[=+@\\t\\r-]/.test(text)) text = "'" + text;
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+
+/**
+ * Build a deterministic, tenant-labelled CSV export artifact from already-authorized
+ * records. Authorization and tenant-scoped record retrieval must happen before calling
+ * this pure formatter; the caller's tenant ID is never treated as proof of access.
+ */
+export function createCsvExportPlan({ tenantId, exportId, schema, records = [], fields = null } = {}) {
+  assertTenant(tenantId);
+  assertRef(exportId, 'exportId');
+  if (!schema || typeof schema !== 'object' || schema.tenantId !== tenantId) {
+    throw Object.assign(new Error('schema tenant mismatch'), { code: 'tenant_mismatch' });
+  }
+  boundedArray(records, 'records', 100000);
+  const allowed = new Set(schema.properties.map(p => p.key));
+  const selected = fields === null ? schema.properties.map(p => p.key) : fields;
+  boundedArray(selected, 'fields', 200);
+  if (selected.length === 0 || new Set(selected).size !== selected.length ||
+      selected.some(field => typeof field !== 'string' || !allowed.has(field))) {
+    throw Object.assign(new Error('export fields invalid'), { code: 'export_fields_invalid' });
+  }
+  const rows = records.map((record, index) => {
+    const validation = validateRecord({ schema, record });
+    if (!validation.valid) {
+      throw Object.assign(new Error('export record validation failed'), {
+        code: 'export_record_invalid', row: index + 1, errors: validation.errors
+      });
+    }
+    return selected.map(field => csvCell(record[field])).join(',');
+  });
+  const csv = [selected.map(csvCell).join(','), ...rows].join('\\r\\n') + '\\r\\n';
+  return Object.freeze({
+    tenantId, exportId, rowCount: records.length, fields: [...selected],
+    contentType: 'text/csv; charset=utf-8', csv,
+    artifactHash: hash({ tenantId, exportId, fields: selected, csv })
+  });
+}
