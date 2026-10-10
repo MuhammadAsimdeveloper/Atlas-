@@ -286,9 +286,19 @@ export function parseCsvImport({tenantId,importId,schema,csv,maxBytes=5_000_000,
      headers.some(h=>!allowed.has(h))){
     throw Object.assign(new Error('CSV headers must be unique schema fields'),{code:'csv_headers_invalid'});
   }
+  const propertyByKey=new Map(schema.properties.map(p=>[p.key,p]));
   const records=rows.map((values,index)=>{
     if(values.length!==headers.length)throw Object.assign(new Error('CSV column count mismatch'),{code:'csv_column_count',row:index+2,expected:headers.length,actual:values.length});
-    return Object.fromEntries(headers.map((header,i)=>[header,values[i]]));
+    const record={};
+    headers.forEach((header,i)=>{
+      const raw=values[i];if(raw==='')return;
+      const property=propertyByKey.get(header);let value=raw;
+      if(property.type==='number'&&raw.trim()!==''&&Number.isFinite(Number(raw)))value=Number(raw);
+      else if(property.type==='boolean'&&/^(true|false)$/i.test(raw))value=raw.toLowerCase()==='true';
+      else if(property.type==='json'){try{value=JSON.parse(raw);}catch{/* invalid JSON remains invalid for the domain validator */}}
+      record[header]=value;
+    });
+    return record;
   });
   return Object.freeze({tenantId,importId,headers,records,rowCount:records.length,
     schemaHash:schema.schemaHash,contentHash:hash({tenantId,importId,headers,records})});
