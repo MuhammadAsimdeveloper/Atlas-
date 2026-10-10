@@ -204,7 +204,7 @@ function csvCell(value) {
   let text = value === null || value === undefined ? '' :
     typeof value === 'object' ? JSON.stringify(value) : String(value);
   // Spreadsheet formula injection protection applies to text values only.
-  if (typeof value === 'string' && /^(?:\\s*[=+@-]|[\\t\\r])/.test(text)) text = "'" + text;
+  if (typeof value === 'string' && /^(?:\s*[=+@-]|[\t\r])/.test(text)) text = "'" + text;
   return '"' + text.replace(/"/g, '""') + '"';
 }
 
@@ -236,7 +236,7 @@ export function createCsvExportPlan({ tenantId, exportId, schema, records = [], 
     }
     return selected.map(field => csvCell(record[field])).join(',');
   });
-  const csv = [selected.map(csvCell).join(','), ...rows].join('\\r\\n') + '\\r\\n';
+  const csv = [selected.map(csvCell).join(','), ...rows].join('\r\n') + '\r\n';
   return Object.freeze({
     tenantId, exportId, rowCount: records.length, fields: [...selected],
     contentType: 'text/csv; charset=utf-8', csv,
