@@ -46,7 +46,7 @@ export function createPlatformAdminApi({ pool, authStore, env = process.env } = 
           pool.query('SELECT count(*)::int AS total FROM atlas_organizations'),
           pool.query('SELECT count(*)::int AS total FROM atlas_auth_audit_events WHERE created_at >= now() - interval \'24 hours\'')
         ]);
-        return send(res, 200, { data: { users: users.rows[0], workspaces: workspaces.rows[0], audit24h: audit.rows[0].total, payments: { status: 'unavailable', reason: 'tenant_rls_read_model_required' }, sections: { content: 'not_configured', notifications: 'not_configured' } } }, env);
+        return send(res, 200, { data: { users: users.rows[0], workspaces: workspaces.rows[0], audit24h: audit.rows[0].total, payments: { status: 'unavailable', reason: 'tenant_rls_read_model_required' }, sections: { content: 'available_read_only', notifications: 'available_read_only' } } }, env);
       }
       if (path === 'users') {
         const q = (url.searchParams.get('q') || '').trim().slice(0, 100);
@@ -70,6 +70,12 @@ export function createPlatformAdminApi({ pool, authStore, env = process.env } = 
         const limit = boundedLimit(url.searchParams.get('limit'));
         const { rows } = await pool.query('SELECT * FROM atlas_v157_admin_list_content_reports($1,$2)', [status || null, limit]);
         return send(res, 200, { data: rows, limit, status: 'available', mutations: 'disabled_pending_audited_workflow' }, env);
+      }
+      if (path.startsWith('notifications/') && path.endsWith('/attempts')) {
+        const notificationId = path.slice('notifications/'.length, -'/attempts'.length);
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(notificationId)) return send(res, 400, { error: 'invalid_notification_id' }, env);
+        const { rows } = await pool.query('SELECT * FROM atlas_v157_admin_notification_attempts($1)', [notificationId]);
+        return send(res, 200, { data: rows, notificationId, status: 'available' }, env);
       }
       if (path === 'notifications') {
         const status = url.searchParams.get('status');
