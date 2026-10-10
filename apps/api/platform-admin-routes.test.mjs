@@ -34,7 +34,7 @@ test('platform admin overview requires the configured verified platform owner', 
   assert.equal(h.res.status,200);
   const body=JSON.parse(h.res.body);
   assert.equal(body.data.users.total,10);
-  assert.equal(body.data.payments.failed,2);
+  assert.equal(body.data.payments.status,'unavailable');
   assert.equal(h.res.headers['cache-control'],'no-store');
 });
 
@@ -53,4 +53,13 @@ test('unknown platform admin paths do not execute SQL', async()=>{
   await h.api.handle(h.req,h.res);
   assert.equal(h.res.status,404);
   assert.equal(h.calls.length,0);
+});
+
+test('cross-tenant payment ledger stays unavailable until an RLS-safe read model exists',async()=>{
+ const h=harness();
+ h.req.url='/api/v1/platform-admin/payments';
+ await h.api.handle(h.req,h.res);
+ assert.equal(h.res.status,503);
+ assert.equal(JSON.parse(h.res.body).error,'platform_finance_read_model_required');
+ assert.equal(h.calls.length,0);
 });
