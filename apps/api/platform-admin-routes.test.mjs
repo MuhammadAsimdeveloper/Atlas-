@@ -63,3 +63,35 @@ test('cross-tenant payment ledger stays unavailable until an RLS-safe read model
  assert.equal(JSON.parse(h.res.body).error,'platform_finance_read_model_required');
  assert.equal(h.calls.length,0);
 });
+
+test('content moderation queue uses the narrow versioned read function', async()=>{
+ const h=harness();
+ h.req.url='/api/v1/platform-admin/content?status=open&limit=10';
+ await h.api.handle(h.req,h.res);
+ assert.equal(h.res.status,200);
+ assert.equal(JSON.parse(h.res.body).status,'available');
+ const query=h.calls.find(c=>c.sql.includes('atlas_v157_admin_list_content_reports'));
+ assert.ok(query);
+ assert.deepEqual(query.params,['open',10]);
+});
+
+test('notification center uses the narrow versioned read function', async()=>{
+ const h=harness();
+ h.req.url='/api/v1/platform-admin/notifications?status=failed&limit=7';
+ await h.api.handle(h.req,h.res);
+ assert.equal(h.res.status,200);
+ assert.equal(JSON.parse(h.res.body).delivery,'provider_worker_not_connected');
+ const query=h.calls.find(c=>c.sql.includes('atlas_v157_admin_list_notifications'));
+ assert.ok(query);
+ assert.deepEqual(query.params,['failed',7]);
+});
+
+test('moderation and notification filters reject unknown states before querying', async()=>{
+ for (const path of ['/api/v1/platform-admin/content?status=delete-all','/api/v1/platform-admin/notifications?status=delivered']) {
+  const h=harness();
+  h.req.url=path;
+  await h.api.handle(h.req,h.res);
+  assert.equal(h.res.status,400);
+  assert.equal(h.calls.length,0);
+ }
+});
